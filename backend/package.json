@@ -14,7 +14,7 @@
     "test:watch": "jest --watch",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "prepare": "husky install"
+    "prepare": "node prepare.js"
   },
   "keywords": [
     "fitness",
@@ -64,12 +64,6 @@
     "rules": {
       "no-console": "off",
       "no-underscore-dangle": "off"
-    }
-  },
-  "husky": {
-    "hooks": {
-      "pre-commit": "npm run lint",
-      "pre-push": "npm test"
     }
   }
 }
