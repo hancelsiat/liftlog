@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="16" failures="0" errors="0" time="8.132">
+  <testsuite name="Workout Routes" errors="0" failures="0" skipped="0" timestamp="2025-11-07T10:32:39" time="6.373" tests="10">
+    <testcase classname="Workout Routes POST /api/workouts should create a new workout for a member" name="Workout Routes POST /api/workouts should create a new workout for a member" time="0.704">
+    </testcase>
+    <testcase classname="Workout Routes POST /api/workouts should not allow unauthorized users to create workouts" name="Workout Routes POST /api/workouts should not allow unauthorized users to create workouts" time="0.479">
+    </testcase>
+    <testcase classname="Workout Routes GET /api/workouts should retrieve member&apos;s own workouts" name="Workout Routes GET /api/workouts should retrieve member&apos;s own workouts" time="0.484">
+    </testcase>
+    <testcase classname="Workout Routes GET /api/workouts should filter workouts by date range" name="Workout Routes GET /api/workouts should filter workouts by date range" time="0.469">
+    </testcase>
+    <testcase classname="Workout Routes GET /api/workouts/:id should retrieve a specific workout" name="Workout Routes GET /api/workouts/:id should retrieve a specific workout" time="0.436">
+    </testcase>
+    <testcase classname="Workout Routes GET /api/workouts/:id should allow trainer to view member&apos;s workout" name="Workout Routes GET /api/workouts/:id should allow trainer to view member&apos;s workout" time="0.521">
+    </testcase>
+    <testcase classname="Workout Routes PATCH /api/workouts/:id should update a member&apos;s own workout" name="Workout Routes PATCH /api/workouts/:id should update a member&apos;s own workout" time="0.498">
+    </testcase>
+    <testcase classname="Workout Routes PATCH /api/workouts/:id should allow trainer to update member&apos;s workout" name="Workout Routes PATCH /api/workouts/:id should allow trainer to update member&apos;s workout" time="0.453">
+    </testcase>
+    <testcase classname="Workout Routes DELETE /api/workouts/:id should delete a member&apos;s own workout" name="Workout Routes DELETE /api/workouts/:id should delete a member&apos;s own workout" time="0.411">
+    </testcase>
+    <testcase classname="Workout Routes DELETE /api/workouts/:id should allow trainer to delete member&apos;s workout" name="Workout Routes DELETE /api/workouts/:id should allow trainer to delete member&apos;s workout" time="0.456">
+    </testcase>
+  </testsuite>
+  <testsuite name="Authentication Routes" errors="0" failures="0" skipped="0" timestamp="2025-11-07T10:32:45" time="1.598" tests="6">
+    <testcase classname="Authentication Routes POST /api/auth/register should register a new user" name="Authentication Routes POST /api/auth/register should register a new user" time="0.309">
+    </testcase>
+    <testcase classname="Authentication Routes POST /api/auth/register should not register a user with existing email" name="Authentication Routes POST /api/auth/register should not register a user with existing email" time="0.13">
+    </testcase>
+    <testcase classname="Authentication Routes POST /api/auth/login should login with valid credentials" name="Authentication Routes POST /api/auth/login should login with valid credentials" time="0.187">
+    </testcase>
+    <testcase classname="Authentication Routes POST /api/auth/login should not login with invalid credentials" name="Authentication Routes POST /api/auth/login should not login with invalid credentials" time="0.255">
+    </testcase>
+    <testcase classname="Authentication Routes GET /api/auth/profile should retrieve user profile for authenticated user" name="Authentication Routes GET /api/auth/profile should retrieve user profile for authenticated user" time="0.295">
+    </testcase>
+    <testcase classname="Authentication Routes GET /api/auth/profile should not allow access without authentication" name="Authentication Routes GET /api/auth/profile should not allow access without authentication" time="0.166">
+    </testcase>
+  </testsuite>
+</testsuites>
