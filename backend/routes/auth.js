@@ -182,20 +182,37 @@ router.patch('/users/:userId',
       const { userId } = req.params;
       const updates = req.body;
 
-      // Prevent password updates through this endpoint
-      delete updates.password;
-
-      const user = await User.findByIdAndUpdate(
-        userId,
-        updates,
-        { new: true, runValidators: true }
-      ).select('-password');
+      // Allow password updates for admin
+      const user = await User.findById(userId);
 
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      res.json(user);
+      // If password is being updated, hash it
+      if (updates.password) {
+        user.password = updates.password;
+        await user.save();
+        delete updates.password; // Remove from updates to avoid double processing
+      }
+
+      // Update other fields
+      Object.keys(updates).forEach(key => {
+        if (key !== 'password') {
+          user[key] = updates[key];
+        }
+      });
+
+      await user.save();
+
+      res.json({
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        profile: user.profile,
+        membershipExpiration: user.membershipExpiration
+      });
     } catch (error) {
       res.status(400).json({ error: error.message });
     }

@@ -110,9 +110,11 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   void _showEditUserDialog(User user) {
     final usernameController = TextEditingController(text: user.username);
     final emailController = TextEditingController(text: user.email);
+    final passwordController = TextEditingController();
     final firstNameController = TextEditingController(text: user.profile?.firstName ?? '');
     final lastNameController = TextEditingController(text: user.profile?.lastName ?? '');
     UserRole selectedRole = user.role;
+    bool changePassword = false;
 
     showDialog(
       context: context,
@@ -154,6 +156,24 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                     }
                   },
                 ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    const Text('Change Password'),
+                    Switch(
+                      value: changePassword,
+                      onChanged: (value) {
+                        setState(() => changePassword = value);
+                      },
+                    ),
+                  ],
+                ),
+                if (changePassword)
+                  TextField(
+                    controller: passwordController,
+                    decoration: const InputDecoration(labelText: 'New Password'),
+                    obscureText: true,
+                  ),
               ],
             ),
           ),
@@ -173,6 +193,10 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   },
                   'role': selectedRole.name,
                 };
+
+                if (changePassword && passwordController.text.isNotEmpty) {
+                  updates['password'] = passwordController.text;
+                }
 
                 await _updateUser(user, updates);
                 Navigator.of(context).pop();
