@@ -9,6 +9,7 @@ import 'training_videos_screen.dart';
 import 'video_upload_screen.dart';
 import 'trainer_videos_screen.dart';
 import 'settings_screen.dart';
+import 'user_management_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -177,9 +178,9 @@ class DashboardScreen extends StatelessWidget {
           title: 'User Management',
           icon: Icons.people,
           onTap: () {
-            // TODO: Implement user management
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('User management coming soon')),
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const UserManagementScreen()),
             );
           },
         ),

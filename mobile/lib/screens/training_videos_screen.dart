@@ -25,7 +25,7 @@ class _TrainingVideosScreenState extends State<TrainingVideosScreen> {
     try {
       final apiService = ApiService();
       final videos = await apiService.getExerciseVideos();
-      
+
       setState(() {
         _videos = videos;
         _isLoading = false;
@@ -34,6 +34,16 @@ class _TrainingVideosScreenState extends State<TrainingVideosScreen> {
       setState(() {
         _error = e.toString();
         _isLoading = false;
+      });
+    }
+  }
+
+  void _filterVideos(String exerciseType) {
+    if (exerciseType == 'all') {
+      _fetchVideos();
+    } else {
+      setState(() {
+        _videos = _videos.where((video) => video.exerciseType == exerciseType).toList();
       });
     }
   }
@@ -54,6 +64,45 @@ class _TrainingVideosScreenState extends State<TrainingVideosScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Training Videos'),
+        actions: [
+          PopupMenuButton<String>(
+            onSelected: _filterVideos,
+            itemBuilder: (BuildContext context) => [
+              const PopupMenuItem<String>(
+                value: 'all',
+                child: Text('All Videos'),
+              ),
+              const PopupMenuItem<String>(
+                value: 'strength',
+                child: Text('Strength'),
+              ),
+              const PopupMenuItem<String>(
+                value: 'cardio',
+                child: Text('Cardio'),
+              ),
+              const PopupMenuItem<String>(
+                value: 'flexibility',
+                child: Text('Flexibility'),
+              ),
+              const PopupMenuItem<String>(
+                value: 'upper_body',
+                child: Text('Upper Body'),
+              ),
+              const PopupMenuItem<String>(
+                value: 'lower_body',
+                child: Text('Lower Body'),
+              ),
+              const PopupMenuItem<String>(
+                value: 'core',
+                child: Text('Core'),
+              ),
+              const PopupMenuItem<String>(
+                value: 'full_body',
+                child: Text('Full Body'),
+              ),
+            ],
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -96,6 +145,21 @@ class _TrainingVideosScreenState extends State<TrainingVideosScreen> {
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                 ),
+                                Row(
+                                  children: [
+                                    Chip(
+                                      label: Text(video.exerciseType),
+                                      labelStyle: const TextStyle(fontSize: 10),
+                                      backgroundColor: _getExerciseTypeColor(video.exerciseType),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Chip(
+                                      label: Text(video.difficulty),
+                                      labelStyle: const TextStyle(fontSize: 10),
+                                      backgroundColor: _getDifficultyColor(video.difficulty),
+                                    ),
+                                  ],
+                                ),
                                 if (video.tags.isNotEmpty)
                                   Wrap(
                                     spacing: 4.0,
@@ -119,5 +183,39 @@ class _TrainingVideosScreenState extends State<TrainingVideosScreen> {
                       },
                     ),
     );
+  }
+
+  Color _getExerciseTypeColor(String exerciseType) {
+    switch (exerciseType) {
+      case 'strength':
+        return Colors.red.shade100;
+      case 'cardio':
+        return Colors.blue.shade100;
+      case 'flexibility':
+        return Colors.green.shade100;
+      case 'upper_body':
+        return Colors.orange.shade100;
+      case 'lower_body':
+        return Colors.purple.shade100;
+      case 'core':
+        return Colors.yellow.shade100;
+      case 'full_body':
+        return Colors.teal.shade100;
+      default:
+        return Colors.grey.shade100;
+    }
+  }
+
+  Color _getDifficultyColor(String difficulty) {
+    switch (difficulty) {
+      case 'beginner':
+        return Colors.green.shade100;
+      case 'intermediate':
+        return Colors.yellow.shade100;
+      case 'advanced':
+        return Colors.red.shade100;
+      default:
+        return Colors.grey.shade100;
+    }
   }
 }

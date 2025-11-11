@@ -8,33 +8,22 @@ import 'services/api_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Predefined network configurations
-  final networkConfigs = {
-    'pc': '192.168.1.16',     // PC IP
-    'phone': '192.168.100.192', // Phone IP
-    'emulator': '10.0.2.2'    // Android emulator
-  };
 
-  try {
-    // First, attempt automatic IP detection
-    await ApiService.configureBaseUrl();
+  // For production/Render deployment, use the Render backend URL
+  // For development, use local IP
+  const bool isProduction = bool.fromEnvironment('dart.vm.product');
+  const String renderBackendUrl = 'https://liftlog-6.onrender.com'; // Your actual Render URL
 
-    // If auto-detection fails, log the detected interfaces
-    final detectedInterfaces = await ApiService.getDetectedNetworkInterfaces();
-    print('Detected Network Interfaces: $detectedInterfaces');
-
-    // Fallback to predefined configurations if no suitable IP found
-    if (ApiService.getCurrentBaseUrl().contains('localhost')) {
-      print('Auto-detection failed. Falling back to predefined network configs.');
-      await ApiService.configureBaseUrl(manualIp: networkConfigs['phone']);
-    }
-  } catch (e) {
-    print('Error during IP configuration: $e');
-    // Extreme fallback to a predefined IP
-    await ApiService.configureBaseUrl(manualIp: networkConfigs['phone']);
+  if (isProduction) {
+    // Production: Use Render backend (no port needed, Render handles it)
+    ApiService.setBaseUrl(renderBackendUrl);
+  } else {
+    // Development: Use Render URL for testing or local network IP
+    await ApiService.configureBaseUrl(
+      renderUrl: renderBackendUrl // Use Render URL even in development for testing
+    );
   }
-  
+
   final apiService = ApiService();
   final token = await apiService.getToken();
   final isLoggedIn = token != null;

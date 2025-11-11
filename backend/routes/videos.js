@@ -228,4 +228,29 @@ router.delete('/:id',
     }
 });
 
+// Get trainer's uploaded videos
+router.get('/trainer', verifyToken, checkRole(['all']), async (req, res) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+
+    const videos = await ExerciseVideo.find({ trainer: req.user._id })
+      .populate('trainer', 'username')
+      .limit(Number(limit))
+      .skip((page - 1) * limit)
+      .sort({ createdAt: -1 });
+
+    const total = await ExerciseVideo.countDocuments({ trainer: req.user._id });
+
+    res.json({
+      videos,
+      totalVideos: total,
+      currentPage: Number(page),
+      totalPages: Math.ceil(total / limit)
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to retrieve trainer videos' });
+  }
+});
+
 module.exports = router;
+

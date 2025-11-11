@@ -26,11 +26,15 @@ const ExerciseVideoSchema = new mongoose.Schema({
   exerciseType: {
     type: String,
     enum: [
-      'strength', 
-      'cardio', 
-      'flexibility', 
-      'bodyweight', 
-      'weightlifting'
+      'strength',
+      'cardio',
+      'flexibility',
+      'bodyweight',
+      'weightlifting',
+      'upper_body',
+      'lower_body',
+      'core',
+      'full_body'
     ],
     required: true
   },

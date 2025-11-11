@@ -60,7 +60,7 @@ router.post('/register', async (req, res) => {
 // User Login
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, role } = req.body;
 
     // Find user by email
     const user = await User.findOne({ email });
@@ -76,6 +76,13 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid login credentials' });
     }
 
+    // Make role check optional and more flexible
+    if (role && role !== 'all' && user.role !== role) {
+      return res.status(403).json({
+        error: `Access denied. You are registered as a ${user.role}, not as a ${role}.`
+      });
+    }
+
     // Check membership status
     if (!user.isMembershipActive()) {
       return res.status(403).json({ error: 'Membership has expired' });
@@ -84,7 +91,7 @@ router.post('/login', async (req, res) => {
     // Generate JWT token
     const token = generateToken(user);
 
-    res.json({ 
+    res.json({
       token,
       user: {
         id: user._id,
@@ -124,18 +131,115 @@ router.patch('/profile', verifyToken, async (req, res) => {
   }
 });
 
+// Admin: Get all users (Admin Only)
+router.get('/users',
+  verifyToken,
+  checkRole(['admin']),
+  async (req, res) => {
+    try {
+      const {
+        page = 1,
+        limit = 10,
+        role,
+        search
+      } = req.query;
+
+      const query = {};
+
+      if (role) query.role = role;
+      if (search) {
+        query.$or = [
+          { username: { $regex: search, $options: 'i' } },
+          { email: { $regex: search, $options: 'i' } }
+        ];
+      }
+
+      const users = await User.find(query)
+        .select('-password')
+        .limit(Number(limit))
+        .skip((page - 1) * limit)
+        .sort({ createdAt: -1 });
+
+      const total = await User.countDocuments(query);
+
+      res.json({
+        users,
+        totalUsers: total,
+        currentPage: Number(page),
+        totalPages: Math.ceil(total / limit)
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+});
+
+// Admin: Update user details (Admin Only)
+router.patch('/users/:userId',
+  verifyToken,
+  checkRole(['admin']),
+  async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const updates = req.body;
+
+      // Prevent password updates through this endpoint
+      delete updates.password;
+
+      const user = await User.findByIdAndUpdate(
+        userId,
+        updates,
+        { new: true, runValidators: true }
+      ).select('-password');
+
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      res.json(user);
+    } catch (error) {
+      res.status(400).json({ error: error.message });
+    }
+});
+
+// Admin: Delete user (Admin Only)
+router.delete('/users/:userId',
+  verifyToken,
+  checkRole(['admin']),
+  async (req, res) => {
+    try {
+      const { userId } = req.params;
+
+      const user = await User.findById(userId);
+
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Prevent admin from deleting themselves
+      if (userId === req.user._id.toString()) {
+        return res.status(400).json({ error: 'Cannot delete your own account' });
+      }
+
+      await user.remove();
+
+      res.json({ message: 'User deleted successfully' });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+});
+
 // Admin: Manage User Membership (Admin Only)
-router.patch('/membership/:userId', 
-  verifyToken, 
-  checkRole(['admin']), 
+router.patch('/membership/:userId',
+  verifyToken,
+  checkRole(['admin']),
   async (req, res) => {
     try {
       const { userId } = req.params;
       const { membershipExpiration } = req.body;
 
       const user = await User.findByIdAndUpdate(
-        userId, 
-        { membershipExpiration }, 
+        userId,
+        { membershipExpiration },
         { new: true, runValidators: true }
       ).select('-password');
 

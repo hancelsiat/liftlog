@@ -16,9 +16,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  
-  // Add role selection
-  UserRole _selectedRole = UserRole.member;
 
   @override
   Widget build(BuildContext context) {
@@ -33,42 +30,6 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Role Selection Buttons
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  ChoiceChip(
-                    label: const Text('Member'),
-                    selected: _selectedRole == UserRole.member,
-                    onSelected: (bool selected) {
-                      setState(() {
-                        _selectedRole = UserRole.member;
-                      });
-                    },
-                  ),
-                  const SizedBox(width: 10),
-                  ChoiceChip(
-                    label: const Text('Trainer'),
-                    selected: _selectedRole == UserRole.trainer,
-                    onSelected: (bool selected) {
-                      setState(() {
-                        _selectedRole = UserRole.trainer;
-                      });
-                    },
-                  ),
-                  const SizedBox(width: 10),
-                  ChoiceChip(
-                    label: const Text('Admin'),
-                    selected: _selectedRole == UserRole.admin,
-                    onSelected: (bool selected) {
-                      setState(() {
-                        _selectedRole = UserRole.admin;
-                      });
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
               
               TextFormField(
                 controller: _emailController,
@@ -124,13 +85,11 @@ class _LoginScreenState extends State<LoginScreen> {
     if (_formKey.currentState!.validate()) {
       final success = await Provider.of<AuthProvider>(context, listen: false)
           .login(
-            _emailController.text, 
-            _passwordController.text,
-            role: _selectedRole
+            _emailController.text,
+            _passwordController.text
           );
       if (success && mounted) {
-        // Navigate based on role
-        // Navigate to dashboard for all roles
+        // Navigate to dashboard
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const DashboardScreen()),

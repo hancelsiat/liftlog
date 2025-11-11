@@ -33,6 +33,10 @@ const WorkoutSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  trainer: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
   date: {
     type: Date,
     default: Date.now
@@ -41,6 +45,11 @@ const WorkoutSchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true
+  },
+  description: {
+    type: String,
+    trim: true,
+    maxlength: 500
   },
   exercises: [ExerciseSchema],
   duration: {
@@ -55,6 +64,15 @@ const WorkoutSchema = new mongoose.Schema({
     type: String,
     enum: ['low', 'moderate', 'high'],
     default: 'moderate'
+  },
+  category: {
+    type: String,
+    enum: ['strength', 'cardio', 'flexibility', 'mixed'],
+    default: 'mixed'
+  },
+  isPublic: {
+    type: Boolean,
+    default: false
   },
   notes: {
     type: String,

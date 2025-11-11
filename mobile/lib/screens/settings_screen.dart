@@ -29,14 +29,19 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
     final url = _urlController.text.trim();
     if (url.isNotEmpty) {
       try {
-        // Remove '/api' if user includes it
-        final cleanUrl = url.endsWith('/api') ? url : '$url/api';
-        await ApiService.configureBaseUrl(manualIp: Uri.parse(cleanUrl).host);
-        
+        if (url.startsWith('http://') || url.startsWith('https://')) {
+          // Full URL provided (for production/Render)
+          ApiService.setBaseUrl(url);
+        } else {
+          // IP address provided (for development) - also update the PC IP in code
+          ApiService.updatePCIP(url); // Update the hardcoded IP in the code
+          await ApiService.configureBaseUrl(manualIp: url);
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Server URL updated successfully')),
         );
-        
+
         setState(() {
           _currentBaseUrl = ApiService.getCurrentBaseUrl();
         });
@@ -76,9 +81,9 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
             TextField(
               controller: _urlController,
               decoration: InputDecoration(
-                labelText: 'Server URL (e.g., http://192.168.1.16:5000)',
+                labelText: 'Server URL',
                 border: OutlineInputBorder(),
-                helperText: 'Enter the full server URL without "/api"',
+                helperText: 'Examples:\n• Development: 192.168.1.16\n• Production: https://liftlog-6.onrender.com',
               ),
             ),
             SizedBox(height: 20),

@@ -26,6 +26,8 @@ if (process.env.NODE_ENV !== 'test') {
   mongoose.connect(process.env.MONGODB_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+    socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
   })
   .then(() => console.log('MongoDB connected successfully'))
   .catch((err) => console.error('MongoDB connection error:', err));
@@ -34,10 +36,14 @@ if (process.env.NODE_ENV !== 'test') {
 // Import Routes
 const authRoutes = require('./routes/auth');
 const workoutRoutes = require('./routes/workouts');
+const videoRoutes = require('./routes/videos');
+const progressRoutes = require('./routes/progress');
 
 // Use Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/workouts', workoutRoutes);
+app.use('/api/videos', videoRoutes);
+app.use('/api/progress', progressRoutes);
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {

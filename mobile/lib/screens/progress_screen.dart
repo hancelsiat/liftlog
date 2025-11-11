@@ -33,6 +33,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
     try {
       final apiService = ApiService();
       final history = await apiService.getProgressHistory();
+      // Sort by date descending (most recent first)
+      history.sort((a, b) => b.date.compareTo(a.date));
       setState(() {
         _progressHistory = history;
         _isLoading = false;

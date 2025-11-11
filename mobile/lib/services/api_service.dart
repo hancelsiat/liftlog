@@ -14,10 +14,13 @@ class ApiService {
 
   // Predefined network configurations with dynamic detection
   static final Map<String, String> _networkConfigs = {
-    'pc': '192.168.1.16',     // PC IP
+    'pc': '192.168.1.16',     // PC IP (update this when IP changes)
     'phone': '192.168.100.192', // Phone IP
     'emulator': '10.0.2.2'    // Android emulator
   };
+
+  // Current PC IP address (UPDATE THIS WHEN YOUR IP CHANGES)
+  static String CURRENT_PC_IP = '192.168.1.16';
 
   // Automatic network detection method
   static Future<String> _detectNetworkIP() async {
@@ -67,11 +70,19 @@ class ApiService {
 
   // Method to set base URL with advanced network configuration
   static Future<void> configureBaseUrl({
-    String? manualIp, 
-    String? networkType
+    String? manualIp,
+    String? networkType,
+    String? renderUrl
   }) async {
     try {
-      // Manual IP takes highest priority
+      // Render URL takes highest priority for production
+      if (renderUrl != null) {
+        _baseUrl = '$renderUrl/api';
+        print('Using Render URL: $_baseUrl');
+        return;
+      }
+
+      // Manual IP takes highest priority for development
       if (manualIp != null) {
         _baseUrl = 'http://$manualIp:5000/api';
         print('Manually set base URL to: $_baseUrl');
@@ -134,7 +145,17 @@ class ApiService {
   // Method to add or update network configuration
   static void updateNetworkConfiguration(String key, String ip) {
     _networkConfigs[key] = ip;
+    if (key == 'pc') {
+      CURRENT_PC_IP = ip; // Update the PC IP constant when changed
+    }
     print('Updated network configuration: $key = $ip');
+  }
+
+  // Quick method to update PC IP when network changes
+  static void updatePCIP(String newIP) {
+    CURRENT_PC_IP = newIP;
+    _networkConfigs['pc'] = newIP;
+    print('PC IP updated to: $newIP');
   }
 
   // Method to get all detected network interfaces (useful for debugging)
@@ -157,8 +178,14 @@ class ApiService {
   }
 
   // Helper method to manually set and log the current base URL
-  static void setBaseUrl(String ip) {
-    _baseUrl = 'http://$ip:5000/api';
+  static void setBaseUrl(String url) {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      // Full URL provided (for production/Render)
+      _baseUrl = '$url/api';
+    } else {
+      // IP address provided (for development)
+      _baseUrl = 'http://$url:5000/api';
+    }
     print('Base URL manually set to: $_baseUrl');
   }
 
@@ -238,9 +265,9 @@ class ApiService {
 
   // Auth methods
   Future<Map<String, dynamic>> register(
-    String email, 
-    String password, 
-    String username, 
+    String email,
+    String password,
+    String username,
     {UserRole role = UserRole.member}
   ) async {
     return await _post('/auth/register', {
@@ -251,15 +278,10 @@ class ApiService {
     });
   }
 
-  Future<Map<String, dynamic>> login(
-    String email, 
-    String password, 
-    {UserRole role = UserRole.member}
-  ) async {
+  Future<Map<String, dynamic>> login(String email, String password) async {
     final response = await _post('/auth/login', {
       'email': email,
       'password': password,
-      'role': role.toString().split('.').last, // Convert enum to string
     });
     if (response.containsKey('token')) {
       await setToken(response['token']);
@@ -345,6 +367,20 @@ class ApiService {
     return videosJson.map((json) => ExerciseVideo.fromJson(json)).toList();
   }
 
+  // Get available trainers for members
+  Future<List<Map<String, dynamic>>> getAvailableTrainers() async {
+    final response = await _get('/workouts/trainers/available');
+    final List<dynamic> trainersJson = response['trainers'];
+    return trainersJson.map((json) => json as Map<String, dynamic>).toList();
+  }
+
+  // Get workouts by trainer
+  Future<List<Map<String, dynamic>>> getWorkoutsByTrainer(String trainerId) async {
+    final response = await _get('/workouts/trainer/$trainerId');
+    final List<dynamic> workoutsJson = response['workouts'];
+    return workoutsJson.map((json) => json as Map<String, dynamic>).toList();
+  }
+
   // Video upload method for trainers
   Future<ExerciseVideo> uploadVideo({
     required File videoFile, 
@@ -353,8 +389,8 @@ class ApiService {
     // Prepare multipart request for file upload
     final token = await getToken();
     final request = http.MultipartRequest(
-      'POST', 
-      Uri.parse('$baseUrl/videos/upload')
+      'POST',
+      Uri.parse('$baseUrl/videos')
     );
 
     // Add authorization header
@@ -385,12 +421,52 @@ class ApiService {
       
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final responseBody = jsonDecode(response.body);
-        return ExerciseVideo.fromJson(responseBody);
+        return ExerciseVideo.fromJson(responseBody['video']);
       } else {
         throw Exception('Video upload failed: ${response.body}');
       }
     } catch (e) {
       throw Exception('Error uploading video: $e');
     }
+  }
+
+  // Admin: Get all users
+  Future<Map<String, dynamic>> getUsers({
+    String? role,
+    String? search,
+    int page = 1,
+    int limit = 10,
+  }) async {
+    final queryParams = <String, String>{};
+    if (role != null) queryParams['role'] = role;
+    if (search != null) queryParams['search'] = search;
+    queryParams['page'] = page.toString();
+    queryParams['limit'] = limit.toString();
+
+    final uri = Uri.parse('$baseUrl/auth/users').replace(queryParameters: queryParams);
+    return _getUri(uri.toString());
+  }
+
+  // Admin: Update user
+  Future<User> updateUser(String userId, Map<String, dynamic> updates) async {
+    final response = await _patch('/auth/users/$userId', updates);
+    return User.fromJson(response);
+  }
+
+  // Admin: Delete user
+  Future<void> deleteUser(String userId) async {
+    await _delete('/auth/users/$userId');
+  }
+
+  Future<Map<String, dynamic>> _getUri(String url) async {
+    final token = await getToken();
+    final response = await http.get(
+      Uri.parse(url),
+      headers: {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
+    );
+    return _handleResponse(response);
   }
 }

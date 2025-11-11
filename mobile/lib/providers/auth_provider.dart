@@ -47,27 +47,19 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> login(
-    String email, 
-    String password, 
-    {UserRole role = UserRole.member}
-  ) async {
+  Future<bool> login(String email, String password) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await _apiService.login(
-        email, 
-        password, 
-        role: role
-      );
-      
+      final response = await _apiService.login(email, password);
+
       // Check if user data is returned in the login response
       if (response.containsKey('user') && response['user'] != null) {
         _user = User.fromJson(response['user']);
       }
-      
+
       _isLoading = false;
       notifyListeners();
       return true;

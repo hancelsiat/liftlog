@@ -26,11 +26,11 @@ router.post('/', verifyToken, checkRole(['member', 'trainer']), async (req, res)
 // Get user's workouts (Member Route)
 router.get('/', verifyToken, async (req, res) => {
   try {
-    const { 
-      startDate, 
-      endDate, 
-      limit = 10, 
-      page = 1 
+    const {
+      startDate,
+      endDate,
+      limit = 10,
+      page = 1
     } = req.query;
 
     const query = { user: req.user._id };
@@ -43,6 +43,7 @@ router.get('/', verifyToken, async (req, res) => {
     }
 
     const workouts = await Workout.find(query)
+      .populate('trainer', 'username')
       .sort({ date: -1 })
       .limit(Number(limit))
       .skip((page - 1) * limit);
@@ -53,6 +54,53 @@ router.get('/', verifyToken, async (req, res) => {
       workouts,
       totalWorkouts: total,
       currentPage: page,
+      totalPages: Math.ceil(total / limit)
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get available trainers for members
+router.get('/trainers/available', verifyToken, checkRole(['all']), async (req, res) => {
+  try {
+    const User = require('../models/User');
+
+    const trainers = await User.find({
+      role: 'trainer',
+      membershipExpiration: { $gt: new Date() }
+    }).select('username email profile.firstName profile.lastName');
+
+    res.json({ trainers });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get workouts by trainer (Member Route)
+router.get('/trainer/:trainerId', verifyToken, checkRole(['all']), async (req, res) => {
+  try {
+    const { trainerId } = req.params;
+    const { limit = 10, page = 1 } = req.query;
+
+    const workouts = await Workout.find({
+      trainer: trainerId,
+      isPublic: true
+    })
+      .populate('trainer', 'username')
+      .sort({ createdAt: -1 })
+      .limit(Number(limit))
+      .skip((page - 1) * limit);
+
+    const total = await Workout.countDocuments({
+      trainer: trainerId,
+      isPublic: true
+    });
+
+    res.json({
+      workouts,
+      totalWorkouts: total,
+      currentPage: Number(page),
       totalPages: Math.ceil(total / limit)
     });
   } catch (error) {

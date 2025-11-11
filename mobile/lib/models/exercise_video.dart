@@ -5,6 +5,8 @@ class ExerciseVideo {
   final String videoUrl;
   final String trainerName;
   final List<String> tags;
+  final String exerciseType;
+  final String difficulty;
 
   ExerciseVideo({
     required this.id,
@@ -13,6 +15,8 @@ class ExerciseVideo {
     required this.videoUrl,
     required this.trainerName,
     this.tags = const [],
+    this.exerciseType = 'strength',
+    this.difficulty = 'beginner',
   });
 
   factory ExerciseVideo.fromJson(Map<String, dynamic> json) {
@@ -22,9 +26,11 @@ class ExerciseVideo {
       description: json['description'] ?? '',
       videoUrl: json['videoUrl'] ?? '',
       trainerName: json['trainerName'] ?? '',
-      tags: json['tags'] != null 
-        ? List<String>.from(json['tags']) 
+      tags: json['tags'] != null
+        ? List<String>.from(json['tags'])
         : [],
+      exerciseType: json['exerciseType'] ?? 'strength',
+      difficulty: json['difficulty'] ?? 'beginner',
     );
   }
 
@@ -36,6 +42,8 @@ class ExerciseVideo {
       'videoUrl': videoUrl,
       'trainerName': trainerName,
       'tags': tags,
+      'exerciseType': exerciseType,
+      'difficulty': difficulty,
     };
   }
 }
