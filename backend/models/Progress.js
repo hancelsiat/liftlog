@@ -9,13 +9,11 @@ const ProgressSchema = new mongoose.Schema({
   bmi: {
     type: Number,
     required: true,
-    min: 10,
-    max: 50
+    max: 300
   },
   caloriesIntake: {
     type: Number,
-    required: true,
-    min: 0
+    required: true
   },
   calorieDeficit: {
     type: Number,

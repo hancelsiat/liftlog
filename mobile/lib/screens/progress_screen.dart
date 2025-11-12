@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:fl_chart/fl_chart.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../models/progress.dart';
@@ -43,9 +44,17 @@ class _ProgressScreenState extends State<ProgressScreen> {
       setState(() {
         _isLoading = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load progress history: $e')),
-      );
+      if (e.toString().contains('Authentication required')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Session expired. Please log in again.')),
+        );
+        // Navigate back to login
+        Navigator.of(context).pushReplacementNamed('/login');
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load progress history: $e')),
+        );
+      }
     }
   }
 
@@ -137,12 +146,50 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 ),
               ),
 
+              // Progress Charts
+              const SizedBox(height: 30),
+              const Text(
+                'Progress Charts',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+
+              if (_progressHistory.isNotEmpty) ...[
+                // BMI Chart
+                _buildChartCard(
+                  title: 'BMI Over Time',
+                  chart: _buildLineChart(
+                    data: _progressHistory.map((p) => p.bmi).toList(),
+                    color: Colors.blue,
+                  ),
+                ),
+
+                // Calories Intake Chart
+                _buildChartCard(
+                  title: 'Calories Intake Over Time',
+                  chart: _buildLineChart(
+                    data: _progressHistory.map((p) => p.caloriesIntake).toList(),
+                    color: Colors.green,
+                  ),
+                ),
+
+                // Calorie Deficit Chart
+                _buildChartCard(
+                  title: 'Calorie Deficit Over Time',
+                  chart: _buildLineChart(
+                    data: _progressHistory.map((p) => p.calorieDeficit).toList(),
+                    color: Colors.red,
+                  ),
+                ),
+              ],
+
               // Progress History
               const SizedBox(height: 30),
               const Text(
                 'Progress History',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
+              const SizedBox(height: 16),
               _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _progressHistory.isEmpty
@@ -153,17 +200,20 @@ class _ProgressScreenState extends State<ProgressScreen> {
                           itemCount: _progressHistory.length,
                           itemBuilder: (context, index) {
                             final progress = _progressHistory[index];
-                            return ListTile(
-                              title: Text('BMI: ${progress.bmi}'),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Calories Intake: ${progress.caloriesIntake}'),
-                                  Text('Calorie Deficit: ${progress.calorieDeficit}'),
-                                ],
-                              ),
-                              trailing: Text(
-                                '${progress.date.day}/${progress.date.month}/${progress.date.year}',
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              child: ListTile(
+                                title: Text('BMI: ${progress.bmi.toStringAsFixed(1)}'),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Calories Intake: ${progress.caloriesIntake.toInt()}'),
+                                    Text('Calorie Deficit: ${progress.calorieDeficit.toInt()}'),
+                                  ],
+                                ),
+                                trailing: Text(
+                                  '${progress.date.day}/${progress.date.month}/${progress.date.year}',
+                                ),
                               ),
                             );
                           },
@@ -171,6 +221,88 @@ class _ProgressScreenState extends State<ProgressScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildChartCard({required String title, required Widget chart}) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 200,
+              child: chart,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLineChart({required List<double> data, required Color color}) {
+    // Reverse data to show chronological order (oldest to newest)
+    final reversedData = data.reversed.toList();
+
+    return LineChart(
+      LineChartData(
+        gridData: FlGridData(show: true),
+        titlesData: FlTitlesData(
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 40,
+            ),
+          ),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              getTitlesWidget: (value, meta) {
+                final index = value.toInt();
+                if (index >= 0 && index < reversedData.length) {
+                  // Show date labels for first, middle, and last points
+                  if (index == 0 ||
+                      index == (reversedData.length - 1) ~/ 2 ||
+                      index == reversedData.length - 1) {
+                    final progress = _progressHistory[_progressHistory.length - 1 - index];
+                    return Text(
+                      '${progress.date.day}/${progress.date.month}',
+                      style: const TextStyle(fontSize: 10),
+                    );
+                  }
+                }
+                return const Text('');
+              },
+            ),
+          ),
+          topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        ),
+        borderData: FlBorderData(show: true),
+        lineBarsData: [
+          LineChartBarData(
+            spots: List.generate(
+              reversedData.length,
+              (index) => FlSpot(index.toDouble(), reversedData[index]),
+            ),
+            isCurved: true,
+            color: color,
+            barWidth: 3,
+            belowBarData: BarAreaData(
+              show: true,
+              color: color.withOpacity(0.1),
+            ),
+            dotData: FlDotData(show: true),
+          ),
+        ],
       ),
     );
   }

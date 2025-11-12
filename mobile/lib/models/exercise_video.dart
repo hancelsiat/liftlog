@@ -20,12 +20,20 @@ class ExerciseVideo {
   });
 
   factory ExerciseVideo.fromJson(Map<String, dynamic> json) {
+    // Handle trainer name from populated trainer object or direct field
+    String trainerName = '';
+    if (json['trainer'] is Map) {
+      trainerName = json['trainer']['username'] ?? '';
+    } else {
+      trainerName = json['trainerName'] ?? '';
+    }
+
     return ExerciseVideo(
       id: json['_id'] ?? '',
       title: json['title'] ?? '',
       description: json['description'] ?? '',
       videoUrl: json['videoUrl'] ?? '',
-      trainerName: json['trainerName'] ?? '',
+      trainerName: trainerName,
       tags: json['tags'] != null
         ? List<String>.from(json['tags'])
         : [],

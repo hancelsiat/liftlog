@@ -70,9 +70,17 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
         _isUploading = false;
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Upload failed: ${e.toString()}')),
-      );
+      if (e.toString().contains('Authentication required')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Session expired. Please log in again.')),
+        );
+        // Navigate back to login
+        Navigator.of(context).pushReplacementNamed('/login');
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Upload failed: ${e.toString()}')),
+        );
+      }
       setState(() {
         _isUploading = false;
       });

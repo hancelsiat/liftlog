@@ -35,6 +35,13 @@ class _TrainingVideosScreenState extends State<TrainingVideosScreen> {
         _error = e.toString();
         _isLoading = false;
       });
+      if (e.toString().contains('Authentication required')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Session expired. Please log in again.')),
+        );
+        // Navigate back to login
+        Navigator.of(context).pushReplacementNamed('/login');
+      }
     }
   }
 

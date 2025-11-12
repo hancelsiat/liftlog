@@ -53,6 +53,9 @@ dependencies:
   # URL launcher for opening external links
   url_launcher: ^6.3.0
 
+  # Charts for progress visualization
+  fl_chart: ^0.66.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

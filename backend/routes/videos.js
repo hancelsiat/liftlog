@@ -44,27 +44,36 @@ const upload = multer({
 });
 
 // Upload a new exercise video (Trainer only)
-router.post('/', 
-  verifyToken, 
-  checkRole(['trainer']), 
-  upload.single('video'), 
+router.post('/',
+  verifyToken,
+  checkRole(['trainer']),
+  upload.single('video'),
   async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: 'No video file uploaded' });
       }
 
-      const { 
-        title, 
-        description, 
-        exerciseType, 
-        difficulty, 
+      const {
+        title,
+        description,
+        exerciseType,
+        difficulty,
         duration,
         tags,
-        isPublic 
+        isPublic
       } = req.body;
 
       const videoUrl = `/uploads/videos/${req.file.filename}`;
+
+      let parsedTags = [];
+      if (tags) {
+        try {
+          parsedTags = JSON.parse(tags);
+        } catch (e) {
+          parsedTags = tags.split(',').map(tag => tag.trim());
+        }
+      }
 
       const exerciseVideo = new ExerciseVideo({
         title,
@@ -74,7 +83,7 @@ router.post('/',
         exerciseType,
         difficulty: difficulty || 'beginner',
         duration: parseInt(duration) || 0,
-        tags: tags ? tags.split(',').map(tag => tag.trim()) : [],
+        tags: parsedTags,
         isPublic: isPublic === 'true'
       });
 
@@ -86,18 +95,18 @@ router.post('/',
       });
     } catch (error) {
       console.error('Video upload error:', error);
-      res.status(500).json({ error: 'Failed to upload video' });
+      res.status(500).json({ error: 'Video upload failed: Something broke!' });
     }
 });
 
 // Get all videos (public or owned by trainer)
 router.get('/', verifyToken, async (req, res) => {
   try {
-    const { 
-      page = 1, 
-      limit = 10, 
-      exerciseType, 
-      difficulty 
+    const {
+      page = 1,
+      limit = 10,
+      exerciseType,
+      difficulty
     } = req.query;
 
     const query = {
@@ -125,31 +134,11 @@ router.get('/', verifyToken, async (req, res) => {
       totalPages: Math.ceil(total / limit)
     });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to retrieve videos' });
-  }
-});
-
-// Get a specific video
-router.get('/:id', verifyToken, async (req, res) => {
-  try {
-    const video = await ExerciseVideo.findById(req.params.id).populate('trainer', 'username');
-
-    if (!video) {
-      return res.status(404).json({ error: 'Video not found' });
-    }
-
-    // Check if video is public or owned by the user
-    if (!video.isPublic && 
-        video.trainer._id.toString() !== req.user._id.toString() && 
-        req.user.role !== 'trainer') {
-      return res.status(403).json({ error: 'Unauthorized to view this video' });
-    }
-
-    res.json(video);
-  } catch (error) {
+    console.error('Error retrieving videos:', error);
     res.status(500).json({ error: 'Failed to retrieve video' });
   }
 });
+
 
 // Update a video (Trainer only)
 router.patch('/:id', 
@@ -183,7 +172,15 @@ router.patch('/:id',
       video.exerciseType = exerciseType || video.exerciseType;
       video.difficulty = difficulty || video.difficulty;
       video.duration = duration ? parseInt(duration) : video.duration;
-      video.tags = tags ? tags.split(',').map(tag => tag.trim()) : video.tags;
+      let parsedTags = video.tags;
+      if (tags) {
+        try {
+          parsedTags = JSON.parse(tags);
+        } catch (e) {
+          parsedTags = tags.split(',').map(tag => tag.trim());
+        }
+      }
+      video.tags = parsedTags;
       video.isPublic = isPublic !== undefined ? isPublic === 'true' : video.isPublic;
 
       await video.save();
@@ -229,7 +226,7 @@ router.delete('/:id',
 });
 
 // Get trainer's uploaded videos
-router.get('/trainer', verifyToken, checkRole(['all']), async (req, res) => {
+router.get('/trainer', verifyToken, checkRole(['trainer']), async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
 
@@ -248,6 +245,7 @@ router.get('/trainer', verifyToken, checkRole(['all']), async (req, res) => {
       totalPages: Math.ceil(total / limit)
     });
   } catch (error) {
+    console.error('Error retrieving trainer videos:', error);
     res.status(500).json({ error: 'Failed to retrieve trainer videos' });
   }
 });

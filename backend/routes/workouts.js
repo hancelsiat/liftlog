@@ -23,6 +23,27 @@ router.post('/', verifyToken, checkRole(['member', 'trainer']), async (req, res)
   }
 });
 
+// Create a new workout template (Trainer Route)
+router.post('/template', verifyToken, checkRole(['trainer']), async (req, res) => {
+  try {
+    const workoutData = {
+      ...req.body,
+      trainer: req.user._id,
+      isPublic: true
+    };
+
+    const workout = new Workout(workoutData);
+    await workout.save();
+
+    res.status(201).json({
+      message: 'Workout template created successfully',
+      workout
+    });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 // Get user's workouts (Member Route)
 router.get('/', verifyToken, async (req, res) => {
   try {

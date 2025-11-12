@@ -28,7 +28,7 @@ router.post('/', verifyToken, async (req, res) => {
 });
 
 // Get user's progress history
-router.get('/', verifyToken, checkRole(['all']), async (req, res) => {
+router.get('/', verifyToken, async (req, res) => {
   try {
     const {
       startDate,

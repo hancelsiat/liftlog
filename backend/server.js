@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const path = require('path');
 
 // Load environment variables
 dotenv.config();
@@ -44,6 +45,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/workouts', workoutRoutes);
 app.use('/api/videos', videoRoutes);
 app.use('/api/progress', progressRoutes);
+
+// Serve static files for uploaded videos
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {

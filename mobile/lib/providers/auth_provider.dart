@@ -14,9 +14,9 @@ class AuthProvider with ChangeNotifier {
   bool get isAuthenticated => _user != null;
 
   Future<bool> register(
-    String email, 
-    String password, 
-    String username, 
+    String email,
+    String password,
+    String username,
     {UserRole role = UserRole.member}
   ) async {
     _isLoading = true;
@@ -25,17 +25,20 @@ class AuthProvider with ChangeNotifier {
 
     try {
       final response = await _apiService.register(
-        email, 
-        password, 
-        username, 
+        email,
+        password,
+        username,
         role: role
       );
-      
+
       // Check if user data is returned in the registration response
       if (response.containsKey('user') && response['user'] != null) {
         _user = User.fromJson(response['user']);
       }
-      
+
+      // Always load profile after successful registration to get complete user data
+      await loadProfile();
+
       _isLoading = false;
       notifyListeners();
       return true;
@@ -55,10 +58,8 @@ class AuthProvider with ChangeNotifier {
     try {
       final response = await _apiService.login(email, password);
 
-      // Check if user data is returned in the login response
-      if (response.containsKey('user') && response['user'] != null) {
-        _user = User.fromJson(response['user']);
-      }
+      // Always load profile after successful login to get complete user data
+      await loadProfile();
 
       _isLoading = false;
       notifyListeners();
@@ -78,6 +79,11 @@ class AuthProvider with ChangeNotifier {
       return true;
     } catch (e) {
       _error = e.toString();
+      // If token is invalid, clear user and token
+      if (e.toString().contains('Authentication required')) {
+        _user = null;
+        await _apiService.removeToken();
+      }
       notifyListeners();
       return false;
     }

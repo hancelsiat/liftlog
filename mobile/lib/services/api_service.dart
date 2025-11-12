@@ -210,9 +210,13 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> _post(String endpoint, Map<String, dynamic> body) async {
+    final token = await getToken();
     final response = await http.post(
       Uri.parse('$baseUrl$endpoint'),
-      headers: {'Content-Type': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
       body: jsonEncode(body),
     );
     return _handleResponse(response);
@@ -258,6 +262,10 @@ class ApiService {
   Map<String, dynamic> _handleResponse(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return jsonDecode(response.body);
+    } else if (response.statusCode == 401) {
+      // Token is invalid/expired, clear it and throw specific error
+      removeToken();
+      throw Exception('Authentication required. Please log in again.');
     } else {
       throw Exception('API Error: ${response.statusCode} - ${response.body}');
     }
@@ -270,12 +278,16 @@ class ApiService {
     String username,
     {UserRole role = UserRole.member}
   ) async {
-    return await _post('/auth/register', {
+    final response = await _post('/auth/register', {
       'email': email,
       'password': password,
       'username': username,
       'role': role.toString().split('.').last, // Convert enum to string
     });
+    if (response.containsKey('token')) {
+      await setToken(response['token']);
+    }
+    return response;
   }
 
   Future<Map<String, dynamic>> login(String email, String password) async {
@@ -311,6 +323,28 @@ class ApiService {
       'name': name,
       'description': description,
       'exercises': exercises,
+    });
+    return Workout.fromJson(response);
+  }
+
+  // Create workout template (Trainer only)
+  Future<Workout> createWorkoutTemplate({
+    required String title,
+    required String description,
+    required List<Map<String, dynamic>> exercises,
+    String? category,
+    String? intensity,
+    int? duration,
+    int? caloriesBurned,
+  }) async {
+    final response = await _post('/workouts/template', {
+      'title': title,
+      'description': description,
+      'exercises': exercises,
+      'category': category ?? 'mixed',
+      'intensity': intensity ?? 'moderate',
+      'duration': duration,
+      'caloriesBurned': caloriesBurned,
     });
     return Workout.fromJson(response);
   }
@@ -396,6 +430,8 @@ class ApiService {
     // Add authorization header
     if (token != null) {
       request.headers['Authorization'] = 'Bearer $token';
+    } else {
+      throw Exception('No token provided');
     }
 
     // Add video file

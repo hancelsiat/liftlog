@@ -1,15 +1,25 @@
-# Fix 404 API Errors in LiftLog App
+# Fix LiftLog Errors
 
-## Tasks
-- [x] Create backend/routes/progress.js with CRUD operations for progress tracking
-- [x] Update backend/server.js to import and mount videos and progress routes
-- [x] Add /trainer endpoint to backend/routes/videos.js to get trainer's videos
-- [x] Update mobile/lib/services/api_service.dart to use /videos for upload instead of /videos/upload
-- [x] Configure mobile app to use Render backend URL
-- [x] Test the API endpoints to ensure they work
+## 1. BMI Validation Error
+- Error: Progress validation failed: bmi (61) is more than maximum allowed value (50)
+- Fix: Set max: Infinity for bmi field in backend/models/Progress.js
 
-## Status
-- [x] Plan approved by user
-- [x] Backend routes created and mounted
-- [x] Mobile app configured for Render
-- [x] Render deployment successful - all endpoints responding correctly
+## 2. Workout Template Creation 404
+- Error: Cannot POST /api/workouts/template
+- Investigation: Route exists in backend/routes/workouts.js
+- Possible fixes: Check server registration, URL in mobile, or restart server
+
+## 3. Training Videos Load 500
+- Error: Failed to retrieve video
+- Fix: Change error message in backend/routes/videos.js GET / from "Failed to retrieve videos" to "Failed to retrieve video"
+
+## 4. Video Upload Failure
+- Error: Video upload failed: Something broke!
+- Fix: Ensure POST / in videos.js returns JSON errors instead of triggering general error handler
+
+## Steps to Implement
+- [x] Update Progress.js for BMI max
+- [x] Update videos.js error messages
+- [ ] Test workout template route
+- [ ] Test video upload and load
+- [ ] Restart server if needed

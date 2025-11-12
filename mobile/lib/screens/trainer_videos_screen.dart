@@ -29,7 +29,7 @@ class _TrainerVideosScreenState extends State<TrainerVideosScreen> {
       });
 
       final videos = await _apiService.getTrainerVideos();
-      
+
       setState(() {
         _videos = videos;
         _isLoading = false;
@@ -39,6 +39,13 @@ class _TrainerVideosScreenState extends State<TrainerVideosScreen> {
         _errorMessage = 'Failed to load videos: ${e.toString()}';
         _isLoading = false;
       });
+      if (e.toString().contains('Authentication required')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Session expired. Please log in again.')),
+        );
+        // Navigate back to login
+        Navigator.of(context).pushReplacementNamed('/login');
+      }
     }
   }
 

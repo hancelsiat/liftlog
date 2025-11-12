@@ -10,16 +10,55 @@ import 'video_upload_screen.dart';
 import 'trainer_videos_screen.dart';
 import 'settings_screen.dart';
 import 'user_management_screen.dart';
+import 'create_workout_template_screen.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserProfile();
+  }
+
+  Future<void> _loadUserProfile() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    try {
+      await authProvider.loadProfile();
+    } catch (e) {
+      // If profile loading fails due to invalid token, logout and redirect to login
+      if (e.toString().contains('Authentication required')) {
+        await authProvider.logout();
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const LoginScreen()),
+          );
+        }
+      }
+      return;
+    }
+    setState(() {
+      _isLoading = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     final user = authProvider.user;
 
-    // Check if user is null or not a member
+    if (_isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    // Check if user is null
     if (user == null) {
       // Redirect to login if no user is logged in
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -137,12 +176,12 @@ class DashboardScreen extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _buildDashboardCard(
-          title: 'Manage Workouts',
+          title: 'Create Workout Template',
           icon: Icons.fitness_center,
           onTap: () {
-            // TODO: Implement trainer workout management
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Trainer features coming soon')),
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => CreateWorkoutTemplateScreen()),
             );
           },
         ),

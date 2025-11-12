@@ -9,24 +9,26 @@ import 'services/api_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // For production/Render deployment, use the Render backend URL
-  // For development, use local IP
-  const bool isProduction = bool.fromEnvironment('dart.vm.product');
+  // Always use Render backend URL for production deployment
   const String renderBackendUrl = 'https://liftlog-6.onrender.com'; // Your actual Render URL
-
-  if (isProduction) {
-    // Production: Use Render backend (no port needed, Render handles it)
-    ApiService.setBaseUrl(renderBackendUrl);
-  } else {
-    // Development: Use Render URL for testing or local network IP
-    await ApiService.configureBaseUrl(
-      renderUrl: renderBackendUrl // Use Render URL even in development for testing
-    );
-  }
+  ApiService.setBaseUrl(renderBackendUrl);
 
   final apiService = ApiService();
   final token = await apiService.getToken();
-  final isLoggedIn = token != null;
+
+  // Validate token on app start - if invalid, remove it
+  bool isLoggedIn = false;
+  if (token != null) {
+    try {
+      // Attempt to load profile to validate token
+      await apiService.getProfile();
+      isLoggedIn = true;
+    } catch (e) {
+      // Token is invalid, remove it
+      await apiService.removeToken();
+      isLoggedIn = false;
+    }
+  }
 
   runApp(MyApp(isLoggedIn: isLoggedIn));
 }
