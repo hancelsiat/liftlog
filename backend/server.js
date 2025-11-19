@@ -1,8 +1,10 @@
 const express = require('express');
 const mongoose = require('mongoose');
+const { MongoClient } = require('mongodb');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
+const { createClient } = require('@supabase/supabase-js');
 
 // Load environment variables
 dotenv.config();
@@ -18,12 +20,13 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use((req, res, next) => {
-  console.log(`Incoming request: ${req.method} ${req.path} from ${req.ip}`);
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} from ${req.ip}`);
   next();
 });
 
 // Database Connection (skip in test environment)
 if (process.env.NODE_ENV !== 'test') {
+  // Connect with Mongoose for schemas
   mongoose.connect(process.env.MONGODB_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
@@ -32,26 +35,56 @@ if (process.env.NODE_ENV !== 'test') {
   })
   .then(() => console.log('MongoDB connected successfully'))
   .catch((err) => console.error('MongoDB connection error:', err));
+
+  // Also initialize MongoClient for any remaining GridFS needs (if any)
+  const initMongo = async () => {
+    const uri = process.env.MONGODB_URI;
+    if (!uri) {
+      console.error('MONGODB_URI missing');
+      process.exit(1);
+    }
+    const client = new MongoClient(uri, { maxPoolSize: 20, serverSelectionTimeoutMS: 10000 });
+    await client.connect();
+    console.log('[init] MongoClient connected');
+    const db = client.db(); // default DB name from URI
+    app.locals.mongoClient = client;
+    app.locals.mongoDb = db;
+  };
+
+  initMongo().catch(err => {
+    console.error('[init] MongoClient init failed', err && (err.stack || err.message));
+    process.exit(1);
+  });
 }
+
+// Initialize Supabase client
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+// Make Supabase client available in app locals
+app.locals.supabase = supabase;
 
 // Import Routes
 const authRoutes = require('./routes/auth');
 const workoutRoutes = require('./routes/workouts');
 const videoRoutes = require('./routes/videos');
 const progressRoutes = require('./routes/progress');
+const presignRoutes = require('./routes/presign');
+const videosCompleteRoutes = require('./routes/videos_complete');
 
 // Use Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/workouts', workoutRoutes);
 app.use('/api/videos', videoRoutes);
 app.use('/api/progress', progressRoutes);
+app.use('/api', presignRoutes);
+app.use('/api', videosCompleteRoutes);
 
 // Serve static files for uploaded videos
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error(`[${new Date().toISOString()}] Error:`, err.stack);
   res.status(500).send('Something broke!');
 });
 
