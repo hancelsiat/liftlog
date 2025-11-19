@@ -1,14 +1,16 @@
+import '../models/exercise.dart';
+
 class Workout {
   final String id;
-  final String userId;
+  final String? userId;
   final String name;
   final String description;
   final DateTime date;
-  final List<String> exercises;
+  final List<Exercise> exercises;
 
   Workout({
     required this.id,
-    required this.userId,
+    this.userId,
     required this.name,
     required this.description,
     required this.date,
@@ -17,12 +19,14 @@ class Workout {
 
   factory Workout.fromJson(Map<String, dynamic> json) {
     return Workout(
-      id: json['_id'],
-      userId: json['userId'],
-      name: json['name'],
-      description: json['description'],
-      date: DateTime.parse(json['date']),
-      exercises: List<String>.from(json['exercises']),
+      id: json['_id']?.toString() ?? '',
+      userId: json['user']?.toString(),
+      name: json['title']?.toString() ?? json['name']?.toString() ?? 'Unnamed Workout',
+      description: json['description']?.toString() ?? '',
+      date: json['date'] != null ? DateTime.tryParse(json['date'].toString()) ?? DateTime.now() : DateTime.now(),
+      exercises: json['exercises'] != null
+          ? (json['exercises'] as List<dynamic>).map((e) => Exercise.fromJson(e as Map<String, dynamic>)).toList()
+          : [],
     );
   }
 
@@ -33,7 +37,7 @@ class Workout {
       'name': name,
       'description': description,
       'date': date.toIso8601String(),
-      'exercises': exercises,
+      'exercises': exercises.map((e) => e.toJson()).toList(),
     };
   }
 }

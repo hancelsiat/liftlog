@@ -9,7 +9,7 @@ const { verifyToken } = require('../middleware/auth'); // adjust to your auth mi
 // init supabase
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const BUCKET = process.env.SUPABASE_BUCKET || 'videos';
+const BUCKET = process.env.SUPABASE_BUCKET || 'video';
 
 if (!SUPABASE_URL || !SERVICE_KEY) {
   console.error('Supabase env missing: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
@@ -44,8 +44,12 @@ router.post('/', verifyToken, upload.single('video'), async (req, res) => {
     }
 
     const { title, exerciseType, description, difficulty, duration, tags, isPublic } = req.body;
-    if (!title || !exerciseType) {
-      return res.status(400).json({ error: 'title and exerciseType required' });
+    const parsedIsPublic = isPublic === 'true' || isPublic === true;
+    const parsedTitle = title ? String(title).trim() : '';
+    const parsedExerciseType = exerciseType ? String(exerciseType).trim() : 'strength'; // default
+
+    if (!parsedTitle) {
+      return res.status(400).json({ error: 'title required' });
     }
     if (!req.user || !req.user._id) {
       return res.status(401).json({ error: 'Unauthorized: no user' });

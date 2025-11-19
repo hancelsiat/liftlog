@@ -4,6 +4,7 @@ import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../models/workout.dart';
 import '../models/user.dart';
+import '../models/exercise.dart';
 
 class CreateWorkoutTemplateScreen extends StatefulWidget {
   const CreateWorkoutTemplateScreen({super.key});

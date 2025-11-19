@@ -54,4 +54,7 @@ class ExerciseVideo {
       'difficulty': difficulty,
     };
   }
+
+  // Backwards-compatible getter so existing code that uses `videoFileId` keeps working.
+  String get videoFileId => videoUrl;
 }

@@ -38,6 +38,9 @@ dependencies:
   # HTTP client for API calls
   http: ^1.2.1
 
+  # Google Sign-In for Drive integration
+  google_sign_in: ^5.0.0
+
   # State management
   provider: ^6.1.2
 
@@ -55,6 +58,9 @@ dependencies:
 
   # Charts for progress visualization
   fl_chart: ^0.66.2
+  dio: ^5.9.0
+  mime: ^2.0.0
+  dart_jsonwebtoken: ^3.3.1
 
 dev_dependencies:
   flutter_test:

@@ -5,7 +5,7 @@ const { createClient } = require('@supabase/supabase-js');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const BUCKET = process.env.SUPABASE_BUCKET || 'videos';
+const BUCKET = process.env.SUPABASE_BUCKET || 'video';
 
 if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
   console.error('presign route: missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');

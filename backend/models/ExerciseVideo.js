@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const ExerciseVideoSchema = new mongoose.Schema({
+const exerciseVideoSchema = new mongoose.Schema({
   title: {
     type: String,
     required: true,
@@ -8,8 +8,7 @@ const ExerciseVideoSchema = new mongoose.Schema({
   },
   description: {
     type: String,
-    trim: true,
-    maxlength: 500
+    trim: true
   },
   trainer: {
     type: mongoose.Schema.Types.ObjectId,
@@ -20,23 +19,14 @@ const ExerciseVideoSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  thumbnailUrl: {
-    type: String
+  videoPath: {
+    type: String,
+    required: true
   },
   exerciseType: {
     type: String,
-    enum: [
-      'strength',
-      'cardio',
-      'flexibility',
-      'bodyweight',
-      'weightlifting',
-      'upper_body',
-      'lower_body',
-      'core',
-      'full_body'
-    ],
-    required: true
+    required: true,
+    enum: ['cardio', 'strength', 'flexibility', 'balance', 'sports', 'other']
   },
   difficulty: {
     type: String,
@@ -44,8 +34,8 @@ const ExerciseVideoSchema = new mongoose.Schema({
     default: 'beginner'
   },
   duration: {
-    type: Number, // Duration in seconds
-    min: 0
+    type: Number, // in seconds
+    default: 0
   },
   tags: [{
     type: String,
@@ -54,11 +44,30 @@ const ExerciseVideoSchema = new mongoose.Schema({
   isPublic: {
     type: Boolean,
     default: false
+  },
+  status: {
+    type: String,
+    enum: ['uploading', 'ready', 'failed'],
+    default: 'ready'
+  },
+  errorDetails: {
+    type: String,
+    default: null
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
   }
-}, {
-  timestamps: true
 });
 
-const ExerciseVideo = mongoose.model('ExerciseVideo', ExerciseVideoSchema);
+// Update the updatedAt field before saving
+exerciseVideoSchema.pre('save', function(next) {
+  this.updatedAt = Date.now();
+  next();
+});
 
-module.exports = ExerciseVideo;
+module.exports = mongoose.model('ExerciseVideo', exerciseVideoSchema);

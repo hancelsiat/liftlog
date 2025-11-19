@@ -10,7 +10,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Always use Render backend URL for production deployment
-  const String renderBackendUrl = 'https://liftlog-6.onrender.com'; // Your actual Render URL
+  const String renderBackendUrl = 'https://liftlog-7.onrender.com'; // Your actual Render URL
   ApiService.setBaseUrl(renderBackendUrl);
 
   final apiService = ApiService();

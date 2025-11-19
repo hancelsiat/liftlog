@@ -21,11 +21,11 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
     scopes: ['https://www.googleapis.com/auth/drive.readonly', 'profile', 'email'],
   );
 
-  File? _selectedVideo;
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _exerciseTypeController = TextEditingController();
   bool _isUploading = false;
+  bool _isPublic = false;
 
   // Google Drive related state
   GoogleSignInAccount? _account;
@@ -35,68 +35,56 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
   String _driveStatus = '';
   bool _showDriveUpload = false;
 
-  Future<void> _pickVideo() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles(
-      type: FileType.video,
-      allowCompression: true,
-    );
 
-    if (result != null) {
-      setState(() {
-        _selectedVideo = File(result.files.single.path!);
-      });
-    }
-  }
 
   Future<void> _uploadVideo() async {
     if (!_formKey.currentState!.validate()) return;
-
-    if (_selectedVideo == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a video')),
-      );
-      return;
-    }
 
     setState(() {
       _isUploading = true;
     });
 
     try {
-      final metadata = {
-        'title': _titleController.text,
-        'description': _descriptionController.text,
-      };
-
-      final uploadedVideo = await _apiService.uploadVideo(
-        videoFile: _selectedVideo!,
-        metadata: metadata,
-      );
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Video "${uploadedVideo.title}" uploaded successfully')),
-      );
-
-      // Clear form after successful upload
-      _titleController.clear();
-      _descriptionController.clear();
-      _exerciseTypeController.clear();
-      setState(() {
-        _selectedVideo = null;
-        _isUploading = false;
-      });
-    } catch (e) {
-      if (e.toString().contains('Authentication required')) {
+      final jwt = await _apiService.getToken();
+      if (jwt == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Session expired. Please log in again.')),
         );
-        // Navigate back to login
         Navigator.of(context).pushReplacementNamed('/login');
-      } else {
+        return;
+      }
+
+      final result = await _apiService.uploadVideo(
+        jwt: jwt,
+        title: _titleController.text,
+        exerciseType: _exerciseTypeController.text,
+        description: _descriptionController.text,
+        isPublic: _isPublic,
+      );
+
+      if (result['success'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Upload failed: ${e.toString()}')),
+          const SnackBar(content: Text('Video uploaded successfully')),
+        );
+
+        // Clear form after successful upload
+        _titleController.clear();
+        _descriptionController.clear();
+        _exerciseTypeController.clear();
+      } else {
+        final message = result['message'] ?? 'Upload failed';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
         );
       }
+
+      setState(() {
+        _isUploading = false;
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Upload failed: ${e.toString()}')),
+      );
       setState(() {
         _isUploading = false;
       });
@@ -198,7 +186,6 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
       _descriptionController.clear();
       _exerciseTypeController.clear();
       setState(() {
-        _selectedVideo = null;
         _isUploading = false;
         _driveStatus = 'Upload completed successfully';
       });
@@ -232,13 +219,7 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
 
-              const SizedBox(height: 24),
-              const Text(
-                '',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
+
 
               // Video Title
               TextFormField(
@@ -283,25 +264,20 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Video Selection
-              ElevatedButton.icon(
-                icon: const Icon(Icons.video_library),
-                label: Text(_selectedVideo == null
-                  ? 'Select Video'
-                  : 'Change Video'),
-                onPressed: _pickVideo,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
+              // Make Public Checkbox
+              CheckboxListTile(
+                title: const Text('Make video public (visible to members)'),
+                value: _isPublic,
+                onChanged: (bool? value) {
+                  setState(() {
+                    _isPublic = value ?? true;
+                  });
+                },
+                controlAffinity: ListTileControlAffinity.leading,
               ),
-              if (_selectedVideo != null) ...[
-                const SizedBox(height: 16),
-                Text(
-                  'Selected: ${_selectedVideo!.path.split('/').last}',
-                  style: const TextStyle(fontSize: 16),
-                ),
-              ],
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
+
+
 
               // Upload Button
               _isUploading
@@ -313,7 +289,7 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
                     child: const Text(
-                      'Upload Video',
+                      'Select and Upload Video',
                       style: TextStyle(fontSize: 18),
                     ),
                   ),

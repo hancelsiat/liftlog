@@ -1,7 +1,11 @@
 import 'dart:convert';
 import 'dart:io' show Platform, File, NetworkInterface, InternetAddressType;
 import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
+import 'package:mime/mime.dart';
+import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:file_picker/file_picker.dart';
 import '../models/user.dart';
 import '../models/workout.dart';
 import '../models/progress.dart';
@@ -211,8 +215,10 @@ class ApiService {
 
   Future<Map<String, dynamic>> _post(String endpoint, Map<String, dynamic> body) async {
     final token = await getToken();
+    final fullUrl = '$baseUrl$endpoint';
+    print('Making POST request to: $fullUrl');
     final response = await http.post(
-      Uri.parse('$baseUrl$endpoint'),
+      Uri.parse(fullUrl),
       headers: {
         'Content-Type': 'application/json',
         if (token != null) 'Authorization': 'Bearer $token',
@@ -224,8 +230,10 @@ class ApiService {
 
   Future<Map<String, dynamic>> _get(String endpoint) async {
     final token = await getToken();
+    final fullUrl = '$baseUrl$endpoint';
+    print('Making GET request to: $fullUrl');
     final response = await http.get(
-      Uri.parse('$baseUrl$endpoint'),
+      Uri.parse(fullUrl),
       headers: {
         'Content-Type': 'application/json',
         if (token != null) 'Authorization': 'Bearer $token',
@@ -249,8 +257,10 @@ class ApiService {
 
   Future<Map<String, dynamic>> _delete(String endpoint) async {
     final token = await getToken();
+    final fullUrl = '$baseUrl$endpoint';
+    print('Making DELETE request to: $fullUrl');
     final response = await http.delete(
-      Uri.parse('$baseUrl$endpoint'),
+      Uri.parse(fullUrl),
       headers: {
         'Content-Type': 'application/json',
         if (token != null) 'Authorization': 'Bearer $token',
@@ -324,7 +334,7 @@ class ApiService {
       'description': description,
       'exercises': exercises,
     });
-    return Workout.fromJson(response);
+    return Workout.fromJson(response['workout'] as Map<String, dynamic>);
   }
 
   // Create workout template (Trainer only)
@@ -346,7 +356,7 @@ class ApiService {
       'duration': duration,
       'caloriesBurned': caloriesBurned,
     });
-    return Workout.fromJson(response);
+    return Workout.fromJson(response['workout'] as Map<String, dynamic>);
   }
 
   Future<Workout> updateWorkout(String id, String name, String description, List<String> exercises) async {
@@ -355,7 +365,7 @@ class ApiService {
       'description': description,
       'exercises': exercises,
     });
-    return Workout.fromJson(response);
+    return Workout.fromJson(response['workout'] as Map<String, dynamic>);
   }
 
   Future<void> deleteWorkout(String id) async {
@@ -416,55 +426,86 @@ class ApiService {
   }
 
   // Video upload method for trainers
-  Future<ExerciseVideo> uploadVideo({
-    required File videoFile, 
-    required Map<String, dynamic> metadata
+  Future<Map<String, dynamic>> uploadVideo({
+    required String jwt,
+    required String title,
+    required String exerciseType,
+    String? description,
+    bool isPublic = true,
   }) async {
-    // Prepare multipart request for file upload
-    final token = await getToken();
-    final request = http.MultipartRequest(
-      'POST',
-      Uri.parse('$baseUrl/videos')
-    );
-
-    // Add authorization header
-    if (token != null) {
-      request.headers['Authorization'] = 'Bearer $token';
-    } else {
-      throw Exception('No token provided');
-    }
-
-    // Add video file
-    request.files.add(
-      await http.MultipartFile.fromPath(
-        'video', 
-        videoFile.path,
-        filename: videoFile.path.split('/').last
-      )
-    );
-
-    // Add metadata fields
-    metadata.forEach((key, value) {
-      request.fields[key] = value is List 
-        ? jsonEncode(value) 
-        : value.toString();
-    });
-
-    // Send request and handle response
     try {
-      final streamedResponse = await request.send();
-      final response = await http.Response.fromStream(streamedResponse);
-      
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final responseBody = jsonDecode(response.body);
-        return ExerciseVideo.fromJson(responseBody['video']);
-      } else {
-        throw Exception('Video upload failed: ${response.body}');
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.video,
+        withData: true, // IMPORTANT for Google Drive picks
+      );
+
+      if (result == null || result.files.isEmpty) {
+        return {'success': false, 'message': 'No file selected'};
       }
+
+      final file = result.files.first;
+      final filename = file.name.isNotEmpty ? file.name : 'video_${DateTime.now().millisecondsSinceEpoch}.mp4';
+      final bytes = file.bytes; // may be null on some platforms if withData not supported
+      final path = file.path; // may be null for Drive
+
+      final mimeType = lookupMimeType(filename) ?? 'video/mp4';
+      final parts = mimeType.split('/');
+      final contentType = MediaType(parts[0], parts.length > 1 ? parts[1] : 'mp4');
+
+      MultipartFile mpFile;
+      if (bytes != null) {
+        mpFile = MultipartFile.fromBytes(bytes, filename: filename, contentType: contentType);
+      } else if (path != null) {
+        mpFile = await MultipartFile.fromFile(path, filename: filename, contentType: contentType);
+      } else {
+        return {'success': false, 'message': 'Unable to read file bytes or path'};
+      }
+
+      final form = FormData.fromMap({
+        'title': title.trim(),
+        'exerciseType': exerciseType.trim(),
+        if (description != null) 'description': description.trim(),
+        'isPublic': isPublic.toString(),
+        'video': mpFile,
+      });
+
+      final dio = Dio();
+      dio.options.headers['Authorization'] = 'Bearer $jwt';
+      dio.options.connectTimeout = const Duration(seconds: 60);
+      dio.options.receiveTimeout = const Duration(seconds: 600);
+
+      print('DEBUG upload URL: ${ApiService.baseUrl}/videos');
+
+      final response = await dio.post(
+        '${ApiService.baseUrl}/videos',
+        data: form,
+        options: Options(
+          headers: {'Authorization': 'Bearer $jwt'},
+          contentType: 'multipart/form-data',
+        ),
+        onSendProgress: (sent, total) {
+          if (total > 0) {
+            final pct = (sent / total * 100).toStringAsFixed(0);
+            print('Upload progress: $pct%');
+          }
+        },
+      );
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        return {'success': true, 'data': response.data};
+      } else {
+        return {'success': false, 'status': response.statusCode, 'data': response.data};
+      }
+    } on DioException catch (e) {
+      print('UPLOAD ERROR status=${e.response?.statusCode} data=${e.response?.data}');
+      return {'success': false, 'message': e.response?.data ?? e.message};
     } catch (e) {
-      throw Exception('Error uploading video: $e');
+      print('uploadVideo exception: $e');
+      return {'success': false, 'message': e.toString()};
     }
   }
+
+
 
   // Admin: Get all users
   Future<Map<String, dynamic>> getUsers({
@@ -492,6 +533,36 @@ class ApiService {
   // Admin: Delete user
   Future<void> deleteUser(String userId) async {
     await _delete('/auth/users/$userId');
+  }
+
+  // Upload video from Google Drive
+  Future<ExerciseVideo> uploadVideoFromDrive({
+    required String fileId,
+    required String accessToken,
+    required Map<String, dynamic> metadata,
+    String? userId,
+  }) async {
+    final token = await getToken();
+    final response = await http.post(
+      Uri.parse('$baseUrl/videos/upload-drive'),
+      headers: {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
+      body: json.encode({
+        'fileId': fileId,
+        'accessToken': accessToken,
+        'userId': userId,
+        ...metadata,
+      }),
+    );
+
+    final responseBody = jsonDecode(response.body);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return ExerciseVideo.fromJson(responseBody['video']);
+    } else {
+      throw Exception('Video upload failed: ${responseBody['error'] ?? responseBody['details'] ?? response.body}');
+    }
   }
 
   Future<Map<String, dynamic>> _getUri(String url) async {

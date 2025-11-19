@@ -56,12 +56,14 @@ class _TrainingVideosScreenState extends State<TrainingVideosScreen> {
   }
 
   void _launchVideo(String videoUrl) async {
-    final Uri url = Uri.parse(videoUrl);
+    // Construct full URL if it's a relative path
+    final fullUrl = videoUrl.startsWith('http') ? videoUrl : '${ApiService.baseUrl}$videoUrl';
+    final Uri url = Uri.parse(fullUrl);
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not launch $videoUrl')),
+        SnackBar(content: Text('Could not launch $fullUrl')),
       );
     }
   }
@@ -182,9 +184,9 @@ class _TrainingVideosScreenState extends State<TrainingVideosScreen> {
                             ),
                             trailing: IconButton(
                               icon: const Icon(Icons.play_circle_fill),
-                              onPressed: () => _launchVideo(video.videoUrl),
+                              onPressed: () => _launchVideo(video.videoFileId),
                             ),
-                            onTap: () => _launchVideo(video.videoUrl),
+                            onTap: () => _launchVideo(video.videoFileId),
                           ),
                         );
                       },
