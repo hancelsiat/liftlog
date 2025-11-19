@@ -1,4 +1,5 @@
-- [x] Add "Make Public" checkbox in video upload screen (default true)
-- [x] Update API service to pass isPublic in uploadVideo
-- [x] Update backend to use isPublic from request body
-- [x] Test that members can see trainer videos
+- [x] Update backend/routes/videos.js to encode BUCKET in videoUrl construction
+- [x] Create backend/scripts/fix_video_urls.js script to update existing DB records
+- [x] Run the fix script to update existing video URLs
+- [ ] Redeploy backend after changes
+- [ ] Test a video URL to ensure it works

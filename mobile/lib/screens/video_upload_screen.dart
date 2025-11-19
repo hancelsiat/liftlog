@@ -25,7 +25,7 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
   final _descriptionController = TextEditingController();
   final _exerciseTypeController = TextEditingController();
   bool _isUploading = false;
-  bool _isPublic = false;
+  bool _isPublic = true;
 
   // Google Drive related state
   GoogleSignInAccount? _account;
@@ -167,7 +167,7 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
         'difficulty': 'beginner',
         'duration': 0,
         'tags': [],
-        'isPublic': false,
+        'isPublic': true,
       };
 
       final uploadedVideo = await _apiService.uploadVideoFromDrive(

@@ -71,7 +71,7 @@ router.post('/', verifyToken, upload.single('video'), async (req, res) => {
       return res.status(500).json({ error: 'upload_failed', message: uploadError.message || uploadError });
     }
 
-    const videoUrl = `${SUPABASE_URL.replace(/\/$/, '')}/storage/v1/object/public/${BUCKET}/${encodeURIComponent(path)}`;
+    const videoUrl = `${SUPABASE_URL.replace(/\/$/, '')}/storage/v1/object/public/${encodeURIComponent(BUCKET)}/${encodeURIComponent(path)}`;
 
     const parsedTags = tags ? (Array.isArray(tags) ? tags : String(tags).split(',').map(t=>t.trim()).filter(Boolean)) : [];
 
@@ -85,7 +85,7 @@ router.post('/', verifyToken, upload.single('video'), async (req, res) => {
       difficulty: difficulty || 'beginner',
       duration: duration ? Number(duration) : 0,
       tags: parsedTags,
-      isPublic: !!isPublic
+      isPublic: parsedIsPublic
     });
 
     await doc.save();
