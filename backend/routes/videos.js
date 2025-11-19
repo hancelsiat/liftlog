@@ -1,4 +1,4 @@
-// backend/routes/videos.js
+ // backend/routes/videos.js
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
@@ -29,6 +29,14 @@ const upload = multer({
 router.post('/', verifyToken, upload.single('video'), async (req, res) => {
   try {
     console.log('Incoming request: POST /api/videos from', req.ip);
+    console.log('DEBUG content-type:', req.headers['content-type']);
+    console.log('DEBUG body keys:', Object.keys(req.body || {}));
+    console.log('DEBUG body content:', req.body);
+    console.log('DEBUG file info:', req.file ? {
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.buffer?.length
+    } : 'NO FILE RECEIVED');
 
     if (!req.file || !req.file.buffer) {
       console.error('No file or buffer present');
@@ -47,8 +55,7 @@ router.post('/', verifyToken, upload.single('video'), async (req, res) => {
     const safeName = `${Date.now()}-${Math.floor(Math.random()*1e9)}-${origName}`;
     const path = safeName; // optionally prefix: `videos/${safeName}`
 
-    const contentType = req.file.mimetype || 'video/mp4';
-
+    const contentType = req.file.mimetype || 'video/mp4'
     // upload to supabase
     const { data, error: uploadError } = await supabase
       .storage
@@ -84,6 +91,36 @@ router.post('/', verifyToken, upload.single('video'), async (req, res) => {
   } catch (err) {
     console.error('videos upload error:', err && err.stack ? err.stack : err);
     return res.status(500).json({ error: 'Video upload failed', message: err.message || String(err) });
+  }
+});
+
+// GET /api/videos/trainer - Get videos uploaded by the current trainer
+router.get('/trainer', verifyToken, async (req, res) => {
+  try {
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ error: 'Unauthorized: no user' });
+    }
+
+    const videos = await ExerciseVideo.find({ trainer: req.user._id }).sort({ createdAt: -1 });
+    console.log(`Found ${videos.length} videos for trainer ${req.user._id}`);
+
+    return res.json({ videos });
+  } catch (err) {
+    console.error('videos trainer get error:', err && err.stack ? err.stack : err);
+    return res.status(500).json({ error: 'Failed to fetch trainer videos', message: err.message || String(err) });
+  }
+});
+
+// GET /api/videos - Get public videos for members
+router.get('/', verifyToken, async (req, res) => {
+  try {
+    const videos = await ExerciseVideo.find({ isPublic: true }).sort({ createdAt: -1 });
+    console.log(`Found ${videos.length} public videos`);
+
+    return res.json({ videos });
+  } catch (err) {
+    console.error('videos get error:', err && err.stack ? err.stack : err);
+    return res.status(500).json({ error: 'Failed to fetch videos', message: err.message || String(err) });
   }
 });
 
