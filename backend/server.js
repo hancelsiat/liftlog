@@ -69,7 +69,7 @@ const workoutRoutes = require('./routes/workouts');
 const videoRoutes = require('./routes/videos');
 const progressRoutes = require('./routes/progress');
 const presignRoutes = require('./routes/presign');
-const videosCompleteRoutes = require('./routes/videos_complete');
+// const videosCompleteRoutes = require('./routes/videos_complete');
 
 // Use Routes
 app.use('/api/auth', authRoutes);
@@ -77,7 +77,7 @@ app.use('/api/workouts', workoutRoutes);
 app.use('/api/videos', videoRoutes);
 app.use('/api/progress', progressRoutes);
 app.use('/api', presignRoutes);
-app.use('/api', videosCompleteRoutes);
+// app.use('/api', videosCompleteRoutes);
 
 // Serve static files for uploaded videos
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
