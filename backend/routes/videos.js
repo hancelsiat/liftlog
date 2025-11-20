@@ -44,7 +44,7 @@ router.post('/', verifyToken, upload.single('video'), async (req, res) => {
     }
 
     const { title, exerciseType, description, difficulty, duration, tags, isPublic } = req.body;
-    const parsedIsPublic = isPublic === 'true' || isPublic === true;
+    const parsedIsPublic = isPublic == null ? true : (isPublic === 'true' || isPublic === true);
     const parsedTitle = title ? String(title).trim() : '';
     const parsedExerciseType = exerciseType ? String(exerciseType).trim() : 'strength'; // default
 
@@ -120,11 +120,52 @@ router.get('/', verifyToken, async (req, res) => {
   try {
     const videos = await ExerciseVideo.find({ isPublic: true }).sort({ createdAt: -1 });
     console.log(`Found ${videos.length} public videos`);
+    console.log('Returning videos:', videos.map(v => ({ id: v._id, videoUrl: v.videoUrl })));
 
     return res.json({ videos });
   } catch (err) {
     console.error('videos get error:', err && err.stack ? err.stack : err);
     return res.status(500).json({ error: 'Failed to fetch videos', message: err.message || String(err) });
+  }
+});
+
+// DELETE /api/videos/:id - Delete a video (trainer only)
+router.delete('/:id', verifyToken, async (req, res) => {
+  try {
+    const videoId = req.params.id;
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ error: 'Unauthorized: no user' });
+    }
+
+    const video = await ExerciseVideo.findById(videoId);
+    if (!video) {
+      return res.status(404).json({ error: 'Video not found' });
+    }
+
+    // Check if the user is the trainer who uploaded the video
+    if (video.trainer.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: 'Forbidden: You can only delete your own videos' });
+    }
+
+    // Delete from Supabase storage
+    const { error: deleteError } = await supabase
+      .storage
+      .from(BUCKET)
+      .remove([video.videoPath]);
+
+    if (deleteError) {
+      console.error('Supabase delete error:', deleteError);
+      // Continue with DB deletion even if storage deletion fails
+    }
+
+    // Delete from database
+    await ExerciseVideo.findByIdAndDelete(videoId);
+    console.log('Video deleted:', videoId);
+
+    return res.json({ message: 'Video deleted successfully' });
+  } catch (err) {
+    console.error('videos delete error:', err && err.stack ? err.stack : err);
+    return res.status(500).json({ error: 'Failed to delete video', message: err.message || String(err) });
   }
 });
 
