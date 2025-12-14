@@ -552,6 +552,14 @@ class ApiService {
     await _delete('/auth/users/$userId');
   }
 
+  // Admin: Approve/Reject trainer
+  Future<User> approveTrainer(String userId, bool isApproved) async {
+    final response = await _patch('/auth/users/$userId/approve', {
+      'isApproved': isApproved,
+    });
+    return User.fromJson(response);
+  }
+
   // Check if user can update progress
   Future<Map<String, dynamic>> canUpdateProgress() async {
     final token = await getToken();

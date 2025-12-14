@@ -183,6 +183,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       floating: false,
       pinned: true,
       backgroundColor: Colors.transparent,
+      automaticallyImplyLeading: false, // Remove back button from dashboard
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: BoxDecoration(

@@ -11,6 +11,8 @@ class User {
   final String name;
   final UserRole role;
   final UserProfile? profile;
+  final bool isEmailVerified;
+  final bool isApproved;
 
   User({
     required this.id,
@@ -19,6 +21,8 @@ class User {
     required this.name,
     this.role = UserRole.member,
     this.profile,
+    this.isEmailVerified = false,
+    this.isApproved = false,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -42,6 +46,8 @@ class User {
       name: json['name'] ?? json['username'] ?? '',
       role: role,
       profile: json['profile'] != null ? UserProfile.fromJson(json['profile']) : null,
+      isEmailVerified: json['isEmailVerified'] ?? false,
+      isApproved: json['isApproved'] ?? false,
     );
   }
 
@@ -53,6 +59,8 @@ class User {
       'name': name,
       'role': role.toString().split('.').last,
       'profile': profile?.toJson(),
+      'isEmailVerified': isEmailVerified,
+      'isApproved': isApproved,
     };
   }
 }
