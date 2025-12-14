@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
-import '../models/exercise_video.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
-import 'package:url_launcher/url_launcher.dart';
+import '../models/user.dart';
+import '../models/exercise_video.dart';
+import '../utils/url_helpers.dart';
+import 'video_player_screen.dart';
 
 class TrainingVideosScreen extends StatefulWidget {
   const TrainingVideosScreen({super.key});
@@ -13,7 +17,7 @@ class TrainingVideosScreen extends StatefulWidget {
 class _TrainingVideosScreenState extends State<TrainingVideosScreen> {
   List<ExerciseVideo> _videos = [];
   bool _isLoading = true;
-  String? _error;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -21,8 +25,13 @@ class _TrainingVideosScreenState extends State<TrainingVideosScreen> {
     _fetchVideos();
   }
 
-  void _fetchVideos() async {
+  Future<void> _fetchVideos() async {
     try {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+
       final apiService = ApiService();
       final videos = await apiService.getExerciseVideos();
 
@@ -32,7 +41,7 @@ class _TrainingVideosScreenState extends State<TrainingVideosScreen> {
       });
     } catch (e) {
       setState(() {
-        _error = e.toString();
+        _errorMessage = 'Failed to load videos: ${e.toString()}';
         _isLoading = false;
       });
       if (e.toString().contains('Authentication required')) {
@@ -45,82 +54,47 @@ class _TrainingVideosScreenState extends State<TrainingVideosScreen> {
     }
   }
 
-  void _filterVideos(String exerciseType) {
-    if (exerciseType == 'all') {
-      _fetchVideos();
-    } else {
-      setState(() {
-        _videos = _videos.where((video) => video.exerciseType == exerciseType).toList();
-      });
-    }
-  }
-
-  void _launchVideo(String videoUrl) async {
-    // Construct full URL if it's a relative path
-    final fullUrl = videoUrl.startsWith('http') ? videoUrl : '${ApiService.baseUrl}$videoUrl';
-    final Uri url = Uri.parse(fullUrl);
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not launch $fullUrl')),
-      );
-    }
+  void _playVideo(String videoUrl, String title) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => VideoPlayerScreen(
+          videoUrl: videoUrl,
+          title: title,
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context);
+    final user = authProvider.user;
+
+    if (user?.role != UserRole.member) {
+      return const Scaffold(
+        body: Center(child: Text('This screen is only for members')),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Training Videos'),
         actions: [
-          PopupMenuButton<String>(
-            onSelected: _filterVideos,
-            itemBuilder: (BuildContext context) => [
-              const PopupMenuItem<String>(
-                value: 'all',
-                child: Text('All Videos'),
-              ),
-              const PopupMenuItem<String>(
-                value: 'strength',
-                child: Text('Strength'),
-              ),
-              const PopupMenuItem<String>(
-                value: 'cardio',
-                child: Text('Cardio'),
-              ),
-              const PopupMenuItem<String>(
-                value: 'flexibility',
-                child: Text('Flexibility'),
-              ),
-              const PopupMenuItem<String>(
-                value: 'upper_body',
-                child: Text('Upper Body'),
-              ),
-              const PopupMenuItem<String>(
-                value: 'lower_body',
-                child: Text('Lower Body'),
-              ),
-              const PopupMenuItem<String>(
-                value: 'core',
-                child: Text('Core'),
-              ),
-              const PopupMenuItem<String>(
-                value: 'full_body',
-                child: Text('Full Body'),
-              ),
-            ],
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _fetchVideos,
           ),
         ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _error != null
+          : _errorMessage != null
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text('Error: $_error'),
+                      Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
                       ElevatedButton(
                         onPressed: _fetchVideos,
                         child: const Text('Retry'),
@@ -130,101 +104,24 @@ class _TrainingVideosScreenState extends State<TrainingVideosScreen> {
                 )
               : _videos.isEmpty
                   ? const Center(
-                      child: Text('No training videos available'),
+                      child: Text(
+                        'No videos available',
+                        style: TextStyle(fontSize: 18),
+                      ),
                     )
                   : ListView.builder(
                       itemCount: _videos.length,
                       itemBuilder: (context, index) {
                         final video = _videos[index];
-                        return Card(
-                          margin: const EdgeInsets.all(8.0),
-                          child: ListTile(
-                            title: Text(
-                              video.title,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('By: ${video.trainerName}'),
-                                Text(
-                                  video.description,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                Row(
-                                  children: [
-                                    Chip(
-                                      label: Text(video.exerciseType),
-                                      labelStyle: const TextStyle(fontSize: 10),
-                                      backgroundColor: _getExerciseTypeColor(video.exerciseType),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Chip(
-                                      label: Text(video.difficulty),
-                                      labelStyle: const TextStyle(fontSize: 10),
-                                      backgroundColor: _getDifficultyColor(video.difficulty),
-                                    ),
-                                  ],
-                                ),
-                                if (video.tags.isNotEmpty)
-                                  Wrap(
-                                    spacing: 4.0,
-                                    children: video.tags
-                                        .map((tag) => Chip(
-                                              label: Text(tag),
-                                              labelStyle:
-                                                  const TextStyle(fontSize: 10),
-                                            ))
-                                        .toList(),
-                                  ),
-                              ],
-                            ),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.play_circle_fill),
-                              onPressed: () => _launchVideo(video.videoFileId),
-                            ),
-                            onTap: () => _launchVideo(video.videoFileId),
-                          ),
+                        return ListTile(
+                          leading: const Icon(Icons.video_library),
+                          title: Text(video.title),
+                          subtitle: Text(video.trainerName),
+                          trailing: const Icon(Icons.play_arrow),
+                          onTap: () => _playVideo(video.videoUrl, video.title),
                         );
                       },
                     ),
     );
-  }
-
-  Color _getExerciseTypeColor(String exerciseType) {
-    switch (exerciseType) {
-      case 'strength':
-        return Colors.red.shade100;
-      case 'cardio':
-        return Colors.blue.shade100;
-      case 'flexibility':
-        return Colors.green.shade100;
-      case 'upper_body':
-        return Colors.orange.shade100;
-      case 'lower_body':
-        return Colors.purple.shade100;
-      case 'core':
-        return Colors.yellow.shade100;
-      case 'full_body':
-        return Colors.teal.shade100;
-      default:
-        return Colors.grey.shade100;
-    }
-  }
-
-  Color _getDifficultyColor(String difficulty) {
-    switch (difficulty) {
-      case 'beginner':
-        return Colors.green.shade100;
-      case 'intermediate':
-        return Colors.yellow.shade100;
-      case 'advanced':
-        return Colors.red.shade100;
-      default:
-        return Colors.grey.shade100;
-    }
   }
 }

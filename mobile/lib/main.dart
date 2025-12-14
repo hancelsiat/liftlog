@@ -1,13 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/workout_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'services/api_service.dart';
+import 'utils/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Set system UI overlay style for premium look
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      systemNavigationBarColor: AppTheme.darkBackground,
+      systemNavigationBarIconBrightness: Brightness.light,
+    ),
+  );
 
   // Always use Render backend URL for production deployment
   const String renderBackendUrl = 'https://liftlog-7.onrender.com'; // Your actual Render URL
@@ -47,10 +59,8 @@ class MyApp extends StatelessWidget {
       ],
       child: MaterialApp(
         title: 'LiftLog',
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-          useMaterial3: true,
-        ),
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.darkTheme,
         home: isLoggedIn ? const DashboardScreen() : const LoginScreen(),
       ),
     );

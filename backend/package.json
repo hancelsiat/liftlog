@@ -14,7 +14,9 @@
     "test:watch": "jest --watch",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "prepare": "node prepare.js"
+    "prepare": "node prepare.js",
+    "create-admin": "node scripts/create_admin.js",
+    "reset-admin": "node scripts/reset_admin_password.js"
   },
   "keywords": [
     "fitness",
@@ -42,6 +44,7 @@
     "helmet": "^4.6.0",
     "jest-junit": "^16.0.0",
     "jsonwebtoken": "^9.0.2",
+    "mime-types": "^3.0.1",
     "mongoose": "^6.0.12",
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",

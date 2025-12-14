@@ -1,8 +1,12 @@
- // backend/routes/videos.js
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const { createClient } = require('@supabase/supabase-js');
+const mime = require('mime-types');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+const child_process = require('child_process');
 const ExerciseVideo = require('../models/ExerciseVideo'); // adjust if model path differs
 const { verifyToken } = require('../middleware/auth'); // adjust to your auth middleware
 
@@ -55,33 +59,67 @@ router.post('/', verifyToken, upload.single('video'), async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized: no user' });
     }
 
+    // Prepare safe names
     const origName = req.file.originalname || 'video.mp4';
-    const safeName = `${Date.now()}-${Math.floor(Math.random()*1e9)}-${origName}`;
-    const path = safeName; // optionally prefix: `videos/${safeName}`
+    const cleanedName = origName.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9\-_\.]/g, '');
+    const safeName = `${Date.now()}-${Math.floor(Math.random()*1e9)}-${cleanedName}`;
+    const finalPathKey = `videos/${safeName}`;
 
-    const contentType = req.file.mimetype || 'video/mp4'
-    // upload to supabase
-    const { data, error: uploadError } = await supabase
-      .storage
-      .from(BUCKET)
-      .upload(path, req.file.buffer, { contentType });
+    // temp files
+    const tmpDir = os.tmpdir();
+    const tmpIn = path.join(tmpDir, `in-${safeName}`);
+    const tmpOut = path.join(tmpDir, `out-${safeName}.mp4`);
 
-    if (uploadError) {
-      console.error('Supabase upload error:', uploadError);
-      return res.status(500).json({ error: 'upload_failed', message: uploadError.message || uploadError });
+    // write buffer to temp file
+    fs.writeFileSync(tmpIn, req.file.buffer);
+
+    // First try a fast remux (cheap, preserves quality)
+    try {
+      child_process.execFileSync('ffmpeg', ['-y', '-i', tmpIn, '-c', 'copy', '-movflags', '+faststart', tmpOut], { stdio: 'inherit', timeout: 120000 });
+    } catch (e) {
+      // if remux fails, fallback to full re-encode
+      console.warn('Remux failed, doing full re-encode', e);
+      child_process.execFileSync('ffmpeg', [
+        '-y', '-i', tmpIn,
+        '-c:v', 'libx264', '-profile:v', 'baseline', '-level', '3.0', '-pix_fmt', 'yuv420p',
+        '-preset', 'fast', '-crf', '23',
+        '-c:a', 'aac', '-b:a', '128k',
+        '-movflags', '+faststart',
+        tmpOut
+      ], { stdio: 'inherit', timeout: 180000 });
     }
 
-    const videoUrl = `${SUPABASE_URL.replace(/\/$/, '')}/storage/v1/object/public/${encodeURIComponent(BUCKET)}/${encodeURIComponent(path)}`;
+    // read fixed buffer and upload to Supabase
+    const fixedBuffer = fs.readFileSync(tmpOut);
+    const contentType = 'video/mp4'; // final file is mp4
+
+    const { data: upData, error: upErr } = await supabase
+      .storage
+      .from(BUCKET)
+      .upload(finalPathKey, fixedBuffer, { contentType, upsert: false });
+
+    if (upErr) {
+      console.error('Supabase upload error after reencode:', upErr);
+      // cleanup
+      try { fs.unlinkSync(tmpIn); fs.unlinkSync(tmpOut); } catch(e) {}
+      return res.status(500).json({ error: 'upload_failed', message: upErr.message || upErr });
+    }
+
+    // build public url
+    const videoUrl = `${SUPABASE_URL.replace(/\/$/, '')}/storage/v1/object/public/${BUCKET}/${encodeURIComponent(finalPathKey.replace(/^\/+/, ''))}`;
+
+    // cleanup temp files
+    try { fs.unlinkSync(tmpIn); fs.unlinkSync(tmpOut); } catch(e) {}
 
     const parsedTags = tags ? (Array.isArray(tags) ? tags : String(tags).split(',').map(t=>t.trim()).filter(Boolean)) : [];
 
     const doc = new ExerciseVideo({
-      title: title.trim(),
+      title: parsedTitle.trim(),
       description: description || '',
       trainer: req.user._id,
       videoUrl,
-      videoPath: path,
-      exerciseType,
+      videoPath: finalPathKey,
+      exerciseType: parsedExerciseType,
       difficulty: difficulty || 'beginner',
       duration: duration ? Number(duration) : 0,
       tags: parsedTags,
@@ -108,7 +146,27 @@ router.get('/trainer', verifyToken, async (req, res) => {
     const videos = await ExerciseVideo.find({ trainer: req.user._id }).sort({ createdAt: -1 });
     console.log(`Found ${videos.length} videos for trainer ${req.user._id}`);
 
-    return res.json({ videos });
+    // Generate signed URLs for each video
+    const videosWithSignedUrls = await Promise.all(videos.map(async (video) => {
+      try {
+        const { data, error } = await supabase
+          .storage
+          .from(BUCKET)
+          .createSignedUrl(video.videoPath, 3600); // 1 hour expiry
+
+        if (error) {
+          console.error('Error creating signed URL for video:', video._id, error);
+          return { ...video.toObject(), videoUrl: video.videoUrl }; // fallback to original
+        }
+
+        return { ...video.toObject(), videoUrl: data.signedUrl };
+      } catch (err) {
+        console.error('Exception creating signed URL:', err);
+        return { ...video.toObject(), videoUrl: video.videoUrl };
+      }
+    }));
+
+    return res.json({ videos: videosWithSignedUrls });
   } catch (err) {
     console.error('videos trainer get error:', err && err.stack ? err.stack : err);
     return res.status(500).json({ error: 'Failed to fetch trainer videos', message: err.message || String(err) });

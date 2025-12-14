@@ -56,6 +56,9 @@ dependencies:
   # URL launcher for opening external links
   url_launcher: ^6.3.0
 
+  # Video player for inline video playback
+  video_player: ^2.8.6
+
   # Charts for progress visualization
   fl_chart: ^0.66.2
   dio: ^5.9.0

@@ -20,11 +20,34 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   List<Progress> _progressHistory = [];
   bool _isLoading = false;
+  bool _canUpdate = true;
+  int _daysUntilNextUpdate = 0;
+  DateTime? _nextAllowedDate;
+  String _updateMessage = '';
 
   @override
   void initState() {
     super.initState();
+    _checkUpdateStatus();
     _fetchProgressHistory();
+  }
+
+  Future<void> _checkUpdateStatus() async {
+    try {
+      final apiService = ApiService();
+      final status = await apiService.canUpdateProgress();
+      
+      setState(() {
+        _canUpdate = status['canUpdate'] ?? true;
+        _daysUntilNextUpdate = status['daysUntilNextUpdate'] ?? 0;
+        _updateMessage = status['message'] ?? '';
+        if (status['nextAllowedDate'] != null) {
+          _nextAllowedDate = DateTime.parse(status['nextAllowedDate']);
+        }
+      });
+    } catch (e) {
+      print('Error checking update status: $e');
+    }
   }
 
   void _fetchProgressHistory() async {
@@ -59,6 +82,17 @@ class _ProgressScreenState extends State<ProgressScreen> {
   }
 
   void _saveProgress() async {
+    if (!_canUpdate) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_updateMessage),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
     if (_formKey.currentState!.validate()) {
       try {
         final apiService = ApiService();
@@ -73,15 +107,26 @@ class _ProgressScreenState extends State<ProgressScreen> {
         _caloriesIntakeController.clear();
         _calorieDeficitController.clear();
 
-        // Refresh progress history
+        // Refresh status and history
+        await _checkUpdateStatus();
         _fetchProgressHistory();
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Progress saved successfully')),
+          const SnackBar(
+            content: Text('Progress saved successfully! Next update available in 7 days.'),
+            backgroundColor: Colors.green,
+          ),
         );
       } catch (e) {
+        final errorMessage = e.toString().contains('once per week')
+            ? 'You can only update your progress once per week'
+            : 'Failed to save progress: $e';
+        
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save progress: $e')),
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -99,8 +144,94 @@ class _ProgressScreenState extends State<ProgressScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Weekly Update Warning Banner
+              if (!_canUpdate)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.orange, width: 2),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.schedule, color: Colors.orange, size: 32),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Weekly Update Limit',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: Colors.orange,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Next update available in $_daysUntilNextUpdate day(s)',
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                            if (_nextAllowedDate != null)
+                              Text(
+                                'Available on: ${_nextAllowedDate!.day}/${_nextAllowedDate!.month}/${_nextAllowedDate!.year}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              // Success Banner when can update
+              if (_canUpdate && _progressHistory.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.green, width: 2),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.check_circle, color: Colors.green, size: 32),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Ready to Update',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: Colors.green,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'You can update your weekly progress now!',
+                              style: TextStyle(fontSize: 14),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
               // Progress Input Form
-              Form(
+              Opacity(
+                opacity: _canUpdate ? 1.0 : 0.5,
+                child: Form(
                 key: _formKey,
                 child: Column(
                   children: [
@@ -139,11 +270,15 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     ),
                     const SizedBox(height: 20),
                     ElevatedButton(
-                      onPressed: _saveProgress,
-                      child: const Text('Save Progress'),
+                      onPressed: _canUpdate ? _saveProgress : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _canUpdate ? null : Colors.grey,
+                      ),
+                      child: Text(_canUpdate ? 'Save Progress' : 'Update Not Available'),
                     ),
                   ],
                 ),
+              ),
               ),
 
               // Progress Charts

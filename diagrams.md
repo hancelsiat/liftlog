@@ -35,45 +35,240 @@ The Context Diagram shows the LiftLog system in its environment, illustrating th
 
 ## Flowchart (Hardware and System)
 
-**Description:**  
-This flowchart illustrates the hardware and system-level data flow within LiftLog. It shows how user interactions on the mobile device flow through the system components, including API calls, database operations, and storage interactions. The flow covers authentication, data retrieval/storage, and response handling.
+**Description:**
+This flowchart illustrates the hardware and system-level data flow within LiftLog. It shows how user interactions on the mobile device flow through the system components, including API calls, database operations, and storage interactions. The flow covers authentication, data retrieval/storage, and response handling, with detailed branches for different user roles and actions.
 
-**Textual Representation:**
+**Mermaid Flowchart:**
 
-```
-Start
-  |
-  v
-User Action on Mobile Device
-  |
-  v
-Mobile App (Flutter)
-  |  (API Request)
-  v
-Backend Server (Express)
-  |  (Process Request)
-  v
-Authentication Middleware
-  |  (Verify Token)
-  v
-Route Handler
-  |  (Business Logic)
-  v
-Database Interaction (MongoDB)
-  |  or
-File Storage Interaction (Supabase)
-  |  (CRUD Operations)
-  v
-Response Generation
-  |  (JSON Response)
-  v
-Backend Server
-  |  (Send Response)
-  v
-Mobile App
-  |  (Update UI)
-  v
-End
+```mermaid
+flowchart TD
+    A[App Launch] --> B{Token Exists?}
+    B -->|Yes| C[Validate Token via API]
+    B -->|No| D[Login/Register Screen]
+
+    C -->|Valid| E[Dashboard Based on Role]
+    C -->|Invalid| F[Remove Token] --> D
+
+    D --> G[User Inputs Credentials]
+    G --> H[API Call: POST /api/auth/login or /register]
+    H --> I[Backend: Auth Route]
+    I --> J{User Exists? / Valid Credentials?}
+    J -->|No| K[Return Error]
+    J -->|Yes| L{Check Membership / Role}
+    L -->|Fail| K
+    L -->|Pass| M[Generate JWT Token]
+    M --> N[Return Token & User Data]
+    N --> O[Store Token Locally]
+    O --> E
+
+    E --> P{User Role?}
+    P -->|Member| Q[Member Actions]
+    P -->|Trainer| R[Trainer Actions]
+    P -->|Admin| S[Admin Actions]
+
+    Q --> T[View Workouts: GET /api/workouts]
+    Q --> U[Log Progress: POST /api/progress]
+    Q --> V[View Videos: GET /api/videos]
+    Q --> W[Settings: GET /api/auth/profile]
+
+    R --> X[Create Workout Template: POST /api/workouts/template]
+    R --> Y[Upload Video: POST /api/videos via Presign]
+    R --> Z[View Member Progress: GET /api/progress/user/:id]
+    R --> AA[Manage Videos: GET /api/videos/trainer]
+
+    S --> BB[User Management: GET /api/auth/users]
+    S --> CC[Update Membership: PATCH /api/auth/membership/:id]
+    S --> DD[View Reports: Various Admin Queries]
+
+    T --> EE[Backend: Workouts Route]
+    EE --> FF[Verify Token & Role]
+    FF --> GG[Query MongoDB: Workouts Collection]
+    GG --> HH[Return Workouts Data]
+    HH --> II[Display Workouts List]
+
+    U --> JJ[Backend: Progress Route]
+    JJ --> KK[Verify Token]
+    KK --> LL[Create Progress Document]
+    LL --> MM[Save to MongoDB: Progress Collection]
+    MM --> NN[Return Success]
+    NN --> OO[Update UI: Progress Logged]
+
+    V --> PP[Backend: Videos Route]
+    PP --> QQ[Verify Token]
+    QQ --> RR[Query MongoDB: ExerciseVideos Collection]
+    RR --> SS[Return Videos List]
+    SS --> TT[Display Videos]
+
+    X --> UU[Backend: Workouts Route]
+    UU --> VV[Check Role: Trainer]
+    VV --> WW[Create Workout Document]
+    WW --> XX[Save to MongoDB]
+    XX --> YY[Return Template Created]
+    YY --> ZZ[Update UI]
+
+    Y --> AAA[API Call: POST /api/presign]
+    AAA --> BBB[Backend: Presign Route]
+    BBB --> CCC[Generate Supabase Upload URL]
+    CCC --> DDD[Return Presigned URL]
+    DDD --> EEE[Upload Video to Supabase]
+    EEE --> FFF[API Call: POST /api/videos]
+    FFF --> GGG[Backend: Videos Route]
+    GGG --> HHH[Create ExerciseVideo Document]
+    HHH --> III[Save to MongoDB]
+    III --> JJJ[Return Video Uploaded]
+    JJJ --> KKK[Update UI]
+
+    Z --> LLL[Backend: Progress Route]
+    LLL --> MMM[Check Role: Trainer/Admin]
+    MMM --> NNN[Query MongoDB: Progress Collection]
+    NNN --> OOO[Return User Progress]
+    OOO --> PPP[Display Progress Charts]
+
+    BB --> QQQ[Backend: Auth Route]
+    QQQ --> RRR[Check Role: Admin]
+    RRR --> SSS[Query MongoDB: Users Collection]
+    SSS --> TTT[Return Users List]
+    TTT --> UUU[Display User Management]
+
+    CC --> VVV[Backend: Auth Route]
+    VVV --> WWW[Check Role: Admin]
+    WWW --> XXX[Update User Document]
+    XXX --> YYY[Save to MongoDB]
+    YYY --> ZZZ[Return Updated User]
+    ZZZ --> AAAA[Update UI]
+
+    W --> BBBB[Backend: Auth Route]
+    BBBB --> CCCC[Verify Token]
+    CCCC --> DDDD[Query MongoDB: Users Collection]
+    DDDD --> EEEE[Return Profile Data]
+    EEEE --> FFFF[Display Profile]
+
+    AA --> GGGG[Backend: Videos Route]
+    GGGG --> HHHH[Check Role: Trainer]
+    HHHH --> IIII[Query MongoDB: Videos by Trainer]
+    IIII --> JJJJ[Return Trainer Videos]
+    JJJJ --> KKKK[Display Manage Videos]
+
+    DD --> LLLL[Backend: Multiple Routes]
+    LLLL --> MMMM[Aggregate Data from MongoDB]
+    MMMM --> NNNN[Return Reports Data]
+    NNNN --> OOOO[Display Reports]
+
+    K --> PPPP[Show Error Message]
+    PPPP --> G
+
+    subgraph "Mobile App (Flutter)"
+        A
+        B
+        C
+        D
+        E
+        G
+        O
+        Q
+        R
+        S
+        T
+        U
+        V
+        W
+        X
+        Y
+        Z
+        AA
+        BB
+        CC
+        DD
+        II
+        OO
+        TT
+        ZZ
+        KKK
+        PPP
+        UUU
+        AAAA
+        FFFF
+        KKKK
+        OOOO
+    end
+
+    subgraph "API Service"
+        H
+        T
+        U
+        V
+        X
+        AAA
+        FFF
+        Z
+        BB
+        CC
+        W
+        AA
+        DD
+    end
+
+    subgraph "Backend (Express.js)"
+        I
+        EE
+        JJ
+        PP
+        UU
+        BBB
+        GGG
+        LLL
+        QQQ
+        VVV
+        BBBB
+        GGGG
+        LLLL
+    end
+
+    subgraph "Middleware"
+        FF
+        KK
+        QQ
+        VV
+        MMM
+        RRR
+        WWW
+        CCCC
+        HHHH
+    end
+
+    subgraph "Database (MongoDB Atlas)"
+        GG
+        MM
+        RR
+        XX
+        III
+        NNN
+        SSS
+        XXX
+        DDDD
+        IIII
+        MMMM
+    end
+
+    subgraph "File Storage (Supabase)"
+        EEE
+    end
+
+    subgraph "Responses"
+        N
+        HH
+        NN
+        SS
+        YY
+        CCC
+        JJJ
+        OOO
+        TTT
+        ZZZ
+        EEEE
+        JJJJ
+        NNNN
+    end
 ```
 
 ## Database Schema

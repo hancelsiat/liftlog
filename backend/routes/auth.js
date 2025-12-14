@@ -15,6 +15,13 @@ router.post('/register', async (req, res) => {
       profile 
     } = req.body;
 
+    // Prevent admin registration through API
+    if (role === 'admin') {
+      return res.status(403).json({ 
+        error: 'Admin accounts cannot be created through registration. Please contact system administrator.' 
+      });
+    }
+
     // Check if user already exists
     const existingUser = await User.findOne({ 
       $or: [{ email }, { username }] 
@@ -34,12 +41,37 @@ router.post('/register', async (req, res) => {
       role,
       membershipExpiration: membershipExpiration || 
         new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Default 30 days
-      profile
+      profile,
+      isEmailVerified: role === 'member', // Members don't need email verification
+      isApproved: role === 'member' // Members are auto-approved
     });
+
+    // If trainer, generate verification token
+    if (role === 'trainer') {
+      const verificationToken = user.generateEmailVerificationToken();
+      await user.save();
+      
+      // TODO: Send verification email
+      console.log(`Verification token for ${email}: ${verificationToken}`);
+      console.log(`Verification link: http://localhost:5000/api/auth/verify-email/${verificationToken}`);
+      
+      return res.status(201).json({ 
+        message: 'Trainer account created. Please check your email to verify your account. Admin approval is also required.',
+        requiresVerification: true,
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          role: user.role,
+          isEmailVerified: user.isEmailVerified,
+          isApproved: user.isApproved
+        }
+      });
+    }
 
     await user.save();
 
-    // Generate JWT token
+    // Generate JWT token for members
     const token = generateToken(user);
 
     res.status(201).json({ 
@@ -50,6 +82,40 @@ router.post('/register', async (req, res) => {
         username: user.username,
         email: user.email,
         role: user.role
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Email Verification
+router.get('/verify-email/:token', async (req, res) => {
+  try {
+    const { token } = req.params;
+    const hashedToken = require('crypto').createHash('sha256').update(token).digest('hex');
+
+    const user = await User.findOne({
+      emailVerificationToken: hashedToken,
+      emailVerificationExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid or expired verification token' });
+    }
+
+    user.isEmailVerified = true;
+    user.emailVerificationToken = null;
+    user.emailVerificationExpires = null;
+    await user.save();
+
+    res.json({ 
+      message: 'Email verified successfully. Your account is pending admin approval.',
+      user: {
+        id: user._id,
+        email: user.email,
+        isEmailVerified: user.isEmailVerified,
+        isApproved: user.isApproved
       }
     });
   } catch (error) {
@@ -81,6 +147,20 @@ router.post('/login', async (req, res) => {
       return res.status(403).json({
         error: `Access denied. You are registered as a ${user.role}, not as a ${role}.`
       });
+    }
+
+    // Check if trainer account is verified and approved
+    if (user.role === 'trainer' && !user.canAccess()) {
+      if (!user.isEmailVerified) {
+        return res.status(403).json({ 
+          error: 'Please verify your email address before logging in. Check your email for the verification link.' 
+        });
+      }
+      if (!user.isApproved) {
+        return res.status(403).json({ 
+          error: 'Your trainer account is pending admin approval. Please wait for approval.' 
+        });
+      }
     }
 
     // Check membership status
@@ -211,10 +291,50 @@ router.patch('/users/:userId',
         email: user.email,
         role: user.role,
         profile: user.profile,
-        membershipExpiration: user.membershipExpiration
+        membershipExpiration: user.membershipExpiration,
+        isEmailVerified: user.isEmailVerified,
+        isApproved: user.isApproved
       });
     } catch (error) {
       res.status(400).json({ error: error.message });
+    }
+});
+
+// Admin: Approve trainer account (Admin Only)
+router.patch('/users/:userId/approve',
+  verifyToken,
+  checkRole(['admin']),
+  async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { isApproved } = req.body;
+
+      const user = await User.findById(userId);
+
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      if (user.role !== 'trainer') {
+        return res.status(400).json({ error: 'Only trainer accounts can be approved' });
+      }
+
+      user.isApproved = isApproved;
+      await user.save();
+
+      res.json({
+        message: `Trainer account ${isApproved ? 'approved' : 'rejected'}`,
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          role: user.role,
+          isEmailVerified: user.isEmailVerified,
+          isApproved: user.isApproved
+        }
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
     }
 });
 

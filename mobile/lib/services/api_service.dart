@@ -217,15 +217,26 @@ class ApiService {
     final token = await getToken();
     final fullUrl = '$baseUrl$endpoint';
     print('Making POST request to: $fullUrl');
-    final response = await http.post(
-      Uri.parse(fullUrl),
-      headers: {
-        'Content-Type': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode(body),
-    );
-    return _handleResponse(response);
+    
+    try {
+      final response = await http.post(
+        Uri.parse(fullUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(body),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Connection timeout. Please check your internet connection or try again later.');
+        },
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      print('POST request error: $e');
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>> _get(String endpoint) async {
@@ -407,8 +418,14 @@ class ApiService {
   // Get trainer's uploaded videos
   Future<List<ExerciseVideo>> getTrainerVideos() async {
     final response = await _get('/videos/trainer');
+    print('DEBUG api raw video json: ${response['videos']}');
     final List<dynamic> videosJson = response['videos'];
     return videosJson.map((json) => ExerciseVideo.fromJson(json)).toList();
+  }
+
+  // Delete a video
+  Future<void> deleteVideo(String videoId) async {
+    await _delete('/videos/$videoId');
   }
 
   // Get available trainers for members
@@ -533,6 +550,24 @@ class ApiService {
   // Admin: Delete user
   Future<void> deleteUser(String userId) async {
     await _delete('/auth/users/$userId');
+  }
+
+  // Check if user can update progress
+  Future<Map<String, dynamic>> canUpdateProgress() async {
+    final token = await getToken();
+    final response = await http.get(
+      Uri.parse('$baseUrl/progress/can-update'),
+      headers: {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to check update status');
+    }
   }
 
   // Upload video from Google Drive

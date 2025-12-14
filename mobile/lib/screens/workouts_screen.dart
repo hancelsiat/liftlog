@@ -184,8 +184,16 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
           padding: const EdgeInsets.all(16.0),
           child: Row(
             children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back),
+              const Expanded(
+                child: Text(
+                  'Available Workouts',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              TextButton.icon(
+                icon: const Icon(Icons.refresh),
+                label: const Text('Change Trainer'),
                 onPressed: () {
                   setState(() {
                     _selectedTrainerId = null;
@@ -193,13 +201,6 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
                   });
                   _loadTrainers();
                 },
-              ),
-              const Expanded(
-                child: Text(
-                  'Available Workouts',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center,
-                ),
               ),
             ],
           ),
