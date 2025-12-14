@@ -228,58 +228,72 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   ),
                 ),
 
-              // Progress Input Form
-              Opacity(
-                opacity: _canUpdate ? 1.0 : 0.5,
-                child: Form(
-                key: _formKey,
-                child: Column(
-                  children: [
-                    TextFormField(
-                      controller: _bmiController,
-                      decoration: const InputDecoration(labelText: 'BMI'),
-                      keyboardType: TextInputType.number,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your BMI';
-                        }
-                        return null;
-                      },
-                    ),
-                    TextFormField(
-                      controller: _caloriesIntakeController,
-                      decoration: const InputDecoration(labelText: 'Calories Intake'),
-                      keyboardType: TextInputType.number,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your daily calories intake';
-                        }
-                        return null;
-                      },
-                    ),
-                    TextFormField(
-                      controller: _calorieDeficitController,
-                      decoration: const InputDecoration(labelText: 'Calorie Deficit'),
-                      keyboardType: TextInputType.number,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your calorie deficit';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 20),
-                    ElevatedButton(
-                      onPressed: _canUpdate ? _saveProgress : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _canUpdate ? null : Colors.grey,
+              // Progress Input Form - Only show when user can update
+              if (_canUpdate)
+                Form(
+                  key: _formKey,
+                  child: Column(
+                    children: [
+                      TextFormField(
+                        controller: _bmiController,
+                        decoration: const InputDecoration(
+                          labelText: 'BMI',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.monitor_weight),
+                        ),
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter your BMI';
+                          }
+                          return null;
+                        },
                       ),
-                      child: Text(_canUpdate ? 'Save Progress' : 'Update Not Available'),
-                    ),
-                  ],
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _caloriesIntakeController,
+                        decoration: const InputDecoration(
+                          labelText: 'Calories Intake',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.restaurant),
+                        ),
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter your daily calories intake';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _calorieDeficitController,
+                        decoration: const InputDecoration(
+                          labelText: 'Calorie Deficit',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.trending_down),
+                        ),
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter your calorie deficit';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton.icon(
+                        onPressed: _saveProgress,
+                        icon: const Icon(Icons.save),
+                        label: const Text('Save Progress'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                          textStyle: const TextStyle(fontSize: 16),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              ),
 
               // Progress Charts
               const SizedBox(height: 30),
