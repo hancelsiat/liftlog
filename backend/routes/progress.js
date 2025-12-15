@@ -3,13 +3,14 @@ const router = express.Router();
 const Progress = require('../models/Progress');
 const { verifyToken, checkRole } = require('../middleware/auth');
 
-// Create a new progress entry (Weekly limit)
+// Create a new progress entry (Weekly limit - ENFORCED)
 router.post('/', verifyToken, async (req, res) => {
   try {
     // Check if user has a progress entry in the last 7 days
     const now = new Date();
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
+    console.log('=== PROGRESS RESTRICTION CHECK ===');
     console.log('Checking progress for user:', req.user._id);
     console.log('Current time:', now);
     console.log('Seven days ago:', sevenDaysAgo);
