@@ -554,10 +554,15 @@ class ApiService {
 
   // Admin: Approve/Reject trainer
   Future<User> approveTrainer(String userId, bool isApproved) async {
-    final response = await _patch('/auth/users/$userId/approve', {
+    // Trim userId to remove any whitespace
+    final cleanUserId = userId.trim();
+    final endpoint = '/auth/users/$cleanUserId/approve';
+    print('Approving trainer with endpoint: $endpoint');
+    
+    final response = await _patch(endpoint, {
       'isApproved': isApproved,
     });
-    return User.fromJson(response);
+    return User.fromJson(response['user']);
   }
 
   // Check if user can update progress
