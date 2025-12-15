@@ -148,7 +148,7 @@ class _TrainingVideosScreenState extends State<TrainingVideosScreen> {
                   fit: StackFit.expand,
                   children: [
                     // Thumbnail image
-                    if (video.thumbnailUrl.isNotEmpty == true)
+                    if (video.thumbnailUrl?.isNotEmpty ?? false)
                       ClipRRect(
                         borderRadius: const BorderRadius.only(
                           topLeft: Radius.circular(12),
@@ -210,7 +210,7 @@ class _TrainingVideosScreenState extends State<TrainingVideosScreen> {
                     ),
                     
                     // Duration badge (bottom right)
-                    if (video.duration != null && video.duration > 0)
+                    if ((video.duration ?? 0) > 0)
                       Positioned(
                         bottom: 8,
                         right: 8,
