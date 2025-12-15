@@ -177,29 +177,6 @@ class _TrainerVideosScreenState extends State<TrainerVideosScreen> with SingleTi
               ],
             ),
           ),
-          IconButton(
-            icon: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                gradient: AppTheme.primaryGradient,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.primaryColor.withOpacity(0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: const Icon(Icons.add, size: 20, color: Colors.white),
-            ),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const VideoUploadScreen()),
-              ).then((_) => _fetchTrainerVideos());
-            },
-          ),
         ],
       ),
     );
@@ -302,39 +279,6 @@ class _TrainerVideosScreenState extends State<TrainerVideosScreen> with SingleTi
                 fontSize: 16,
                 color: AppTheme.textSecondary.withOpacity(0.8),
                 height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 32),
-            Container(
-              decoration: BoxDecoration(
-                gradient: AppTheme.primaryGradient,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.primaryColor.withOpacity(0.4),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const VideoUploadScreen()),
-                  ).then((_) => _fetchTrainerVideos());
-                },
-                icon: const Icon(Icons.add_circle_outline),
-                label: const Text('Upload Video'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.transparent,
-                  shadowColor: Colors.transparent,
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                  textStyle: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
               ),
             ),
           ],
