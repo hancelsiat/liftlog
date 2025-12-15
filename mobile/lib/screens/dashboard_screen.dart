@@ -221,22 +221,24 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         centerTitle: true,
       ),
       actions: [
-        IconButton(
-          icon: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppTheme.surfaceColor.withOpacity(0.5),
-              borderRadius: BorderRadius.circular(12),
+        // Only show settings for admin users
+        if (user.role == UserRole.admin)
+          IconButton(
+            icon: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceColor.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.settings_outlined, size: 20),
             ),
-            child: const Icon(Icons.settings_outlined, size: 20),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ServerSettingsScreen()),
+              );
+            },
           ),
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const ServerSettingsScreen()),
-            );
-          },
-        ),
         IconButton(
           icon: Container(
             padding: const EdgeInsets.all(8),
