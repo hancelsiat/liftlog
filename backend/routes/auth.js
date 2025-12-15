@@ -320,6 +320,15 @@ router.patch('/users/:userId/approve',
       }
 
       user.isApproved = isApproved;
+      
+      // When admin approves, also mark email as verified
+      // This bypasses the need for email verification since admin approval is more important
+      if (isApproved) {
+        user.isEmailVerified = true;
+        user.emailVerificationToken = null;
+        user.emailVerificationExpires = null;
+      }
+      
       await user.save();
 
       res.json({
