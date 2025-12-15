@@ -357,20 +357,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                                     Row(
                                       children: [
                                         Icon(
-                                          user.isEmailVerified ? Icons.check_circle : Icons.cancel,
-                                          size: 14,
-                                          color: user.isEmailVerified ? Colors.green : Colors.grey,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          user.isEmailVerified ? 'Email Verified' : 'Email Not Verified',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: user.isEmailVerified ? Colors.green : Colors.grey,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Icon(
                                           user.isApproved ? Icons.check_circle : Icons.pending,
                                           size: 14,
                                           color: user.isApproved ? Colors.green : Colors.orange,
