@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const child_process = require('child_process');
+const ffmpeg = require('fluent-ffmpeg');
 const ExerciseVideo = require('../models/ExerciseVideo'); // adjust if model path differs
 const { verifyToken } = require('../middleware/auth'); // adjust to your auth middleware
 
@@ -28,6 +29,57 @@ const upload = multer({
   storage,
   limits: { fileSize: 500 * 1024 * 1024 } // 500MB
 });
+
+// Helper function to generate thumbnail from video
+async function generateThumbnail(videoBuffer) {
+  return new Promise((resolve, reject) => {
+    const tempVideoPath = path.join(os.tmpdir(), `video-${Date.now()}.mp4`);
+    const tempThumbnailPath = path.join(os.tmpdir(), `thumb-${Date.now()}.jpg`);
+
+    try {
+      // Write video buffer to temp file
+      fs.writeFileSync(tempVideoPath, videoBuffer);
+
+      // Generate thumbnail at 1 second mark
+      ffmpeg(tempVideoPath)
+        .screenshots({
+          timestamps: ['00:00:01.000'],
+          filename: path.basename(tempThumbnailPath),
+          folder: path.dirname(tempThumbnailPath),
+          size: '1280x720'
+        })
+        .on('end', () => {
+          try {
+            // Read the generated thumbnail
+            const thumbnailBuffer = fs.readFileSync(tempThumbnailPath);
+            
+            // Clean up temp files
+            fs.unlinkSync(tempVideoPath);
+            fs.unlinkSync(tempThumbnailPath);
+            
+            resolve(thumbnailBuffer);
+          } catch (err) {
+            console.error('Error reading thumbnail:', err);
+            reject(err);
+          }
+        })
+        .on('error', (err) => {
+          console.error('FFmpeg error:', err);
+          // Clean up temp files
+          try {
+            if (fs.existsSync(tempVideoPath)) fs.unlinkSync(tempVideoPath);
+            if (fs.existsSync(tempThumbnailPath)) fs.unlinkSync(tempThumbnailPath);
+          } catch (cleanupErr) {
+            console.error('Cleanup error:', cleanupErr);
+          }
+          reject(err);
+        });
+    } catch (err) {
+      console.error('Error in generateThumbnail:', err);
+      reject(err);
+    }
+  });
+}
 
 // POST /api/videos
 router.post('/', verifyToken, upload.single('video'), async (req, res) => {
@@ -108,6 +160,37 @@ router.post('/', verifyToken, upload.single('video'), async (req, res) => {
     // build public url
     const videoUrl = `${SUPABASE_URL.replace(/\/$/, '')}/storage/v1/object/public/${BUCKET}/${encodeURIComponent(finalPathKey.replace(/^\/+/, ''))}`;
 
+    // Generate thumbnail
+    let thumbnailUrl = null;
+    let thumbnailPath = null;
+    try {
+      console.log('Generating thumbnail...');
+      const thumbnailBuffer = await generateThumbnail(fixedBuffer);
+      
+      // Upload thumbnail to Supabase
+      const thumbFileName = `${safeName.replace(/\.[^.]+$/, '')}-thumb.jpg`;
+      const thumbPathKey = `thumbnails/${thumbFileName}`;
+      
+      const { data: thumbUploadData, error: thumbUploadError } = await supabase
+        .storage
+        .from(BUCKET)
+        .upload(thumbPathKey, thumbnailBuffer, {
+          contentType: 'image/jpeg',
+          upsert: false
+        });
+
+      if (thumbUploadError) {
+        console.error('Thumbnail upload error:', thumbUploadError);
+      } else {
+        thumbnailPath = thumbPathKey;
+        thumbnailUrl = `${SUPABASE_URL.replace(/\/$/, '')}/storage/v1/object/public/${BUCKET}/${encodeURIComponent(thumbPathKey.replace(/^\/+/, ''))}`;
+        console.log('Thumbnail uploaded:', thumbnailUrl);
+      }
+    } catch (thumbErr) {
+      console.error('Error generating/uploading thumbnail:', thumbErr);
+      // Continue without thumbnail - not a critical error
+    }
+
     // cleanup temp files
     try { fs.unlinkSync(tmpIn); fs.unlinkSync(tmpOut); } catch(e) {}
 
@@ -119,6 +202,8 @@ router.post('/', verifyToken, upload.single('video'), async (req, res) => {
       trainer: req.user._id,
       videoUrl,
       videoPath: finalPathKey,
+      thumbnailUrl,
+      thumbnailPath,
       exerciseType: parsedExerciseType,
       difficulty: difficulty || 'beginner',
       duration: duration ? Number(duration) : 0,
@@ -206,10 +291,15 @@ router.delete('/:id', verifyToken, async (req, res) => {
     }
 
     // Delete from Supabase storage
+    const filesToDelete = [video.videoPath];
+    if (video.thumbnailPath) {
+      filesToDelete.push(video.thumbnailPath);
+    }
+    
     const { error: deleteError } = await supabase
       .storage
       .from(BUCKET)
-      .remove([video.videoPath]);
+      .remove(filesToDelete);
 
     if (deleteError) {
       console.error('Supabase delete error:', deleteError);
