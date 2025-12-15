@@ -96,7 +96,23 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Trainer Workouts'),
+        title: Text(_selectedTrainerId == null ? 'Choose Trainer' : 'Trainer Workouts'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (_selectedTrainerId != null) {
+              // If viewing workouts, go back to trainer list
+              setState(() {
+                _selectedTrainerId = null;
+                _workouts = [];
+              });
+              _loadTrainers();
+            } else {
+              // If viewing trainer list, go back to dashboard
+              Navigator.of(context).pop();
+            }
+          },
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
