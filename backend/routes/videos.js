@@ -231,23 +231,37 @@ router.get('/trainer', verifyToken, async (req, res) => {
     const videos = await ExerciseVideo.find({ trainer: req.user._id }).sort({ createdAt: -1 });
     console.log(`Found ${videos.length} videos for trainer ${req.user._id}`);
 
-    // Generate signed URLs for each video
+    // Generate signed URLs for videos and thumbnails
     const videosWithSignedUrls = await Promise.all(videos.map(async (video) => {
       try {
-        const { data, error } = await supabase
+        const videoObj = video.toObject();
+        
+        // Generate signed URL for video
+        const { data: videoData, error: videoError } = await supabase
           .storage
           .from(BUCKET)
           .createSignedUrl(video.videoPath, 3600); // 1 hour expiry
 
-        if (error) {
-          console.error('Error creating signed URL for video:', video._id, error);
-          return { ...video.toObject(), videoUrl: video.videoUrl }; // fallback to original
+        if (!videoError && videoData) {
+          videoObj.videoUrl = videoData.signedUrl;
         }
 
-        return { ...video.toObject(), videoUrl: data.signedUrl };
+        // Generate signed URL for thumbnail if it exists
+        if (video.thumbnailPath) {
+          const { data: thumbData, error: thumbError } = await supabase
+            .storage
+            .from(BUCKET)
+            .createSignedUrl(video.thumbnailPath, 3600); // 1 hour expiry
+
+          if (!thumbError && thumbData) {
+            videoObj.thumbnailUrl = thumbData.signedUrl;
+          }
+        }
+
+        return videoObj;
       } catch (err) {
-        console.error('Exception creating signed URL:', err);
-        return { ...video.toObject(), videoUrl: video.videoUrl };
+        console.error('Exception creating signed URLs:', err);
+        return video.toObject();
       }
     }));
 
@@ -261,11 +275,52 @@ router.get('/trainer', verifyToken, async (req, res) => {
 // GET /api/videos - Get public videos for members
 router.get('/', verifyToken, async (req, res) => {
   try {
-    const videos = await ExerciseVideo.find({ isPublic: true }).sort({ createdAt: -1 });
+    const videos = await ExerciseVideo.find({ isPublic: true })
+      .populate('trainer', 'username email')
+      .sort({ createdAt: -1 });
     console.log(`Found ${videos.length} public videos`);
-    console.log('Returning videos:', videos.map(v => ({ id: v._id, videoUrl: v.videoUrl })));
 
-    return res.json({ videos });
+    // Generate signed URLs for videos and thumbnails
+    const videosWithSignedUrls = await Promise.all(videos.map(async (video) => {
+      try {
+        const videoObj = video.toObject();
+        
+        // Generate signed URL for video
+        const { data: videoData, error: videoError } = await supabase
+          .storage
+          .from(BUCKET)
+          .createSignedUrl(video.videoPath, 3600); // 1 hour expiry
+
+        if (!videoError && videoData) {
+          videoObj.videoUrl = videoData.signedUrl;
+        }
+
+        // Generate signed URL for thumbnail if it exists
+        if (video.thumbnailPath) {
+          const { data: thumbData, error: thumbError } = await supabase
+            .storage
+            .from(BUCKET)
+            .createSignedUrl(video.thumbnailPath, 3600); // 1 hour expiry
+
+          if (!thumbError && thumbData) {
+            videoObj.thumbnailUrl = thumbData.signedUrl;
+          }
+        }
+
+        return videoObj;
+      } catch (err) {
+        console.error('Exception creating signed URLs:', err);
+        return video.toObject();
+      }
+    }));
+
+    console.log('Returning videos with thumbnails:', videosWithSignedUrls.map(v => ({ 
+      id: v._id, 
+      title: v.title,
+      hasThumbnail: !!v.thumbnailUrl 
+    })));
+
+    return res.json({ videos: videosWithSignedUrls });
   } catch (err) {
     console.error('videos get error:', err && err.stack ? err.stack : err);
     return res.status(500).json({ error: 'Failed to fetch videos', message: err.message || String(err) });
