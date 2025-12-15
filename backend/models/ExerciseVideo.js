@@ -23,6 +23,14 @@ const exerciseVideoSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  thumbnailUrl: {
+    type: String,
+    default: null
+  },
+  thumbnailPath: {
+    type: String,
+    default: null
+  },
   exerciseType: {
     type: String,
     required: true,

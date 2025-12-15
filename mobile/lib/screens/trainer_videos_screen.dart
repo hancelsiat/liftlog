@@ -373,133 +373,367 @@ class _TrainerVideosScreenState extends State<TrainerVideosScreen> with SingleTi
         );
       },
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
+        margin: const EdgeInsets.only(bottom: 20),
         decoration: AppTheme.glassMorphism,
         child: InkWell(
           onTap: () => _playVideo(video.videoUrl, video.title),
           borderRadius: BorderRadius.circular(20),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    gradient: AppTheme.secondaryGradient,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppTheme.secondaryColor.withOpacity(0.3),
-                        blurRadius: 12,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Thumbnail Section (YouTube-style)
+              Stack(
+                children: [
+                  // Thumbnail Image or Placeholder
+                  ClipRRect(
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                    ),
+                    child: AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child: video.thumbnailUrl != null && video.thumbnailUrl!.isNotEmpty
+                          ? Image.network(
+                              video.thumbnailUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return _buildThumbnailPlaceholder(video);
+                              },
+                              loadingBuilder: (context, child, loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return _buildThumbnailPlaceholder(video);
+                              },
+                            )
+                          : _buildThumbnailPlaceholder(video),
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.play_circle_filled,
-                    size: 40,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        video.title,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.textPrimary,
+                  
+                  // Play Button Overlay
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withOpacity(0.3),
+                          ],
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                       ),
-                      if (video.description != null && video.description!.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          video.description!,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: AppTheme.textSecondary.withOpacity(0.8),
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.7),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppTheme.primaryColor.withOpacity(0.5),
+                                blurRadius: 20,
+                                spreadRadius: 2,
+                              ),
+                            ],
                           ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                          child: const Icon(
+                            Icons.play_arrow,
+                            size: 40,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  
+                  // Duration Badge (if available)
+                  if (video.duration != null && video.duration! > 0)
+                    Positioned(
+                      bottom: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.8),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          video.formattedDuration,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  
+                  // Menu Button
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: PopupMenuButton<String>(
+                      icon: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.6),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.more_vert, size: 20, color: Colors.white),
+                      ),
+                      color: AppTheme.cardBackground,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      onSelected: (value) {
+                        if (value == 'play') {
+                          _playVideo(video.videoUrl, video.title);
+                        } else if (value == 'delete') {
+                          _showDeleteDialog(video);
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'play',
+                          child: Row(
+                            children: [
+                              Icon(Icons.play_arrow, color: AppTheme.primaryColor),
+                              SizedBox(width: 12),
+                              Text('Play Video', style: TextStyle(color: AppTheme.textPrimary)),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete_outline, color: AppTheme.errorColor),
+                              SizedBox(width: 12),
+                              Text('Delete', style: TextStyle(color: AppTheme.errorColor)),
+                            ],
+                          ),
                         ),
                       ],
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppTheme.accentColor.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
+                    ),
+                  ),
+                ],
+              ),
+              
+              // Video Info Section (YouTube-style)
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Title
+                    Text(
+                      video.title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textPrimary,
+                        height: 1.3,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    
+                    const SizedBox(height: 8),
+                    
+                    // Trainer Info Row
+                    Row(
+                      children: [
+                        // Trainer Avatar
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            gradient: AppTheme.primaryGradient,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
                             child: Text(
-                              video.exerciseType.toUpperCase(),
+                              video.trainerName.isNotEmpty 
+                                  ? video.trainerName[0].toUpperCase()
+                                  : 'T',
                               style: const TextStyle(
-                                fontSize: 10,
+                                color: Colors.white,
                                 fontWeight: FontWeight.bold,
-                                color: AppTheme.accentColor,
-                                letterSpacing: 0.5,
+                                fontSize: 14,
                               ),
                             ),
                           ),
-                        ],
+                        ),
+                        const SizedBox(width: 12),
+                        
+                        // Trainer Name
+                        Expanded(
+                          child: Text(
+                            video.trainerName.isNotEmpty 
+                                ? video.trainerName
+                                : 'Unknown Trainer',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: AppTheme.textSecondary.withOpacity(0.9),
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    // Description
+                    if (video.description != null && video.description!.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        video.description!,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppTheme.textSecondary.withOpacity(0.8),
+                          height: 1.4,
+                        ),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
-                  ),
-                ),
-                PopupMenuButton<String>(
-                  icon: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surfaceColor.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(Icons.more_vert, size: 20, color: AppTheme.textSecondary),
-                  ),
-                  color: AppTheme.cardBackground,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  onSelected: (value) {
-                    if (value == 'play') {
-                      _playVideo(video.videoUrl, video.title);
-                    } else if (value == 'delete') {
-                      _showDeleteDialog(video);
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'play',
-                      child: Row(
-                        children: [
-                          Icon(Icons.play_arrow, color: AppTheme.primaryColor),
-                          SizedBox(width: 12),
-                          Text('Play Video', style: TextStyle(color: AppTheme.textPrimary)),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          Icon(Icons.delete_outline, color: AppTheme.errorColor),
-                          SizedBox(width: 12),
-                          Text('Delete', style: TextStyle(color: AppTheme.errorColor)),
-                        ],
-                      ),
+                    
+                    const SizedBox(height: 12),
+                    
+                    // Tags Row
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        // Exercise Type Badge
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppTheme.accentColor.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: AppTheme.accentColor.withOpacity(0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _getExerciseIcon(video.exerciseType),
+                                size: 14,
+                                color: AppTheme.accentColor,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                video.exerciseType.toUpperCase(),
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.accentColor,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        
+                        // Difficulty Badge
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: _getDifficultyColor(video.difficulty).withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: _getDifficultyColor(video.difficulty).withOpacity(0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: Text(
+                            video.difficulty.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: _getDifficultyColor(video.difficulty),
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
     );
+  }
+  
+  Widget _buildThumbnailPlaceholder(ExerciseVideo video) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppTheme.primaryColor.withOpacity(0.3),
+            AppTheme.secondaryColor.withOpacity(0.3),
+          ],
+        ),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              _getExerciseIcon(video.exerciseType),
+              size: 48,
+              color: Colors.white.withOpacity(0.7),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              video.exerciseType.toUpperCase(),
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.7),
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  IconData _getExerciseIcon(String type) {
+    switch (type.toLowerCase()) {
+      case 'cardio':
+        return Icons.directions_run;
+      case 'strength':
+        return Icons.fitness_center;
+      case 'flexibility':
+        return Icons.self_improvement;
+      case 'balance':
+        return Icons.accessibility_new;
+      case 'sports':
+        return Icons.sports_basketball;
+      default:
+        return Icons.fitness_center;
+    }
+  }
+  
+  Color _getDifficultyColor(String difficulty) {
+    switch (difficulty.toLowerCase()) {
+      case 'beginner':
+        return Colors.green;
+      case 'intermediate':
+        return Colors.orange;
+      case 'advanced':
+        return Colors.red;
+      default:
+        return AppTheme.accentColor;
+    }
   }
 
   void _showDeleteDialog(ExerciseVideo video) {
