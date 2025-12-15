@@ -201,7 +201,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Trainer accounts require email verification before activation.',
+                    'Trainer accounts require admin approval before activation.',
                     style: TextStyle(
                       color: AppTheme.textSecondary.withOpacity(0.9),
                       fontSize: 12,
@@ -479,9 +479,9 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
       );
 
       if (success && mounted) {
-        // Check if trainer registration (requires verification)
+        // Check if trainer registration (requires admin approval)
         if (_selectedRole == UserRole.trainer) {
-          // Show success dialog for trainer
+          // Show success dialog for trainer - don't auto-login
           showDialog(
             context: context,
             barrierDismissible: false,
@@ -531,7 +531,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                       children: [
                         Row(
                           children: [
-                            const Icon(Icons.email, color: AppTheme.infoColor, size: 20),
+                            const Icon(Icons.admin_panel_settings, color: AppTheme.infoColor, size: 20),
                             const SizedBox(width: 8),
                             Text(
                               'Next Steps:',
@@ -545,7 +545,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          '1. Email verification link sent (check spam folder)\n2. Wait for admin approval\n3. Login after approval\n\nNote: Email delivery may take a few minutes',
+                          '1. Wait for admin approval\n2. You will be notified once approved\n3. Login after approval',
                           style: TextStyle(
                             color: AppTheme.textSecondary.withOpacity(0.9),
                             fontSize: 13,
