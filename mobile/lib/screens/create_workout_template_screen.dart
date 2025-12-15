@@ -28,6 +28,45 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
   final List<String> _categories = ['strength', 'cardio', 'flexibility', 'mixed'];
   final List<String> _intensities = ['low', 'moderate', 'high'];
 
+  // Predefined exercises by category
+  final Map<String, List<Map<String, dynamic>>> _predefinedExercises = {
+    'strength': [
+      {'name': 'Bench Press', 'icon': Icons.fitness_center, 'defaultSets': 3, 'defaultReps': 10},
+      {'name': 'Squats', 'icon': Icons.accessibility_new, 'defaultSets': 4, 'defaultReps': 12},
+      {'name': 'Deadlift', 'icon': Icons.fitness_center, 'defaultSets': 3, 'defaultReps': 8},
+      {'name': 'Shoulder Press', 'icon': Icons.fitness_center, 'defaultSets': 3, 'defaultReps': 10},
+      {'name': 'Bicep Curls', 'icon': Icons.fitness_center, 'defaultSets': 3, 'defaultReps': 12},
+      {'name': 'Tricep Dips', 'icon': Icons.fitness_center, 'defaultSets': 3, 'defaultReps': 12},
+      {'name': 'Lat Pulldown', 'icon': Icons.fitness_center, 'defaultSets': 3, 'defaultReps': 10},
+      {'name': 'Leg Press', 'icon': Icons.accessibility_new, 'defaultSets': 3, 'defaultReps': 12},
+      {'name': 'Lunges', 'icon': Icons.accessibility_new, 'defaultSets': 3, 'defaultReps': 10},
+      {'name': 'Pull-ups', 'icon': Icons.fitness_center, 'defaultSets': 3, 'defaultReps': 8},
+      {'name': 'Push-ups', 'icon': Icons.fitness_center, 'defaultSets': 3, 'defaultReps': 15},
+      {'name': 'Plank', 'icon': Icons.self_improvement, 'defaultSets': 3, 'defaultReps': 1},
+    ],
+    'cardio': [
+      {'name': 'Running', 'icon': Icons.directions_run, 'defaultSets': 1, 'defaultReps': 30},
+      {'name': 'Cycling', 'icon': Icons.directions_bike, 'defaultSets': 1, 'defaultReps': 30},
+      {'name': 'Jump Rope', 'icon': Icons.sports, 'defaultSets': 3, 'defaultReps': 100},
+      {'name': 'Burpees', 'icon': Icons.fitness_center, 'defaultSets': 3, 'defaultReps': 15},
+      {'name': 'Mountain Climbers', 'icon': Icons.fitness_center, 'defaultSets': 3, 'defaultReps': 20},
+      {'name': 'High Knees', 'icon': Icons.directions_run, 'defaultSets': 3, 'defaultReps': 30},
+      {'name': 'Jumping Jacks', 'icon': Icons.sports, 'defaultSets': 3, 'defaultReps': 30},
+    ],
+    'flexibility': [
+      {'name': 'Yoga Flow', 'icon': Icons.self_improvement, 'defaultSets': 1, 'defaultReps': 20},
+      {'name': 'Stretching', 'icon': Icons.self_improvement, 'defaultSets': 1, 'defaultReps': 15},
+      {'name': 'Hamstring Stretch', 'icon': Icons.self_improvement, 'defaultSets': 2, 'defaultReps': 1},
+      {'name': 'Quad Stretch', 'icon': Icons.self_improvement, 'defaultSets': 2, 'defaultReps': 1},
+      {'name': 'Shoulder Stretch', 'icon': Icons.self_improvement, 'defaultSets': 2, 'defaultReps': 1},
+    ],
+    'mixed': [
+      {'name': 'Circuit Training', 'icon': Icons.fitness_center, 'defaultSets': 3, 'defaultReps': 12},
+      {'name': 'HIIT', 'icon': Icons.sports, 'defaultSets': 4, 'defaultReps': 30},
+      {'name': 'CrossFit WOD', 'icon': Icons.fitness_center, 'defaultSets': 1, 'defaultReps': 1},
+    ],
+  };
+
   @override
   void dispose() {
     _titleController.dispose();
@@ -37,7 +76,133 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
     super.dispose();
   }
 
-  void _addExercise() {
+  void _showExerciseSelector() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (context, scrollController) => Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).primaryColor,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Select Exercises',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                controller: scrollController,
+                padding: const EdgeInsets.all(16),
+                children: [
+                  ..._categories.map((category) {
+                    final exercises = _predefinedExercises[category] ?? [];
+                    if (exercises.isEmpty) return const SizedBox.shrink();
+                    
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Text(
+                            category.toUpperCase(),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ),
+                        ...exercises.map((exercise) => Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: ListTile(
+                            leading: Icon(
+                              exercise['icon'] as IconData,
+                              color: Theme.of(context).primaryColor,
+                            ),
+                            title: Text(exercise['name'] as String),
+                            subtitle: Text(
+                              '${exercise['defaultSets']} sets × ${exercise['defaultReps']} reps',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            trailing: const Icon(Icons.add_circle_outline),
+                            onTap: () {
+                              _addPredefinedExercise(exercise);
+                              Navigator.pop(context);
+                            },
+                          ),
+                        )),
+                        const SizedBox(height: 16),
+                      ],
+                    );
+                  }),
+                  // Custom exercise option
+                  Card(
+                    color: Colors.blue.shade50,
+                    child: ListTile(
+                      leading: const Icon(Icons.edit, color: Colors.blue),
+                      title: const Text('Custom Exercise'),
+                      subtitle: const Text('Create your own exercise'),
+                      trailing: const Icon(Icons.arrow_forward),
+                      onTap: () {
+                        Navigator.pop(context);
+                        _addCustomExercise();
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _addPredefinedExercise(Map<String, dynamic> exercise) {
+    setState(() {
+      _exercises.add({
+        'name': exercise['name'],
+        'sets': exercise['defaultSets'],
+        'reps': exercise['defaultReps'],
+        'weight': 0,
+        'notes': '',
+      });
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${exercise['name']} added!'),
+        duration: const Duration(seconds: 1),
+      ),
+    );
+  }
+
+  void _addCustomExercise() {
     setState(() {
       _exercises.add({
         'name': '',
@@ -117,22 +282,6 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
     return Scaffold(
       appBar: AppBar(
         title: const Text('Create Workout Template'),
-        actions: [
-          if (_isLoading)
-            const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            )
-          else
-            IconButton(
-              icon: const Icon(Icons.save),
-              onPressed: _saveWorkoutTemplate,
-            ),
-        ],
       ),
       body: Form(
         key: _formKey,
@@ -254,30 +403,30 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
               const SizedBox(height: 32),
 
               // Exercises Section
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Exercises',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: _addExercise,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add Exercise'),
-                  ),
-                ],
+              const Text(
+                'Exercises',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
 
               if (_exercises.isEmpty)
-                const Center(
+                Center(
                   child: Padding(
-                    padding: EdgeInsets.all(32.0),
-                    child: Text(
-                      'No exercises added yet.\nTap "Add Exercise" to get started.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey),
+                    padding: const EdgeInsets.all(32.0),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.fitness_center,
+                          size: 64,
+                          color: Colors.grey.shade400,
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'No exercises added yet.\nTap "Add Exercise" to get started.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ],
                     ),
                   ),
                 )
@@ -296,9 +445,27 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
                           children: [
                             Row(
                               children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).primaryColor.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    '${index + 1}',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                      color: Theme.of(context).primaryColor,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
                                 Expanded(
                                   child: Text(
-                                    'Exercise ${index + 1}',
+                                    _exercises[index]['name'].isEmpty 
+                                        ? 'Exercise ${index + 1}' 
+                                        : _exercises[index]['name'],
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 16,
@@ -382,6 +549,61 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
                     );
                   },
                 ),
+              const SizedBox(height: 24),
+
+              // Add Exercise Button
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton.icon(
+                  onPressed: _showExerciseSelector,
+                  icon: const Icon(Icons.add_circle_outline, size: 28),
+                  label: const Text(
+                    'Add Exercise',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).primaryColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Save Workout Button
+              if (_exercises.isNotEmpty)
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton.icon(
+                    onPressed: _isLoading ? null : _saveWorkoutTemplate,
+                    icon: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.check_circle, size: 28),
+                    label: Text(
+                      _isLoading ? 'Saving...' : 'Save Workout Template',
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 32),
             ],
           ),
         ),
