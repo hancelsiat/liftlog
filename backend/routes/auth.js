@@ -42,22 +42,17 @@ router.post('/register', async (req, res) => {
       membershipExpiration: membershipExpiration || 
         new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Default 30 days
       profile,
-      isEmailVerified: role === 'member', // Members don't need email verification
-      isApproved: role === 'member' // Members are auto-approved
+      isEmailVerified: true, // No email verification needed - admin approval is the gate
+      isApproved: role === 'member' // Members are auto-approved, trainers need admin approval
     });
 
-    // If trainer, generate verification token
+    await user.save();
+
+    // If trainer, return message about pending approval
     if (role === 'trainer') {
-      const verificationToken = user.generateEmailVerificationToken();
-      await user.save();
-      
-      // TODO: Send verification email
-      console.log(`Verification token for ${email}: ${verificationToken}`);
-      console.log(`Verification link: http://localhost:5000/api/auth/verify-email/${verificationToken}`);
-      
       return res.status(201).json({ 
-        message: 'Trainer account created. Please check your email to verify your account. Admin approval is also required.',
-        requiresVerification: true,
+        message: 'Trainer account created successfully. Your account is pending admin approval.',
+        requiresApproval: true,
         user: {
           id: user._id,
           username: user.username,
@@ -69,9 +64,7 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    await user.save();
-
-    // Generate JWT token for members
+    // Generate JWT token for members (auto-approved)
     const token = generateToken(user);
 
     res.status(201).json({ 
@@ -149,18 +142,11 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Check if trainer account is verified and approved
-    if (user.role === 'trainer' && !user.canAccess()) {
-      if (!user.isEmailVerified) {
-        return res.status(403).json({ 
-          error: 'Please verify your email address before logging in. Check your email for the verification link.' 
-        });
-      }
-      if (!user.isApproved) {
-        return res.status(403).json({ 
-          error: 'Your trainer account is pending admin approval. Please wait for approval.' 
-        });
-      }
+    // Check if trainer account is approved (no email verification needed)
+    if (user.role === 'trainer' && !user.isApproved) {
+      return res.status(403).json({ 
+        error: 'Your trainer account is pending admin approval. Please wait for approval.' 
+      });
     }
 
     // Check membership status
@@ -320,15 +306,6 @@ router.patch('/users/:userId/approve',
       }
 
       user.isApproved = isApproved;
-      
-      // When admin approves, also mark email as verified
-      // This bypasses the need for email verification since admin approval is more important
-      if (isApproved) {
-        user.isEmailVerified = true;
-        user.emailVerificationToken = null;
-        user.emailVerificationExpires = null;
-      }
-      
       await user.save();
 
       res.json({
