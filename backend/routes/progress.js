@@ -41,7 +41,7 @@ router.post('/', verifyToken, async (req, res) => {
       }
 
       progress = new Progress(firstProgressData);
-      await progress.save();
+      await progress.save({ validateBeforeSave: false });
       
       return res.status(201).json({
         message: 'Progress logged successfully',
@@ -146,7 +146,7 @@ router.post('/', verifyToken, async (req, res) => {
     }
 
     const newProgress = new Progress(newProgressData);
-    await newProgress.save();
+    await newProgress.save({ validateBeforeSave: false });
 
     console.log('Progress updated successfully:', newProgress._id);
 
