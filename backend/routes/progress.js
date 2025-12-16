@@ -22,8 +22,10 @@ router.post('/', verifyToken, async (req, res) => {
     
     if (progress) {
       console.log('Found existing progress:');
+      console.log('  _id:', progress._id);
       console.log('  lastBmiUpdate:', progress.lastBmiUpdate);
       console.log('  lastCaloriesUpdate:', progress.lastCaloriesUpdate);
+      console.log('  Full document:', JSON.stringify(progress.toObject()));
     } else {
       console.log('No existing progress found - first time user');
     }
