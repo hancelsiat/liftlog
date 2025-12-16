@@ -57,8 +57,14 @@ router.post('/', verifyToken, async (req, res) => {
 
     // Check BMI restriction (7 days)
     if (bmi !== undefined && bmi !== null) {
-      if (!progress.canUpdateBmi()) {
-        const daysUntil = progress.daysUntilNextBmiUpdate();
+      // Manual check if methods don't exist
+      const canUpdateBmi = progress.lastBmiUpdate 
+        ? (now - new Date(progress.lastBmiUpdate)) / (1000 * 60 * 60 * 24) >= 7
+        : true;
+      
+      if (!canUpdateBmi) {
+        const daysSinceUpdate = (now - new Date(progress.lastBmiUpdate)) / (1000 * 60 * 60 * 24);
+        const daysUntil = Math.max(0, Math.ceil(7 - daysSinceUpdate));
         restrictions.bmi = {
           canUpdate: false,
           message: `BMI can be updated in ${daysUntil} day(s)`,
@@ -85,8 +91,14 @@ router.post('/', verifyToken, async (req, res) => {
         });
       }
 
-      if (!progress.canUpdateCalories()) {
-        const hoursUntil = progress.hoursUntilNextCaloriesUpdate();
+      // Manual check if methods don't exist
+      const canUpdateCalories = progress.lastCaloriesUpdate
+        ? (now - new Date(progress.lastCaloriesUpdate)) / (1000 * 60 * 60) >= 24
+        : true;
+      
+      if (!canUpdateCalories) {
+        const hoursSinceUpdate = (now - new Date(progress.lastCaloriesUpdate)) / (1000 * 60 * 60);
+        const hoursUntil = Math.max(0, Math.ceil(24 - hoursSinceUpdate));
         restrictions.calories = {
           canUpdate: false,
           message: `Calories can be updated in ${hoursUntil} hour(s)`,
@@ -171,16 +183,31 @@ router.get('/can-update', verifyToken, async (req, res) => {
       });
     }
 
-    // Check BMI status (7 days restriction)
-    const canUpdateBmi = progress.canUpdateBmi();
-    const daysUntilBmi = progress.daysUntilNextBmiUpdate();
+    // Check BMI status (7 days restriction) - manual calculation
+    const now = new Date();
+    const canUpdateBmi = progress.lastBmiUpdate 
+      ? (now - new Date(progress.lastBmiUpdate)) / (1000 * 60 * 60 * 24) >= 7
+      : true;
+    
+    const daysSinceLastBmiUpdate = progress.lastBmiUpdate
+      ? (now - new Date(progress.lastBmiUpdate)) / (1000 * 60 * 60 * 24)
+      : 0;
+    const daysUntilBmi = Math.max(0, Math.ceil(7 - daysSinceLastBmiUpdate));
+    
     const bmiNextUpdate = progress.lastBmiUpdate 
       ? new Date(progress.lastBmiUpdate.getTime() + 7 * 24 * 60 * 60 * 1000)
       : null;
 
-    // Check Calories status (24 hours restriction)
-    const canUpdateCalories = progress.canUpdateCalories();
-    const hoursUntilCalories = progress.hoursUntilNextCaloriesUpdate();
+    // Check Calories status (24 hours restriction) - manual calculation
+    const canUpdateCalories = progress.lastCaloriesUpdate
+      ? (now - new Date(progress.lastCaloriesUpdate)) / (1000 * 60 * 60) >= 24
+      : true;
+    
+    const hoursSinceLastCaloriesUpdate = progress.lastCaloriesUpdate
+      ? (now - new Date(progress.lastCaloriesUpdate)) / (1000 * 60 * 60)
+      : 0;
+    const hoursUntilCalories = Math.max(0, Math.ceil(24 - hoursSinceLastCaloriesUpdate));
+    
     const caloriesNextUpdate = progress.lastCaloriesUpdate
       ? new Date(progress.lastCaloriesUpdate.getTime() + 24 * 60 * 60 * 1000)
       : null;
