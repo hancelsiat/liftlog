@@ -15,10 +15,18 @@ router.post('/', verifyToken, async (req, res) => {
     console.log('BMI:', bmi);
     console.log('Calories Intake:', caloriesIntake);
     console.log('Calorie Deficit:', calorieDeficit);
-    console.log('Code Version: v2.0 - Fixed null validation');
+    console.log('Code Version: v2.1 - Fixed time restrictions');
 
     // Get or create user's progress document
     let progress = await Progress.findOne({ user: req.user._id }).sort({ createdAt: -1 });
+    
+    if (progress) {
+      console.log('Found existing progress:');
+      console.log('  lastBmiUpdate:', progress.lastBmiUpdate);
+      console.log('  lastCaloriesUpdate:', progress.lastCaloriesUpdate);
+    } else {
+      console.log('No existing progress found - first time user');
+    }
     
     if (!progress) {
       // First time user - create new progress
