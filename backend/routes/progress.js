@@ -366,68 +366,66 @@ router.post('/admin/fix-schema', verifyToken, checkRole(['admin']), async (req, 
     
     console.log('Attempting to fix Progress collection schema...');
     
-    // Update the validator to remove required fields
-    await db.command({
-      collMod: 'progresses',
-      validator: {
-        $jsonSchema: {
-          bsonType: 'object',
-          required: ['user'],
-          properties: {
-            user: {
-              bsonType: 'objectId',
-              description: 'User reference - required'
-            },
-            bmi: {
-              bsonType: ['double', 'int', 'null'],
-              description: 'BMI value - optional'
-            },
-            caloriesIntake: {
-              bsonType: ['double', 'int', 'null'],
-              description: 'Calories intake - optional'
-            },
-            calorieDeficit: {
-              bsonType: ['double', 'int', 'null'],
-              description: 'Calorie deficit - optional'
-            },
-            lastBmiUpdate: {
-              bsonType: ['date', 'null'],
-              description: 'Last BMI update timestamp'
-            },
-            lastCaloriesUpdate: {
-              bsonType: ['date', 'null'],
-              description: 'Last calories update timestamp'
-            },
-            date: {
-              bsonType: 'date',
-              description: 'Entry date'
+    // OPTION 1: Try to remove validator completely
+    try {
+      await db.command({
+        collMod: 'progresses',
+        validator: {},
+        validationLevel: 'off'
+      });
+      console.log('✅ Validator removed completely!');
+      
+      return res.json({
+        success: true,
+        message: 'Database validator removed. Mongoose will handle all validation now.'
+      });
+    } catch (error1) {
+      console.log('Could not remove validator, trying to update it...', error1.message);
+      
+      // OPTION 2: Update validator to make fields optional
+      try {
+        await db.command({
+          collMod: 'progresses',
+          validator: {
+            $jsonSchema: {
+              bsonType: 'object',
+              required: ['user'],
+              properties: {
+                user: {
+                  bsonType: 'objectId'
+                }
+              }
             }
-          }
+          },
+          validationLevel: 'moderate',
+          validationAction: 'warn'
+        });
+        console.log('✅ Validator updated to minimal schema!');
+        
+        return res.json({
+          success: true,
+          message: 'Database validator updated. Only user field is required now.'
+        });
+      } catch (error2) {
+        console.log('Could not update validator:', error2.message);
+        
+        if (error2.code === 26) {
+          return res.json({
+            success: true,
+            message: 'Collection has no validator - Mongoose handles validation.'
+          });
         }
-      },
-      validationLevel: 'moderate',
-      validationAction: 'warn'
-    });
-    
-    console.log('✅ Database schema fixed successfully!');
-    
-    res.json({
-      success: true,
-      message: 'Database schema updated successfully. BMI, caloriesIntake, and calorieDeficit are now optional fields.'
-    });
+        
+        throw error2;
+      }
+    }
   } catch (error) {
     console.error('Error fixing schema:', error);
     
-    if (error.code === 26) {
-      return res.json({
-        success: true,
-        message: 'Collection has no validator - Mongoose will handle validation. This is fine.'
-      });
-    }
-    
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message,
+      details: 'Try deleting all progress entries and recreating them.'
     });
   }
 });
