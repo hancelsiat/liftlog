@@ -15,6 +15,7 @@ router.post('/', verifyToken, async (req, res) => {
     console.log('BMI:', bmi);
     console.log('Calories Intake:', caloriesIntake);
     console.log('Calorie Deficit:', calorieDeficit);
+    console.log('Code Version: v2.0 - Fixed null validation');
 
     // Get or create user's progress document
     let progress = await Progress.findOne({ user: req.user._id }).sort({ createdAt: -1 });
