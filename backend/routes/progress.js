@@ -49,17 +49,13 @@ router.post('/', verifyToken, async (req, res) => {
       }
 
       progress = new Progress(firstProgressData);
-      // Explicitly mark timestamp fields as modified to ensure they're saved
-      if (firstProgressData.lastBmiUpdate) {
-        progress.markModified('lastBmiUpdate');
-      }
-      if (firstProgressData.lastCaloriesUpdate) {
-        progress.markModified('lastCaloriesUpdate');
-      }
       await progress.save({ validateBeforeSave: false });
       
-      console.log('First progress saved with lastBmiUpdate:', progress.lastBmiUpdate);
-      console.log('First progress saved with lastCaloriesUpdate:', progress.lastCaloriesUpdate);
+      // Reload from database to confirm it was saved
+      progress = await Progress.findById(progress._id);
+      console.log('First progress saved and reloaded:');
+      console.log('  lastBmiUpdate:', progress.lastBmiUpdate);
+      console.log('  lastCaloriesUpdate:', progress.lastCaloriesUpdate);
       
       return res.status(201).json({
         message: 'Progress logged successfully',
@@ -171,18 +167,12 @@ router.post('/', verifyToken, async (req, res) => {
     }
 
     const newProgress = new Progress(newProgressData);
-    // Explicitly mark timestamp fields as modified to ensure they're saved
-    if (newProgressData.lastBmiUpdate) {
-      newProgress.markModified('lastBmiUpdate');
-    }
-    if (newProgressData.lastCaloriesUpdate) {
-      newProgress.markModified('lastCaloriesUpdate');
-    }
     await newProgress.save({ validateBeforeSave: false });
 
     console.log('Progress updated successfully:', newProgress._id);
-    console.log('Saved with lastBmiUpdate:', newProgress.lastBmiUpdate);
-    console.log('Saved with lastCaloriesUpdate:', newProgress.lastCaloriesUpdate);
+    console.log('New progress data before save:', newProgressData);
+    console.log('New progress after save - lastBmiUpdate:', newProgress.lastBmiUpdate);
+    console.log('New progress after save - lastCaloriesUpdate:', newProgress.lastCaloriesUpdate);
 
     res.status(201).json({
       message: 'Progress updated successfully',
