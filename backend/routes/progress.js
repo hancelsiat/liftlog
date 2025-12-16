@@ -358,6 +358,23 @@ router.get('/user/:userId',
     }
 });
 
+// TEMPORARY: Admin route to delete all progress (for testing)
+router.delete('/admin/delete-all', verifyToken, checkRole(['admin']), async (req, res) => {
+  try {
+    const result = await Progress.deleteMany({});
+    
+    res.json({
+      success: true,
+      message: `Deleted ${result.deletedCount} progress entries. You can now create fresh progress data.`
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // TEMPORARY: Admin route to fix database schema
 router.post('/admin/fix-schema', verifyToken, checkRole(['admin']), async (req, res) => {
   try {
