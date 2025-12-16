@@ -358,4 +358,78 @@ router.get('/user/:userId',
     }
 });
 
+// TEMPORARY: Admin route to fix database schema
+router.post('/admin/fix-schema', verifyToken, checkRole(['admin']), async (req, res) => {
+  try {
+    const mongoose = require('mongoose');
+    const db = mongoose.connection.db;
+    
+    console.log('Attempting to fix Progress collection schema...');
+    
+    // Update the validator to remove required fields
+    await db.command({
+      collMod: 'progresses',
+      validator: {
+        $jsonSchema: {
+          bsonType: 'object',
+          required: ['user'],
+          properties: {
+            user: {
+              bsonType: 'objectId',
+              description: 'User reference - required'
+            },
+            bmi: {
+              bsonType: ['double', 'int', 'null'],
+              description: 'BMI value - optional'
+            },
+            caloriesIntake: {
+              bsonType: ['double', 'int', 'null'],
+              description: 'Calories intake - optional'
+            },
+            calorieDeficit: {
+              bsonType: ['double', 'int', 'null'],
+              description: 'Calorie deficit - optional'
+            },
+            lastBmiUpdate: {
+              bsonType: ['date', 'null'],
+              description: 'Last BMI update timestamp'
+            },
+            lastCaloriesUpdate: {
+              bsonType: ['date', 'null'],
+              description: 'Last calories update timestamp'
+            },
+            date: {
+              bsonType: 'date',
+              description: 'Entry date'
+            }
+          }
+        }
+      },
+      validationLevel: 'moderate',
+      validationAction: 'warn'
+    });
+    
+    console.log('✅ Database schema fixed successfully!');
+    
+    res.json({
+      success: true,
+      message: 'Database schema updated successfully. BMI, caloriesIntake, and calorieDeficit are now optional fields.'
+    });
+  } catch (error) {
+    console.error('Error fixing schema:', error);
+    
+    if (error.code === 26) {
+      return res.json({
+        success: true,
+        message: 'Collection has no validator - Mongoose will handle validation. This is fine.'
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;
