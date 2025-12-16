@@ -112,11 +112,18 @@ router.post('/', verifyToken, async (req, res) => {
       }
     }
 
-    // If all updates are restricted, return error
-    if (Object.keys(restrictions).length > 0 && Object.keys(updateData).length === 0) {
+    // If there are any restrictions, return error immediately
+    if (Object.keys(restrictions).length > 0) {
       return res.status(400).json({
         error: 'Update restricted',
         restrictions
+      });
+    }
+
+    // If no fields to update, return error
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({
+        error: 'No fields to update'
       });
     }
 
