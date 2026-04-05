@@ -146,72 +146,52 @@ router.get('/:id', verifyToken, async (req, res) => {
 });
 
 // Update a workout
-router.patch('/:id', verifyToken, checkRole(['member', 'trainer']), async (req, res) => {
-  console.log('--- DEBUG: PATCH ROUTE START ---');
-  try {
-    console.log(`[1] Finding workout with ID: ${req.params.id}`);
+    // First, find the workout to ensure it exists and for authorization
     const workout = await Workout.findById(req.params.id);
-    console.log(`[2] Workout found in DB: ${workout ? workout._id : 'null'}`);
 
     if (!workout) {
-      console.log('[2a] Workout not found, sending 404.');
       return res.status(404).json({ error: 'Workout not found' });
     }
 
-    console.log('[3] Checking authorization...');
-    const isUserOwner = workout.user?.equals(req.user._id);
-    const isTrainerOwner = workout.trainer?.equals(req.user._id);
-    const isAuthorized = isUserOwner || isTrainerOwner;
-    console.log(`[3a] isUserOwner: ${isUserOwner}, isTrainerOwner: ${isTrainerOwner}, isAuthorized: ${isAuthorized}`);
+    // Authorization check (copied from admin logic)
+    const isOwner = workout.user?.equals(req.user._id) || workout.trainer?.equals(req.user._id);
+    const canTrainerEdit = req.user.role === 'trainer' && !!workout.user;
 
-    if (!isAuthorized) {
-      console.log('[3b] User is not direct owner. Checking if trainer can modify...');
-      if (req.user.role === 'trainer' && workout.user) {
-        console.log('[3c] Trainer is allowed to modify this member workout.');
-      } else {
-        console.log('[3d] Unauthorized, sending 403.');
-        return res.status(403).json({ error: 'Unauthorized to update this workout' });
-      }
+    if (!isOwner && !canTrainerEdit) {
+      return res.status(403).json({ error: 'Unauthorized to update this workout' });
     }
 
-    console.log('[4] Updating workout with body:', req.body);
-    const updatedWorkout = await Workout.findByIdAndUpdate(
-      req.params.id,
-      { $set: req.body },
-      { new: true, runValidators: true }
-    );
-    console.log('[5] Workout updated in DB:', updatedWorkout);
+    // Now, apply the updates and save
+    Object.keys(req.body).forEach(key => {
+      workout[key] = req.body[key];
+    });
 
-    res.json(updatedWorkout);
-    console.log('--- DEBUG: PATCH ROUTE END ---');
+    const updatedWorkout = await workout.save();
 
-  } catch (error) {
-    console.error('--- DEBUG: PATCH ROUTE ERROR ---', error);
-    res.status(500).json({ error: error.message });
-  }
-});
+    res.json({
+      message: 'Workout updated successfully',
+      workout: updatedWorkout
+    });
 
 // Delete a workout
 router.delete('/:id', verifyToken, checkRole(['member', 'trainer']), async (req, res) => {
   try {
+    // First, find the workout to ensure it exists and for authorization
     const workout = await Workout.findById(req.params.id);
 
     if (!workout) {
       return res.status(404).json({ error: 'Workout not found' });
     }
 
-    // AUTH-CHECK: A user can delete their own workout. A trainer can delete their own
-    // template, or any member's workout.
-    const isUserOwner = workout.user?.equals(req.user._id);
-    const isTrainerOwner = workout.trainer?.equals(req.user._id);
-    const isTrainerAndMemberWorkout = req.user.role === 'trainer' && workout.user;
+    // Authorization check (copied from update logic)
+    const isOwner = workout.user?.equals(req.user._id) || workout.trainer?.equals(req.user._id);
+    const canTrainerDelete = req.user.role === 'trainer' && !!workout.user;
 
-    const isAuthorized = isUserOwner || isTrainerOwner || isTrainerAndMemberWorkout;
-
-    if (!isAuthorized) {
+    if (!isOwner && !canTrainerDelete) {
       return res.status(403).json({ error: 'Unauthorized to delete this workout' });
     }
 
+    // Now, remove the workout
     await workout.remove();
 
     res.json({ message: 'Workout deleted successfully' });
