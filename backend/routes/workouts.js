@@ -164,17 +164,11 @@ router.patch('/:id', verifyToken, checkRole(['member', 'trainer']), async (req, 
       return res.status(403).json({ error: 'Unauthorized to update this workout' });
     }
 
-    // Now, apply the updates and save
-    if (req.body.title) {
-      workout.title = req.body.title;
-    }
-    Object.keys(req.body).forEach(key => {
-      if (key !== 'title') {
-        workout[key] = req.body[key];
-      }
-    });
-
-    const updatedWorkout = await workout.save();
+    const updatedWorkout = await Workout.findByIdAndUpdate(
+      req.params.id,
+      { $set: req.body },
+      { new: true, runValidators: true }
+    );
 
     res.json({
       message: 'Workout updated successfully',
