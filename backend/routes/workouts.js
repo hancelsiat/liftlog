@@ -165,8 +165,13 @@ router.patch('/:id', verifyToken, checkRole(['member', 'trainer']), async (req, 
     }
 
     // Now, apply the updates and save
+    if (req.body.title) {
+      workout.title = req.body.title;
+    }
     Object.keys(req.body).forEach(key => {
-      workout[key] = req.body[key];
+      if (key !== 'title') {
+        workout[key] = req.body[key];
+      }
     });
 
     const updatedWorkout = await workout.save();
