@@ -6,6 +6,7 @@ const { verifyToken, checkRole } = require('../middleware/auth');
 // Create a new workout (Member Route)
 router.post('/', verifyToken, checkRole(['member', 'trainer']), async (req, res) => {
   try {
+    console.log(`[0] DB Connection State: ${mongoose.connection.readyState}`);
     const workoutData = {
       ...req.body,
       user: req.user._id
