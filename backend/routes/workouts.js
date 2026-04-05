@@ -161,8 +161,8 @@ router.patch('/:id', verifyToken, checkRole(['member', 'trainer']), async (req, 
     }
 
     // AUTH-CHECK: Safer authorization logic that handles both users and trainers.
-    const isUserOwner = workout.user?.toString() === req.user._id.toString();
-    const isTrainerOwner = workout.trainer?.toString() === req.user._id.toString();
+    const isUserOwner = workout.user?.equals(req.user._id);
+    const isTrainerOwner = workout.trainer?.equals(req.user._id);
     const isAuthorized = isUserOwner || isTrainerOwner;
 
     if (!isAuthorized) {
@@ -199,8 +199,8 @@ router.delete('/:id', verifyToken, checkRole(['member', 'trainer']), async (req,
     }
 
     // AUTH-CHECK: Safer authorization logic that handles both users and trainers.
-    const isUserOwner = workout.user?.toString() === req.user._id.toString();
-    const isTrainerOwner = workout.trainer?.toString() === req.user._id.toString();
+    const isUserOwner = workout.user?.equals(req.user._id);
+    const isTrainerOwner = workout.trainer?.equals(req.user._id);
     const isAuthorized = isUserOwner || isTrainerOwner;
 
     if (!isAuthorized) {
