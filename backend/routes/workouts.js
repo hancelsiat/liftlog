@@ -27,7 +27,7 @@ router.post('/', verifyToken, checkRole(['member', 'trainer']), async (req, res)
 router.post('/template', verifyToken, checkRole(['trainer']), async (req, res) => {
   try {    const { title, ...rest } = req.body;
     const workoutData = {
-      ...req.body,
+      ...rest,
       name: title, // Map incoming 'title' to the schema's 'name' field
       trainer: req.user._id,
       isPublic: true
