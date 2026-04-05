@@ -6,7 +6,6 @@ const { verifyToken, checkRole } = require('../middleware/auth');
 // Create a new workout (Member Route)
 router.post('/', verifyToken, checkRole(['member', 'trainer']), async (req, res) => {
   try {
-    console.log(`[0] DB Connection State: ${mongoose.connection.readyState}`);
     const workoutData = {
       ...req.body,
       user: req.user._id
@@ -151,6 +150,7 @@ router.get('/:id', verifyToken, async (req, res) => {
 // Update a workout
 router.patch('/:id', verifyToken, checkRole(['member', 'trainer']), async (req, res) => {
   try {
+    console.log(`[0] DB Connection State: ${mongoose.connection.readyState}`);
     // First, find the workout to ensure it exists and for authorization
     const workout = await Workout.findById(req.params.id);
 
