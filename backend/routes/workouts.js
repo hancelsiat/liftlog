@@ -167,7 +167,7 @@ router.patch('/:id', verifyToken, checkRole(['member', 'trainer']), async (req, 
     const updatedWorkout = await Workout.findByIdAndUpdate(
       req.params.id,
       { $set: req.body },
-      { new: true, runValidators: true }
+      { new: true }
     );
 
     res.json({
