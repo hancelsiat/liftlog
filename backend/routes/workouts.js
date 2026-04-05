@@ -146,6 +146,8 @@ router.get('/:id', verifyToken, async (req, res) => {
 });
 
 // Update a workout
+router.patch('/:id', verifyToken, checkRole(['member', 'trainer']), async (req, res) => {
+  try {
     // First, find the workout to ensure it exists and for authorization
     const workout = await Workout.findById(req.params.id);
 
@@ -172,6 +174,10 @@ router.get('/:id', verifyToken, async (req, res) => {
       message: 'Workout updated successfully',
       workout: updatedWorkout
     });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
 
 // Delete a workout
 router.delete('/:id', verifyToken, checkRole(['member', 'trainer']), async (req, res) => {
