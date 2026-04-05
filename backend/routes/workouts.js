@@ -184,7 +184,7 @@ router.patch('/:id', verifyToken, checkRole(['member', 'trainer']), async (req, 
 
     const updatedWorkout = await Workout.findByIdAndUpdate(
       req.params.id, 
-      req.body, 
+      { $set: req.body }, // Use $set to prevent overwriting the whole document
       { new: true, runValidators: true }
     );
 
