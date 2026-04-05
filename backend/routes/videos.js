@@ -102,7 +102,7 @@ router.post('/', verifyToken, upload.single('video'), async (req, res) => {
     const { title, exerciseType, description, difficulty, duration, tags, isPublic } = req.body;
     const parsedIsPublic = isPublic == null ? true : (isPublic === 'true' || isPublic === true);
     const parsedTitle = title ? String(title).trim() : '';
-    const parsedExerciseType = exerciseType ? String(exerciseType).trim() : 'strength'; // default
+    const parsedExerciseType = exerciseType ? String(exerciseType).trim().toLowerCase() : 'strength'; // default, convert to lowercase
 
     if (!parsedTitle) {
       return res.status(400).json({ error: 'title required' });

@@ -5,6 +5,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
+const User = require('./models/User');
 
 // Load environment variables
 dotenv.config();
@@ -24,6 +25,41 @@ app.use((req, res, next) => {
   next();
 });
 
+// Function to create default admin if it doesn't exist
+const createDefaultAdmin = async () => {
+  try {
+    // Check if admin already exists
+    const existingAdmin = await User.findOne({ email: 'admin@gmail.com' });
+    
+    if (existingAdmin) {
+      console.log('[Init] Default admin account already exists');
+      return;
+    }
+
+    // Create default admin account
+    const admin = new User({
+      username: 'admin',
+      email: 'admin@gmail.com',
+      password: 'admin123',
+      role: 'admin',
+      isEmailVerified: true,
+      isApproved: true,
+      membershipExpiration: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
+      profile: {
+        firstName: 'System',
+        lastName: 'Administrator'
+      }
+    });
+
+    await admin.save();
+    console.log('[Init] ✅ Default admin account created successfully!');
+    console.log('[Init] Email: admin@gmail.com | Password: admin123');
+    console.log('[Init] ⚠️  IMPORTANT: Change the password after first login!');
+  } catch (error) {
+    console.error('[Init] Error creating default admin:', error.message);
+  }
+};
+
 // Database Connection (skip in test environment)
 if (process.env.NODE_ENV !== 'test') {
   // Connect with Mongoose for schemas
@@ -33,7 +69,11 @@ if (process.env.NODE_ENV !== 'test') {
     serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
     socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
   })
-  .then(() => console.log('MongoDB connected successfully'))
+  .then(async () => {
+    console.log('MongoDB connected successfully');
+    // Create default admin after successful connection
+    await createDefaultAdmin();
+  })
   .catch((err) => console.error('MongoDB connection error:', err));
 
   // Also initialize MongoClient for any remaining GridFS needs (if any)

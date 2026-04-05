@@ -16,7 +16,8 @@
     "lint:fix": "eslint . --fix",
     "prepare": "node prepare.js",
     "create-admin": "node scripts/create_admin.js",
-    "reset-admin": "node scripts/reset_admin_password.js"
+    "reset-admin": "node scripts/reset_admin_password.js",
+    "migrate:workouts": "node migrateWorkouts.js"
   },
   "keywords": [
     "fitness",
@@ -37,6 +38,7 @@
     "@aws-sdk/client-s3": "^3.934.0",
     "@aws-sdk/s3-request-presigner": "^3.934.0",
     "@supabase/supabase-js": "^2.39.0",
+    "axios": "^1.13.2",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^10.0.0",

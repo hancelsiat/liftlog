@@ -26,10 +26,13 @@ router.post('/', verifyToken, checkRole(['member', 'trainer']), async (req, res)
 // Create a new workout template (Trainer Route)
 router.post('/template', verifyToken, checkRole(['trainer']), async (req, res) => {
   try {
+    // Destructure to ensure any 'trainer' field from the client is ignored.
+    const { trainer, ...workoutDetails } = req.body;
+
     const workoutData = {
-      ...req.body,
-      trainer: req.user._id,
-      isPublic: true
+      ...workoutDetails,
+      trainer: req.user._id, // Securely assign the trainer from the token
+      isPublic: true // Templates are always public
     };
 
     const workout = new Workout(workoutData);
@@ -77,6 +80,18 @@ router.get('/', verifyToken, async (req, res) => {
       currentPage: page,
       totalPages: Math.ceil(total / limit)
     });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Trainer: Get all workouts they have created
+router.get('/my-creations', verifyToken, checkRole(['trainer']), async (req, res) => {
+  try {
+    const workouts = await Workout.find({ trainer: req.user._id })
+      .sort({ createdAt: -1 });
+
+    res.json({ workouts });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

@@ -72,9 +72,13 @@ const exerciseVideoSchema = new mongoose.Schema({
   }
 });
 
-// Update the updatedAt field before saving
+// Update the updatedAt field and normalize exerciseType before saving
 exerciseVideoSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
+  // Normalize exerciseType to lowercase to handle case-insensitive input
+  if (this.exerciseType) {
+    this.exerciseType = this.exerciseType.toLowerCase();
+  }
   next();
 });
 
