@@ -176,11 +176,11 @@ router.patch('/:id', verifyToken, checkRole(['member', 'trainer']), async (req, 
       return res.status(404).json({ error: 'Workout not found' });
     }
 
-    // Ensure user can only update their own workouts or trainer can update
-    if (
-      workout.user.toString() !== req.user._id.toString() && 
-      req.user.role !== 'trainer'
-    ) {
+    // AUTH-CHECK: Ensure user can only update their own workouts or trainer can update their own templates
+    const isOwner = (workout.user && workout.user.toString() === req.user._id.toString()) || 
+                    (workout.trainer && workout.trainer.toString() === req.user._id.toString());
+
+    if (!isOwner) {
       return res.status(403).json({ error: 'Unauthorized to update this workout' });
     }
 
@@ -208,15 +208,15 @@ router.delete('/:id', verifyToken, checkRole(['member', 'trainer']), async (req,
       return res.status(404).json({ error: 'Workout not found' });
     }
 
-    // Ensure user can only delete their own workouts or trainer can delete
-    if (
-      workout.user.toString() !== req.user._id.toString() && 
-      req.user.role !== 'trainer'
-    ) {
+    // AUTH-CHECK: Ensure user can only delete their own workouts or trainer can delete their own templates
+    const isOwner = (workout.user && workout.user.toString() === req.user._id.toString()) || 
+                    (workout.trainer && workout.trainer.toString() === req.user._id.toString());
+
+    if (!isOwner) {
       return res.status(403).json({ error: 'Unauthorized to delete this workout' });
     }
 
-    await workout.remove();
+    await Workout.findByIdAndDelete(req.params.id);
 
     res.json({ message: 'Workout deleted successfully' });
   } catch (error) {
