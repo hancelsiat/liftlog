@@ -176,14 +176,18 @@ router.patch('/:id', verifyToken, checkRole(['member', 'trainer']), async (req, 
       return res.status(404).json({ error: 'Workout not found' });
     }
 
-    // AUTH-CHECK: User can update their own workout. A trainer can update any user's workout, but only their own template.
-    const isOwner = (workout.user && workout.user.toString() === req.user._id.toString()) || 
-                    (workout.trainer && workout.trainer.toString() === req.user._id.toString());
+    // AUTH-CHECK: Simplified and safer authorization logic.
+    // A user is authorized if:
+    // 1. They are the user who logged the workout.
+    // 2. They are the trainer who created the template.
+    // 3. They are a trainer, and it's a member's workout log.
+    const isUserOwner = workout.user?.toString() === req.user._id.toString();
+    const isTrainerOwner = workout.trainer?.toString() === req.user._id.toString();
+    const isTrainerModifyingMemberWorkout = req.user.role === 'trainer' && !!workout.user;
 
-    // A trainer is also allowed to edit any workout that is a user's log (not another trainer's template).
-    const canTrainerEdit = req.user.role === 'trainer' && !!workout.user;
+    const isAuthorized = isUserOwner || isTrainerOwner || isTrainerModifyingMemberWorkout;
 
-    if (!isOwner && !canTrainerEdit) {
+    if (!isAuthorized) {
       return res.status(403).json({ error: 'Unauthorized to update this workout' });
     }
 
@@ -211,14 +215,18 @@ router.delete('/:id', verifyToken, checkRole(['member', 'trainer']), async (req,
       return res.status(404).json({ error: 'Workout not found' });
     }
 
-    // AUTH-CHECK: User can delete their own workout. A trainer can delete any user's workout, or their own template.
-    const isOwner = (workout.user && workout.user.toString() === req.user._id.toString()) || 
-                    (workout.trainer && workout.trainer.toString() === req.user._id.toString());
+    // AUTH-CHECK: Simplified and safer authorization logic.
+    // A user is authorized if:
+    // 1. They are the user who logged the workout.
+    // 2. They are the trainer who created the template.
+    // 3. They are a trainer, and it's a member's workout log.
+    const isUserOwner = workout.user?.toString() === req.user._id.toString();
+    const isTrainerOwner = workout.trainer?.toString() === req.user._id.toString();
+    const isTrainerModifyingMemberWorkout = req.user.role === 'trainer' && !!workout.user;
 
-    // A trainer is also allowed to delete any workout that is a user's log (not another trainer's template).
-    const canTrainerDelete = req.user.role === 'trainer' && !!workout.user;
+    const isAuthorized = isUserOwner || isTrainerOwner || isTrainerModifyingMemberWorkout;
 
-    if (!isOwner && !canTrainerDelete) {
+    if (!isAuthorized) {
       return res.status(403).json({ error: 'Unauthorized to delete this workout' });
     }
 
