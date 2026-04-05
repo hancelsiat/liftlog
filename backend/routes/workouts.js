@@ -25,13 +25,15 @@ router.post('/', verifyToken, checkRole(['member', 'trainer']), async (req, res)
 
 // Create a new workout template (Trainer Route)
 router.post('/template', verifyToken, checkRole(['trainer']), async (req, res) => {
-  try {    const workout = new Workout({
-      name: req.body.title,
-      description: req.body.description,
-      exercises: req.body.exercises,
+  try {    const { title, ...rest } = req.body;
+    const workoutData = {
+      ...rest,
+      name: title, // Map incoming 'title' to the schema's 'name' field
       trainer: req.user._id,
       isPublic: true
-    });
+    };
+
+    const workout = new Workout(workoutData);
     await workout.save();
 
     res.status(201).json({
