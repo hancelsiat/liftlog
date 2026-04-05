@@ -25,14 +25,10 @@ router.post('/', verifyToken, checkRole(['member', 'trainer']), async (req, res)
 
 // Create a new workout template (Trainer Route)
 router.post('/template', verifyToken, checkRole(['trainer']), async (req, res) => {
-  try {
-    const { name, ...workoutDetails } = req.body; // Separate name from the rest
-
-    const workoutData = {
-      ...workoutDetails,
-      title: name, // Map the incoming 'name' to the schema's 'title' field
-      trainer: req.user._id, // Securely assign the trainer from the token
-      isPublic: true // Templates are always public
+  try {    const workoutData = {
+      ...req.body,
+      trainer: req.user._id,
+      isPublic: true
     };
 
     const workout = new Workout(workoutData);
@@ -80,18 +76,6 @@ router.get('/', verifyToken, async (req, res) => {
       currentPage: page,
       totalPages: Math.ceil(total / limit)
     });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Trainer: Get all workouts they have created
-router.get('/my-creations', verifyToken, checkRole(['trainer']), async (req, res) => {
-  try {
-    const workouts = await Workout.find({ trainer: req.user._id })
-      .sort({ createdAt: -1 });
-
-    res.json({ workouts });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -147,17 +131,7 @@ router.get('/trainer/:trainerId', verifyToken, checkRole(['all']), async (req, r
 // Get a specific workout by ID
 router.get('/:id', verifyToken, async (req, res) => {
   try {
-    console.log('--- DEBUG: UPDATE WORKOUT ---');
-    console.log('Workout ID:', req.params.id);
-    console.log('User making request:', req.user);
-    console.log('--- DEBUG: DELETE WORKOUT ---');
-    console.log('Workout ID:', req.params.id);
-    console.log('User making request:', req.user);
     const workout = await Workout.findById(req.params.id);
-    console.log('Workout found in DB:', workout);
-    console.log('----------------------------');
-    console.log('Workout found in DB:', workout);
-    console.log('----------------------------');
 
     if (!workout) {
       return res.status(404).json({ error: 'Workout not found' });
@@ -186,19 +160,18 @@ router.patch('/:id', verifyToken, checkRole(['member', 'trainer']), async (req, 
       return res.status(404).json({ error: 'Workout not found' });
     }
 
-    // AUTH-CHECK: Simplified and safer authorization logic.
-    // A user is authorized if:
-    // 1. They are the user who logged the workout.
-    // 2. They are the trainer who created the template.
-    // 3. They are a trainer, and it's a member's workout log.
+    // AUTH-CHECK: Safer authorization logic that handles both users and trainers.
     const isUserOwner = workout.user?.toString() === req.user._id.toString();
     const isTrainerOwner = workout.trainer?.toString() === req.user._id.toString();
-    const isTrainerModifyingMemberWorkout = req.user.role === 'trainer' && !!workout.user;
-
-    const isAuthorized = isUserOwner || isTrainerOwner || isTrainerModifyingMemberWorkout;
+    const isAuthorized = isUserOwner || isTrainerOwner;
 
     if (!isAuthorized) {
-      return res.status(403).json({ error: 'Unauthorized to update this workout' });
+      // Allow trainers to edit member workouts, but not other trainers' templates.
+      if (req.user.role === 'trainer' && workout.user) {
+        // This is a trainer editing a member's workout. Allow.
+      } else {
+        return res.status(403).json({ error: 'Unauthorized to update this workout' });
+      }
     }
 
     const updatedWorkout = await Workout.findByIdAndUpdate(
@@ -225,22 +198,21 @@ router.delete('/:id', verifyToken, checkRole(['member', 'trainer']), async (req,
       return res.status(404).json({ error: 'Workout not found' });
     }
 
-    // AUTH-CHECK: Simplified and safer authorization logic.
-    // A user is authorized if:
-    // 1. They are the user who logged the workout.
-    // 2. They are the trainer who created the template.
-    // 3. They are a trainer, and it's a member's workout log.
+    // AUTH-CHECK: Safer authorization logic that handles both users and trainers.
     const isUserOwner = workout.user?.toString() === req.user._id.toString();
     const isTrainerOwner = workout.trainer?.toString() === req.user._id.toString();
-    const isTrainerModifyingMemberWorkout = req.user.role === 'trainer' && !!workout.user;
-
-    const isAuthorized = isUserOwner || isTrainerOwner || isTrainerModifyingMemberWorkout;
+    const isAuthorized = isUserOwner || isTrainerOwner;
 
     if (!isAuthorized) {
-      return res.status(403).json({ error: 'Unauthorized to delete this workout' });
+      // Allow trainers to delete member workouts, but not other trainers' templates.
+      if (req.user.role === 'trainer' && workout.user) {
+        // This is a trainer deleting a member's workout. Allow.
+      } else {
+        return res.status(403).json({ error: 'Unauthorized to delete this workout' });
+      }
     }
 
-    await Workout.findByIdAndDelete(req.params.id);
+    await workout.remove();
 
     res.json({ message: 'Workout deleted successfully' });
   } catch (error) {
