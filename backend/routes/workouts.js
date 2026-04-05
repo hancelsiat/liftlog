@@ -137,12 +137,18 @@ router.get('/:id', verifyToken, async (req, res) => {
       return res.status(404).json({ error: 'Workout not found' });
     }
 
-    // Ensure user can only access their own workouts or trainer can view
-    if (
-      workout.user.toString() !== req.user._id.toString() && 
-      req.user.role !== 'trainer'
-    ) {
-      return res.status(403).json({ error: 'Unauthorized access' });
+    // AUTH-CHECK: Safer authorization logic that handles both users and trainers.
+    const isUserOwner = workout.user?.equals(req.user._id);
+    const isTrainerOwner = workout.trainer?.equals(req.user._id);
+    const isAuthorized = isUserOwner || isTrainerOwner;
+
+    if (!isAuthorized) {
+      // Allow trainers to edit member workouts, but not other trainers' templates.
+      if (req.user.role === 'trainer' && workout.user) {
+        // This is a trainer editing a member's workout. Allow.
+      } else {
+        return res.status(403).json({ error: 'Unauthorized to update this workout' });
+      }
     }
 
     res.json(workout);
@@ -198,18 +204,16 @@ router.delete('/:id', verifyToken, checkRole(['member', 'trainer']), async (req,
       return res.status(404).json({ error: 'Workout not found' });
     }
 
-    // AUTH-CHECK: Safer authorization logic that handles both users and trainers.
+    // AUTH-CHECK: A user can delete their own workout. A trainer can delete their own
+    // template, or any member's workout.
     const isUserOwner = workout.user?.equals(req.user._id);
     const isTrainerOwner = workout.trainer?.equals(req.user._id);
-    const isAuthorized = isUserOwner || isTrainerOwner;
+    const isTrainerAndMemberWorkout = req.user.role === 'trainer' && workout.user;
+
+    const isAuthorized = isUserOwner || isTrainerOwner || isTrainerAndMemberWorkout;
 
     if (!isAuthorized) {
-      // Allow trainers to delete member workouts, but not other trainers' templates.
-      if (req.user.role === 'trainer' && workout.user) {
-        // This is a trainer deleting a member's workout. Allow.
-      } else {
-        return res.status(403).json({ error: 'Unauthorized to delete this workout' });
-      }
+      return res.status(403).json({ error: 'Unauthorized to delete this workout' });
     }
 
     await workout.remove();
