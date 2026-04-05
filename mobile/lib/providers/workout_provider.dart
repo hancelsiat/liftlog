@@ -41,7 +41,7 @@ class WorkoutProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> updateWorkout(String id, String name, String description, List<String> exercises) async {
+  Future<bool> updateWorkout(String id, String name, String description, List<Map<String, dynamic>> exercises) async {
     try {
       final updatedWorkout = await _apiService.updateWorkout(id, name, description, exercises);
       final index = _workouts.indexWhere((w) => w.id == id);

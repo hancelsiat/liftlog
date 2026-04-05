@@ -4,10 +4,11 @@ import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../models/workout.dart';
 import '../models/user.dart';
-import '../models/exercise.dart';
 
 class CreateWorkoutTemplateScreen extends StatefulWidget {
-  const CreateWorkoutTemplateScreen({super.key});
+  final Workout? workout;
+
+  const CreateWorkoutTemplateScreen({super.key, this.workout});
 
   @override
   State<CreateWorkoutTemplateScreen> createState() => _CreateWorkoutTemplateScreenState();
@@ -22,7 +23,7 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
 
   String _category = 'strength';
   String _intensity = 'moderate';
-  List<Map<String, dynamic>> _exercises = [];
+  final List<Map<String, dynamic>> _exercises = [];
   bool _isLoading = false;
 
   final List<String> _categories = ['strength', 'cardio', 'flexibility', 'mixed'];
@@ -66,6 +67,16 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
       {'name': 'CrossFit WOD', 'icon': Icons.fitness_center, 'defaultSets': 1, 'defaultReps': 1},
     ],
   };
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.workout != null) {
+      _titleController.text = widget.workout!.name;
+      _descriptionController.text = widget.workout!.description;
+      _exercises.addAll(widget.workout!.exercises.map((e) => e.toJson()));
+    }
+  }
 
   @override
   void dispose() {
@@ -242,24 +253,35 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
 
     try {
       final apiService = ApiService();
-      await apiService.createWorkoutTemplate(
-        title: _titleController.text.trim(),
-        description: _descriptionController.text.trim(),
-        exercises: _exercises,
-        category: _category,
-        intensity: _intensity,
-        duration: int.tryParse(_durationController.text),
-        caloriesBurned: int.tryParse(_caloriesController.text),
-      );
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Workout template created successfully!')),
-      );
+      if (widget.workout == null) {
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        await apiService.createWorkoutTemplate(
+          title: _titleController.text.trim(),
+          description: _descriptionController.text.trim(),
+          exercises: _exercises,
+          category: _category,
+          intensity: _intensity,
+          trainerId: authProvider.user!.id,
+        );
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Workout template created successfully!')),
+        );
+      } else {
+        await apiService.updateWorkout(
+          widget.workout!.id,
+          _titleController.text.trim(),
+          _descriptionController.text.trim(),
+          _exercises,
+        );
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Workout template updated successfully!')),
+        );
+      }
 
       Navigator.pop(context);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error creating workout template: $e')),
+        SnackBar(content: Text('Error saving workout template: $e')),
       );
     } finally {
       setState(() {
@@ -332,7 +354,7 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
                 children: [
                   Expanded(
                     child: DropdownButtonFormField<String>(
-                      value: _category,
+                      initialValue: _category,
                       decoration: const InputDecoration(
                         labelText: 'Category',
                         border: OutlineInputBorder(),
@@ -353,7 +375,7 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
                   const SizedBox(width: 16),
                   Expanded(
                     child: DropdownButtonFormField<String>(
-                      value: _intensity,
+                      initialValue: _intensity,
                       decoration: const InputDecoration(
                         labelText: 'Intensity',
                         border: OutlineInputBorder(),
@@ -375,31 +397,7 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
               ),
               const SizedBox(height: 16),
 
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _durationController,
-                      decoration: const InputDecoration(
-                        labelText: 'Duration (minutes)',
-                        border: OutlineInputBorder(),
-                      ),
-                      keyboardType: TextInputType.number,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _caloriesController,
-                      decoration: const InputDecoration(
-                        labelText: 'Calories Burned',
-                        border: OutlineInputBorder(),
-                      ),
-                      keyboardType: TextInputType.number,
-                    ),
-                  ),
-                ],
-              ),
+
               const SizedBox(height: 32),
 
               // Exercises Section

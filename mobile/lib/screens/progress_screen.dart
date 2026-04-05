@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'dart:async';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../models/progress.dart';
@@ -13,23 +14,47 @@ class ProgressScreen extends StatefulWidget {
 }
 
 class _ProgressScreenState extends State<ProgressScreen> {
-  final _formKey = GlobalKey<FormState>();
+  final _bmiFormKey = GlobalKey<FormState>();
+  final _caloriesFormKey = GlobalKey<FormState>();
   final _bmiController = TextEditingController();
   final _caloriesIntakeController = TextEditingController();
   final _calorieDeficitController = TextEditingController();
 
   List<Progress> _progressHistory = [];
   bool _isLoading = false;
-  bool _canUpdate = true;
-  int _daysUntilNextUpdate = 0;
-  DateTime? _nextAllowedDate;
-  String _updateMessage = '';
+  
+  // BMI status
+  bool _canUpdateBmi = true;
+  int _daysUntilNextBmiUpdate = 0;
+  DateTime? _bmiNextAllowedDate;
+  String _bmiUpdateMessage = '';
+  
+  // Calories status
+  bool _canUpdateCalories = true;
+  int _hoursUntilNextCaloriesUpdate = 0;
+  DateTime? _caloriesNextAllowedDate;
+  String _caloriesUpdateMessage = '';
+
+  Timer? _updateTimer;
 
   @override
   void initState() {
     super.initState();
     _checkUpdateStatus();
     _fetchProgressHistory();
+    // Update timer every minute to refresh countdown
+    _updateTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
+      _checkUpdateStatus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _bmiController.dispose();
+    _caloriesIntakeController.dispose();
+    _calorieDeficitController.dispose();
+    _updateTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _checkUpdateStatus() async {
@@ -38,11 +63,22 @@ class _ProgressScreenState extends State<ProgressScreen> {
       final status = await apiService.canUpdateProgress();
       
       setState(() {
-        _canUpdate = status['canUpdate'] ?? true;
-        _daysUntilNextUpdate = status['daysUntilNextUpdate'] ?? 0;
-        _updateMessage = status['message'] ?? '';
-        if (status['nextAllowedDate'] != null) {
-          _nextAllowedDate = DateTime.parse(status['nextAllowedDate']);
+        // BMI status
+        final bmiStatus = status['bmi'] as Map<String, dynamic>?;
+        _canUpdateBmi = bmiStatus?['canUpdate'] ?? true;
+        _daysUntilNextBmiUpdate = bmiStatus?['daysUntilNext'] ?? 0;
+        _bmiUpdateMessage = bmiStatus?['message'] ?? '';
+        if (bmiStatus?['nextAllowedDate'] != null) {
+          _bmiNextAllowedDate = DateTime.parse(bmiStatus!['nextAllowedDate']);
+        }
+        
+        // Calories status
+        final caloriesStatus = status['calories'] as Map<String, dynamic>?;
+        _canUpdateCalories = caloriesStatus?['canUpdate'] ?? true;
+        _hoursUntilNextCaloriesUpdate = caloriesStatus?['hoursUntilNext'] ?? 0;
+        _caloriesUpdateMessage = caloriesStatus?['message'] ?? '';
+        if (caloriesStatus?['nextAllowedDate'] != null) {
+          _caloriesNextAllowedDate = DateTime.parse(caloriesStatus!['nextAllowedDate']);
         }
       });
     } catch (e) {
@@ -71,7 +107,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Session expired. Please log in again.')),
         );
-        // Navigate back to login
         Navigator.of(context).pushReplacementNamed('/login');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -81,11 +116,11 @@ class _ProgressScreenState extends State<ProgressScreen> {
     }
   }
 
-  void _saveProgress() async {
-    if (!_canUpdate) {
+  void _saveBmi() async {
+    if (!_canUpdateBmi) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_updateMessage),
+          content: Text(_bmiUpdateMessage),
           backgroundColor: Colors.orange,
           duration: const Duration(seconds: 3),
         ),
@@ -93,38 +128,69 @@ class _ProgressScreenState extends State<ProgressScreen> {
       return;
     }
 
-    if (_formKey.currentState!.validate()) {
+    if (_bmiFormKey.currentState!.validate()) {
       try {
         final apiService = ApiService();
-        final progress = await apiService.createProgress(
+        await apiService.createProgressPartial(
           bmi: double.parse(_bmiController.text),
-          caloriesIntake: double.parse(_caloriesIntakeController.text),
-          calorieDeficit: double.parse(_calorieDeficitController.text),
         );
 
-        // Clear input fields
         _bmiController.clear();
-        _caloriesIntakeController.clear();
-        _calorieDeficitController.clear();
-
-        // Refresh status and history
         await _checkUpdateStatus();
         _fetchProgressHistory();
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Progress saved successfully! Next update available in 7 days.'),
+            content: Text('BMI updated successfully! Next update available in 7 days.'),
             backgroundColor: Colors.green,
           ),
         );
       } catch (e) {
-        final errorMessage = e.toString().contains('once per week')
-            ? 'You can only update your progress once per week'
-            : 'Failed to save progress: $e';
-        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(errorMessage),
+            content: Text('Failed to update BMI: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _saveCalories() async {
+    if (!_canUpdateCalories) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_caloriesUpdateMessage),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
+    if (_caloriesFormKey.currentState!.validate()) {
+      try {
+        final apiService = ApiService();
+        await apiService.createProgressPartial(
+          caloriesIntake: double.parse(_caloriesIntakeController.text),
+          calorieDeficit: double.parse(_calorieDeficitController.text),
+        );
+
+        _caloriesIntakeController.clear();
+        _calorieDeficitController.clear();
+        await _checkUpdateStatus();
+        _fetchProgressHistory();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Calories updated successfully! Next update available in 24 hours.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update calories: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -144,159 +210,15 @@ class _ProgressScreenState extends State<ProgressScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Weekly Update Warning Banner
-              if (!_canUpdate)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.orange, width: 2),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.schedule, color: Colors.orange, size: 32),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Weekly Update Limit',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: Colors.orange,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Next update available in $_daysUntilNextUpdate day(s)',
-                              style: const TextStyle(fontSize: 14),
-                            ),
-                            if (_nextAllowedDate != null)
-                              Text(
-                                'Available on: ${_nextAllowedDate!.day}/${_nextAllowedDate!.month}/${_nextAllowedDate!.year}',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontStyle: FontStyle.italic,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-              // Success Banner when can update
-              if (_canUpdate && _progressHistory.isNotEmpty)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.green, width: 2),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.check_circle, color: Colors.green, size: 32),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Ready to Update',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: Colors.green,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'You can update your weekly progress now!',
-                              style: TextStyle(fontSize: 14),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-              // Progress Input Form - Only show when user can update
-              if (_canUpdate)
-                Form(
-                  key: _formKey,
-                  child: Column(
-                    children: [
-                      TextFormField(
-                        controller: _bmiController,
-                        decoration: const InputDecoration(
-                          labelText: 'BMI',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.monitor_weight),
-                        ),
-                        keyboardType: TextInputType.number,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter your BMI';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _caloriesIntakeController,
-                        decoration: const InputDecoration(
-                          labelText: 'Calories Intake',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.restaurant),
-                        ),
-                        keyboardType: TextInputType.number,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter your daily calories intake';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _calorieDeficitController,
-                        decoration: const InputDecoration(
-                          labelText: 'Calorie Deficit',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.trending_down),
-                        ),
-                        keyboardType: TextInputType.number,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter your calorie deficit';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 20),
-                      ElevatedButton.icon(
-                        onPressed: _saveProgress,
-                        icon: const Icon(Icons.save),
-                        label: const Text('Save Progress'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                          textStyle: const TextStyle(fontSize: 16),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+              // BMI Section
+              _buildBmiSection(),
+              const SizedBox(height: 24),
+              
+              // Calories Section
+              _buildCaloriesSection(),
+              const SizedBox(height: 30),
 
               // Progress Charts
-              const SizedBox(height: 30),
               const Text(
                 'Progress Charts',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -308,7 +230,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 _buildChartCard(
                   title: 'BMI Over Time',
                   chart: _buildLineChart(
-                    data: _progressHistory.map((p) => p.bmi).toList(),
+                    data: _progressHistory.where((p) => p.bmi != null).map((p) => p.bmi!).toList(),
                     color: Colors.blue,
                   ),
                 ),
@@ -317,7 +239,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 _buildChartCard(
                   title: 'Calories Intake Over Time',
                   chart: _buildLineChart(
-                    data: _progressHistory.map((p) => p.caloriesIntake).toList(),
+                    data: _progressHistory.where((p) => p.caloriesIntake != null).map((p) => p.caloriesIntake!).toList(),
                     color: Colors.green,
                   ),
                 ),
@@ -326,7 +248,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 _buildChartCard(
                   title: 'Calorie Deficit Over Time',
                   chart: _buildLineChart(
-                    data: _progressHistory.map((p) => p.calorieDeficit).toList(),
+                    data: _progressHistory.where((p) => p.calorieDeficit != null).map((p) => p.calorieDeficit!).toList(),
                     color: Colors.red,
                   ),
                 ),
@@ -352,12 +274,12 @@ class _ProgressScreenState extends State<ProgressScreen> {
                             return Card(
                               margin: const EdgeInsets.only(bottom: 8),
                               child: ListTile(
-                                title: Text('BMI: ${progress.bmi.toStringAsFixed(1)}'),
+                                title: Text('BMI: ${progress.bmi?.toStringAsFixed(1) ?? 'N/A'}'),
                                 subtitle: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text('Calories Intake: ${progress.caloriesIntake.toInt()}'),
-                                    Text('Calorie Deficit: ${progress.calorieDeficit.toInt()}'),
+                                    Text('Calories Intake: ${progress.caloriesIntake?.toInt() ?? 'N/A'}'),
+                                    Text('Calorie Deficit: ${progress.calorieDeficit?.toInt() ?? 'N/A'}'),
                                   ],
                                 ),
                                 trailing: Text(
@@ -369,6 +291,269 @@ class _ProgressScreenState extends State<ProgressScreen> {
                         ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBmiSection() {
+    return Card(
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.monitor_weight, size: 32, color: Colors.blue),
+                const SizedBox(width: 12),
+                const Text(
+                  'BMI Tracking',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Update once per week',
+              style: TextStyle(color: Colors.grey[600], fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+
+            // Status Banner
+            if (!_canUpdateBmi)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange, width: 2),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.schedule, color: Colors.orange),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Update Locked',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          Text('Next update in $_daysUntilNextBmiUpdate day(s)'),
+                          if (_bmiNextAllowedDate != null)
+                            Text(
+                              'Available: ${_bmiNextAllowedDate!.day}/${_bmiNextAllowedDate!.month}/${_bmiNextAllowedDate!.year}',
+                              style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green, width: 2),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.green),
+                    SizedBox(width: 12),
+                    Text(
+                      'Ready to Update',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 16),
+
+            // BMI Input Form
+            Form(
+              key: _bmiFormKey,
+              child: Column(
+                children: [
+                  TextFormField(
+                    controller: _bmiController,
+                    enabled: _canUpdateBmi,
+                    decoration: InputDecoration(
+                      labelText: 'BMI',
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.monitor_weight),
+                      filled: !_canUpdateBmi,
+                      fillColor: !_canUpdateBmi ? Colors.grey[200] : null,
+                    ),
+                    keyboardType: TextInputType.number,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter your BMI';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: _canUpdateBmi ? _saveBmi : null,
+                    icon: const Icon(Icons.save),
+                    label: const Text('Update BMI'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                      textStyle: const TextStyle(fontSize: 16),
+                      backgroundColor: Colors.blue,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCaloriesSection() {
+    return Card(
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.restaurant, size: 32, color: Colors.green),
+                const SizedBox(width: 12),
+                const Text(
+                  'Calories Tracking',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Update every 24 hours',
+              style: TextStyle(color: Colors.grey[600], fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+
+            // Status Banner
+            if (!_canUpdateCalories)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange, width: 2),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.schedule, color: Colors.orange),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Update Locked',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          Text('Next update in $_hoursUntilNextCaloriesUpdate hour(s)'),
+                          if (_caloriesNextAllowedDate != null)
+                            Text(
+                              'Available: ${_caloriesNextAllowedDate!.day}/${_caloriesNextAllowedDate!.month} ${_caloriesNextAllowedDate!.hour}:${_caloriesNextAllowedDate!.minute.toString().padLeft(2, '0')}',
+                              style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green, width: 2),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.green),
+                    SizedBox(width: 12),
+                    Text(
+                      'Ready to Update',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 16),
+
+            // Calories Input Form
+            Form(
+              key: _caloriesFormKey,
+              child: Column(
+                children: [
+                  TextFormField(
+                    controller: _caloriesIntakeController,
+                    enabled: _canUpdateCalories,
+                    decoration: InputDecoration(
+                      labelText: 'Calories Intake',
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.restaurant),
+                      filled: !_canUpdateCalories,
+                      fillColor: !_canUpdateCalories ? Colors.grey[200] : null,
+                    ),
+                    keyboardType: TextInputType.number,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter your daily calories intake';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _calorieDeficitController,
+                    enabled: _canUpdateCalories,
+                    decoration: InputDecoration(
+                      labelText: 'Calorie Deficit',
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.trending_down),
+                      filled: !_canUpdateCalories,
+                      fillColor: !_canUpdateCalories ? Colors.grey[200] : null,
+                    ),
+                    keyboardType: TextInputType.number,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter your calorie deficit';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: _canUpdateCalories ? _saveCalories : null,
+                    icon: const Icon(Icons.save),
+                    label: const Text('Update Calories'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                      textStyle: const TextStyle(fontSize: 16),
+                      backgroundColor: Colors.green,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -398,6 +583,10 @@ class _ProgressScreenState extends State<ProgressScreen> {
   }
 
   Widget _buildLineChart({required List<double> data, required Color color}) {
+    if (data.isEmpty) {
+      return const Center(child: Text('No data available'));
+    }
+
     // Reverse data to show chronological order (oldest to newest)
     final reversedData = data.reversed.toList();
 
@@ -454,13 +643,5 @@ class _ProgressScreenState extends State<ProgressScreen> {
         ],
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _bmiController.dispose();
-    _caloriesIntakeController.dispose();
-    _calorieDeficitController.dispose();
-    super.dispose();
   }
 }

@@ -27,6 +27,12 @@ class AppTheme {
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
+
+  static const LinearGradient tertiaryGradient = LinearGradient(
+    colors: [Color(0xFFF7B733), Color(0xFFFC4A1A)], // Example: Yellow to Orange
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
   
   static const LinearGradient backgroundGradient = LinearGradient(
     colors: [Color(0xFF1A1A2E), Color(0xFF16213E), Color(0xFF0F3460)],
@@ -59,12 +65,10 @@ class AppTheme {
         secondary: secondaryColor,
         tertiary: accentColor,
         surface: cardBackground,
-        background: darkBackground,
         error: errorColor,
         onPrimary: Colors.white,
         onSecondary: Colors.white,
         onSurface: textPrimary,
-        onBackground: textPrimary,
       ),
       
       // AppBar Theme

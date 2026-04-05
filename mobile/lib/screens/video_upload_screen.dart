@@ -23,9 +23,19 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
 
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _exerciseTypeController = TextEditingController();
+  String _selectedExerciseType = 'strength'; // Default value
   bool _isUploading = false;
   bool _isPublic = true;
+
+  // Available exercise types matching backend enum
+  final List<String> _exerciseTypes = [
+    'cardio',
+    'strength',
+    'flexibility',
+    'balance',
+    'sports',
+    'other',
+  ];
 
   // Google Drive related state
   GoogleSignInAccount? _account;
@@ -33,7 +43,7 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
   List<Map<String, dynamic>> _driveFiles = [];
   bool _isLoadingDrive = false;
   String _driveStatus = '';
-  bool _showDriveUpload = false;
+  final bool _showDriveUpload = false;
 
 
 
@@ -57,7 +67,7 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
       final result = await _apiService.uploadVideo(
         jwt: jwt,
         title: _titleController.text,
-        exerciseType: _exerciseTypeController.text,
+        exerciseType: _selectedExerciseType,
         description: _descriptionController.text,
         isPublic: _isPublic,
       );
@@ -70,11 +80,14 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
         // Clear form after successful upload
         _titleController.clear();
         _descriptionController.clear();
-        _exerciseTypeController.clear();
+        setState(() {
+          _selectedExerciseType = 'strength'; // Reset to default
+        });
       } else {
-        final message = result['message'] ?? 'Upload failed';
+        final message = result['message'];
+        final displayMessage = (message is Map) ? message.toString() : (message ?? 'Upload failed');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
+          SnackBar(content: Text(displayMessage)),
         );
       }
 
@@ -163,7 +176,7 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
       final metadata = {
         'title': _titleController.text,
         'description': _descriptionController.text,
-        'exerciseType': _exerciseTypeController.text,
+        'exerciseType': _selectedExerciseType,
         'difficulty': 'beginner',
         'duration': 0,
         'tags': [],
@@ -184,8 +197,8 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
       // Clear form after successful upload
       _titleController.clear();
       _descriptionController.clear();
-      _exerciseTypeController.clear();
       setState(() {
+        _selectedExerciseType = 'strength'; // Reset to default
         _isUploading = false;
         _driveStatus = 'Upload completed successfully';
       });
@@ -248,16 +261,30 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Exercise Type
-              TextFormField(
-                controller: _exerciseTypeController,
+              // Exercise Type Dropdown
+              DropdownButtonFormField<String>(
+                initialValue: _selectedExerciseType,
                 decoration: const InputDecoration(
-                  labelText: 'Exercise Type (e.g., strength, cardio)',
+                  labelText: 'Exercise Type',
                   border: OutlineInputBorder(),
+                  helperText: 'Select the type of exercise',
                 ),
+                items: _exerciseTypes.map((String type) {
+                  return DropdownMenuItem<String>(
+                    value: type,
+                    child: Text(type.toUpperCase()),
+                  );
+                }).toList(),
+                onChanged: (String? newValue) {
+                  if (newValue != null) {
+                    setState(() {
+                      _selectedExerciseType = newValue;
+                    });
+                  }
+                },
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter an exercise type';
+                    return 'Please select an exercise type';
                   }
                   return null;
                 },
@@ -304,7 +331,6 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
-    _exerciseTypeController.dispose();
     _googleSignIn.signOut();
     super.dispose();
   }

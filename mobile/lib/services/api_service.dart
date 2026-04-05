@@ -334,6 +334,16 @@ class ApiService {
     return workoutsJson.map((json) => Workout.fromJson(json)).toList();
   }
 
+  Future<List<Workout>> getTrainerWorkouts() async {
+    final response = await _get('/workouts/my-creations');
+    final List<dynamic> workoutsJson = response['workouts'];
+    return workoutsJson.map((json) => Workout.fromJson(json)).toList();
+  }
+
+
+
+
+
   Future<Workout> getWorkout(String id) async {
     final response = await _get('/workouts/$id');
     return Workout.fromJson(response);
@@ -348,6 +358,25 @@ class ApiService {
     return Workout.fromJson(response['workout'] as Map<String, dynamic>);
   }
 
+  Future<Workout> updateWorkout(String id, String name, String description, List<Map<String, dynamic>> exercises) async {
+    final response = await _patch('/workouts/$id', {
+      'name': name,
+      'description': description,
+      'exercises': exercises,
+    });
+    return Workout.fromJson(response['workout'] as Map<String, dynamic>);
+  }
+
+  Future<void> deleteWorkout(String workoutId) async {
+    await _delete('/workouts/$workoutId');
+  }
+
+
+
+
+
+
+
   // Create workout template (Trainer only)
   Future<Workout> createWorkoutTemplate({
     required String title,
@@ -357,31 +386,23 @@ class ApiService {
     String? intensity,
     int? duration,
     int? caloriesBurned,
+    String? trainerId,
   }) async {
     final response = await _post('/workouts/template', {
       'title': title,
       'description': description,
-      'exercises': exercises,
+      'exercises': exercises, // This now correctly sends the list of maps
       'category': category ?? 'mixed',
       'intensity': intensity ?? 'moderate',
       'duration': duration,
       'caloriesBurned': caloriesBurned,
+      'isPublic': true,
+      if (trainerId != null) 'trainer': trainerId,
     });
     return Workout.fromJson(response['workout'] as Map<String, dynamic>);
   }
 
-  Future<Workout> updateWorkout(String id, String name, String description, List<String> exercises) async {
-    final response = await _patch('/workouts/$id', {
-      'name': name,
-      'description': description,
-      'exercises': exercises,
-    });
-    return Workout.fromJson(response['workout'] as Map<String, dynamic>);
-  }
 
-  Future<void> deleteWorkout(String id) async {
-    await _delete('/workouts/$id');
-  }
 
   // Progress tracking methods
   Future<Progress> createProgress({
@@ -480,7 +501,7 @@ class ApiService {
 
       final form = FormData.fromMap({
         'title': title.trim(),
-        'exerciseType': exerciseType.trim(),
+        'exerciseType': exerciseType.trim().toLowerCase(), // Normalize to lowercase
         if (description != null) 'description': description.trim(),
         'isPublic': isPublic.toString(),
         'video': mpFile,
@@ -565,7 +586,7 @@ class ApiService {
     return User.fromJson(response['user']);
   }
 
-  // Check if user can update progress
+  // Check if user can update progress (returns separate status for BMI and Calories)
   Future<Map<String, dynamic>> canUpdateProgress() async {
     final token = await getToken();
     final response = await http.get(
@@ -581,6 +602,21 @@ class ApiService {
     } else {
       throw Exception('Failed to check update status');
     }
+  }
+
+  // Create progress with optional fields (BMI and/or Calories)
+  Future<Progress> createProgressPartial({
+    double? bmi,
+    double? caloriesIntake,
+    double? calorieDeficit,
+  }) async {
+    final Map<String, dynamic> body = {};
+    if (bmi != null) body['bmi'] = bmi;
+    if (caloriesIntake != null) body['caloriesIntake'] = caloriesIntake;
+    if (calorieDeficit != null) body['calorieDeficit'] = calorieDeficit;
+
+    final response = await _post('/progress', body);
+    return Progress.fromJson(response['progress']);
   }
 
   // Upload video from Google Drive

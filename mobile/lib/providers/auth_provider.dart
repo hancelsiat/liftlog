@@ -36,8 +36,15 @@ class AuthProvider with ChangeNotifier {
         _user = User.fromJson(response['user']);
       }
 
-      // Always load profile after successful registration to get complete user data
-      await loadProfile();
+      // Only load profile for members (auto-approved)
+      // Trainers need admin approval, so don't auto-login
+      if (role == UserRole.member) {
+        await loadProfile();
+      } else {
+        // For trainers, clear any stored token since they can't login yet
+        await _apiService.removeToken();
+        _user = null;
+      }
 
       _isLoading = false;
       notifyListeners();
