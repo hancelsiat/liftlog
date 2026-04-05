@@ -147,39 +147,47 @@ router.get('/:id', verifyToken, async (req, res) => {
 
 // Update a workout
 router.patch('/:id', verifyToken, checkRole(['member', 'trainer']), async (req, res) => {
+  console.log('--- DEBUG: PATCH ROUTE START ---');
   try {
+    console.log(`[1] Finding workout with ID: ${req.params.id}`);
     const workout = await Workout.findById(req.params.id);
+    console.log(`[2] Workout found in DB: ${workout ? workout._id : 'null'}`);
 
     if (!workout) {
+      console.log('[2a] Workout not found, sending 404.');
       return res.status(404).json({ error: 'Workout not found' });
     }
 
-    // AUTH-CHECK: Safer authorization logic that handles both users and trainers.
+    console.log('[3] Checking authorization...');
     const isUserOwner = workout.user?.equals(req.user._id);
     const isTrainerOwner = workout.trainer?.equals(req.user._id);
     const isAuthorized = isUserOwner || isTrainerOwner;
+    console.log(`[3a] isUserOwner: ${isUserOwner}, isTrainerOwner: ${isTrainerOwner}, isAuthorized: ${isAuthorized}`);
 
     if (!isAuthorized) {
-      // Allow trainers to edit member workouts, but not other trainers' templates.
+      console.log('[3b] User is not direct owner. Checking if trainer can modify...');
       if (req.user.role === 'trainer' && workout.user) {
-        // This is a trainer editing a member's workout. Allow.
+        console.log('[3c] Trainer is allowed to modify this member workout.');
       } else {
+        console.log('[3d] Unauthorized, sending 403.');
         return res.status(403).json({ error: 'Unauthorized to update this workout' });
       }
     }
 
+    console.log('[4] Updating workout with body:', req.body);
     const updatedWorkout = await Workout.findByIdAndUpdate(
-      req.params.id, 
-      { $set: req.body }, // Use $set to prevent overwriting the whole document
+      req.params.id,
+      { $set: req.body },
       { new: true, runValidators: true }
     );
+    console.log('[5] Workout updated in DB:', updatedWorkout);
 
-    res.json({
-      message: 'Workout updated successfully',
-      workout: updatedWorkout
-    });
+    res.json(updatedWorkout);
+    console.log('--- DEBUG: PATCH ROUTE END ---');
+
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    console.error('--- DEBUG: PATCH ROUTE ERROR ---', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
