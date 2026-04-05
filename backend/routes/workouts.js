@@ -139,19 +139,7 @@ router.get('/:id', verifyToken, async (req, res) => {
       return res.status(404).json({ error: 'Workout not found' });
     }
 
-    // AUTH-CHECK: Safer authorization logic that handles both users and trainers.
-    const isUserOwner = workout.user?.equals(req.user._id);
-    const isTrainerOwner = workout.trainer?.equals(req.user._id);
-    const isAuthorized = isUserOwner || isTrainerOwner;
 
-    if (!isAuthorized) {
-      // Allow trainers to edit member workouts, but not other trainers' templates.
-      if (req.user.role === 'trainer' && workout.user) {
-        // This is a trainer editing a member's workout. Allow.
-      } else {
-        return res.status(403).json({ error: 'Unauthorized to update this workout' });
-      }
-    }
 
     res.json(workout);
   } catch (error) {
