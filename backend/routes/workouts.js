@@ -110,16 +110,13 @@ router.get('/trainers/available', verifyToken, checkRole(['all']), async (req, r
 router.get('/trainer/:trainerId', verifyToken, checkRole(['all']), async (req, res) => {
   try {
     const { trainerId } = req.params;
-    const { limit = 10, page = 1 } = req.query;
 
     const workouts = await Workout.find({
       trainer: trainerId,
       isPublic: true
     })
       .populate('trainer', 'username')
-      .sort({ createdAt: -1 })
-      .limit(Number(limit))
-      .skip((page - 1) * limit);
+      .sort({ createdAt: -1 });
 
     const total = await Workout.countDocuments({
       trainer: trainerId,
@@ -129,8 +126,8 @@ router.get('/trainer/:trainerId', verifyToken, checkRole(['all']), async (req, r
     res.json({
       workouts,
       totalWorkouts: total,
-      currentPage: Number(page),
-      totalPages: Math.ceil(total / limit)
+      currentPage: 1,
+      totalPages: 1
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
