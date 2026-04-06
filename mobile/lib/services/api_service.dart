@@ -280,6 +280,20 @@ class ApiService {
     return _handleResponse(response);
   }
 
+  Future<Map<String, dynamic>> _deleteWithBody(String endpoint, Map<String, dynamic> body) async {
+    final token = await getToken();
+    final request = http.Request('DELETE', Uri.parse('$baseUrl$endpoint'));
+    request.headers.addAll({
+      'Content-Type': 'application/json',
+      if (token != null) 'Authorization': 'Bearer $token',
+    });
+    request.body = jsonEncode(body);
+
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+    return _handleResponse(response);
+  }
+
   Map<String, dynamic> _handleResponse(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return jsonDecode(response.body);
@@ -376,6 +390,10 @@ class ApiService {
 
 
 
+
+  Future<void> deleteWorkouts(List<String> workoutIds) async {
+    await _deleteWithBody('/workouts', {'workoutIds': workoutIds});
+  }
 
   // Create workout template (Trainer only)
   Future<Workout> createWorkoutTemplate({

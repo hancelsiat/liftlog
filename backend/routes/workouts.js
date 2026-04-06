@@ -208,6 +208,30 @@ router.delete('/:id', verifyToken, checkRole(['member', 'trainer']), async (req,
   }
 });
 
+router.delete('/', verifyToken, checkRole(['trainer']), async (req, res) => {
+  try {
+    const { workoutIds } = req.body;
+
+    if (!workoutIds || !Array.isArray(workoutIds) || workoutIds.length === 0) {
+      return res.status(400).json({ error: 'Workout IDs must be a non-empty array' });
+    }
+
+    const result = await Workout.deleteMany({
+      _id: { $in: workoutIds },
+      trainer: req.user._id  // Ensure trainer can only delete their own workouts
+    });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: 'No matching workouts found to delete' });
+    }
+
+    res.json({ message: `${result.deletedCount} workouts deleted successfully` });
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Trainer: Get workouts for a specific user
 router.get('/user/:userId', 
   verifyToken, 

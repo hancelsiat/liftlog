@@ -13,6 +13,8 @@ class ManageWorkoutsScreen extends StatefulWidget {
 class _ManageWorkoutsScreenState extends State<ManageWorkoutsScreen> {
   final ApiService _apiService = ApiService();
   late Future<List<Workout>> _workoutsFuture;
+  bool _isSelecting = false;
+  Set<String> _selectedWorkouts = {};
 
   @override
   void initState() {
@@ -33,12 +35,42 @@ class _ManageWorkoutsScreenState extends State<ManageWorkoutsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Manage Workouts'),
-      ),
       body: FutureBuilder<List<Workout>>(
         future: _workoutsFuture,
         builder: (context, snapshot) {
+          return Scaffold(
+            appBar: AppBar(
+              title: Text(_isSelecting ? 'Select Workouts' : 'Manage Workouts'),
+              actions: [
+                if (_isSelecting)
+                  IconButton(
+                    icon: Icon(Icons.select_all),
+                    onPressed: () {
+                      setState(() {
+                        if (_selectedWorkouts.length == snapshot.data!.length) {
+                          _selectedWorkouts.clear();
+                        } else {
+                          _selectedWorkouts = snapshot.data!.map((w) => w.id).toSet();
+                        }
+                      });
+                    },
+                  ),
+                if (_isSelecting)
+                  IconButton(
+                    icon: Icon(Icons.delete),
+                    onPressed: _deleteSelectedWorkouts,
+                  ),
+                if (!_isSelecting)
+                  IconButton(
+                    icon: Icon(Icons.select),
+                    onPressed: () {
+                      setState(() {
+                        _isSelecting = true;
+                      });
+                    },
+                  ),
+              ],
+            ),
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
@@ -51,9 +83,44 @@ class _ManageWorkoutsScreenState extends State<ManageWorkoutsScreen> {
               itemCount: workouts.length,
               itemBuilder: (context, index) {
                 final workout = workouts[index];
+                final isSelected = _selectedWorkouts.contains(workout.id);
                 return ListTile(
+                  leading: _isSelecting ? Checkbox(value: isSelected, onChanged: (bool? value) {
+                    setState(() {
+                      if (value == true) {
+                        _selectedWorkouts.add(workout.id);
+                      } else {
+                        _selectedWorkouts.remove(workout.id);
+                      }
+                    });
+                  }) : null,
                   title: Text(workout.name),
                   subtitle: Text(workout.description),
+                  onTap: () {
+                    if (_isSelecting) {
+                      setState(() {
+                        if (isSelected) {
+                          _selectedWorkouts.remove(workout.id);
+                        } else {
+                          _selectedWorkouts.add(workout.id);
+                        }
+                      });
+                    } else {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              CreateWorkoutTemplateScreen(workout: workout),
+                        ),
+                      );
+                    }
+                  },
+                  onLongPress: () {
+                    setState(() {
+                      _isSelecting = true;
+                      _selectedWorkouts.add(workout.id);
+                    });
+                  },
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -69,12 +136,7 @@ class _ManageWorkoutsScreenState extends State<ManageWorkoutsScreen> {
                           );
                         },
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.delete),
-                        onPressed: () {
-                          _deleteWorkout(workout.id);
-                        },
-                      ),
+
                     ],
                   ),
                 );
@@ -86,18 +148,22 @@ class _ManageWorkoutsScreenState extends State<ManageWorkoutsScreen> {
     );
   }
 
-  void _deleteWorkout(String workoutId) async {
+  void _deleteSelectedWorkouts() async {
+    if (_selectedWorkouts.isEmpty) return;
+
     try {
-      await _apiService.deleteWorkout(workoutId);
+      await _apiService.deleteWorkouts(_selectedWorkouts.toList());
       setState(() {
         _workoutsFuture = _fetchTrainerWorkouts();
+        _isSelecting = false;
+        _selectedWorkouts.clear();
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Workout deleted successfully')),
+        const SnackBar(content: Text('Workouts deleted successfully')),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to delete workout: $e')),
+        SnackBar(content: Text('Failed to delete workouts: $e')),
       );
     }
   }
