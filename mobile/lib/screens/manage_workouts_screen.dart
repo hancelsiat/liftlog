@@ -34,117 +34,120 @@ class _ManageWorkoutsScreenState extends State<ManageWorkoutsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: FutureBuilder<List<Workout>>(
-        future: _workoutsFuture,
-        builder: (context, snapshot) {
-          return Scaffold(
-            appBar: AppBar(
-              title: Text(_isSelecting ? 'Select Workouts' : 'Manage Workouts'),
-              actions: [
-                if (_isSelecting)
-                  IconButton(
-                    icon: Icon(Icons.select_all),
-                    onPressed: () {
-                      setState(() {
+    return FutureBuilder<List<Workout>>(
+      future: _workoutsFuture,
+      builder: (context, snapshot) {
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(_isSelecting ? 'Select Workouts' : 'Manage Workouts'),
+            actions: [
+              if (_isSelecting)
+                IconButton(
+                  icon: Icon(Icons.select_all),
+                  onPressed: () {
+                    setState(() {
+                      if (snapshot.hasData) {
                         if (_selectedWorkouts.length == snapshot.data!.length) {
                           _selectedWorkouts.clear();
                         } else {
                           _selectedWorkouts = snapshot.data!.map((w) => w.id).toSet();
                         }
-                      });
-                    },
-                  ),
-                if (_isSelecting)
-                  IconButton(
-                    icon: Icon(Icons.delete),
-                    onPressed: _deleteSelectedWorkouts,
-                  ),
-                if (!_isSelecting)
-                  IconButton(
-                    icon: Icon(Icons.select),
-                    onPressed: () {
-                      setState(() {
-                        _isSelecting = true;
-                      });
-                    },
-                  ),
-              ],
-            ),
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('You have not created any workouts yet.'));
-          } else {
-            final workouts = snapshot.data!;
-            return ListView.builder(
-              itemCount: workouts.length,
-              itemBuilder: (context, index) {
-                final workout = workouts[index];
-                final isSelected = _selectedWorkouts.contains(workout.id);
-                return ListTile(
-                  leading: _isSelecting ? Checkbox(value: isSelected, onChanged: (bool? value) {
-                    setState(() {
-                      if (value == true) {
-                        _selectedWorkouts.add(workout.id);
-                      } else {
-                        _selectedWorkouts.remove(workout.id);
                       }
                     });
-                  }) : null,
-                  title: Text(workout.name),
-                  subtitle: Text(workout.description),
-                  onTap: () {
-                    if (_isSelecting) {
+                  },
+                ),
+              if (_isSelecting)
+                IconButton(
+                  icon: Icon(Icons.delete),
+                  onPressed: _deleteSelectedWorkouts,
+                ),
+              IconButton(
+                icon: Icon(_isSelecting ? Icons.close : Icons.check_box_outline_blank),
+                onPressed: () {
+                  setState(() {
+                    _isSelecting = !_isSelecting;
+                    _selectedWorkouts.clear();
+                  });
+                },
+              ),
+            ],
+          ),
+          body: Builder(
+            builder: (context) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            } else if (snapshot.hasError) {
+              return Center(child: Text('Error: ${snapshot.error}'));
+            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return const Center(child: Text('You have not created any workouts yet.'));
+            } else {
+              final workouts = snapshot.data!;
+              return ListView.builder(
+                itemCount: workouts.length,
+                itemBuilder: (context, index) {
+                  final workout = workouts[index];
+                  final isSelected = _selectedWorkouts.contains(workout.id);
+                  return ListTile(
+                    leading: _isSelecting ? Checkbox(value: isSelected, onChanged: (bool? value) {
                       setState(() {
-                        if (isSelected) {
-                          _selectedWorkouts.remove(workout.id);
-                        } else {
+                        if (value == true) {
                           _selectedWorkouts.add(workout.id);
+                        } else {
+                          _selectedWorkouts.remove(workout.id);
                         }
                       });
-                    } else {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              CreateWorkoutTemplateScreen(workout: workout),
+                    }) : null,
+                    title: Text(workout.name),
+                    subtitle: Text(workout.description),
+                    onTap: () {
+                      if (_isSelecting) {
+                        setState(() {
+                          if (isSelected) {
+                            _selectedWorkouts.remove(workout.id);
+                          } else {
+                            _selectedWorkouts.add(workout.id);
+                          }
+                        });
+                      } else {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                CreateWorkoutTemplateScreen(workout: workout),
+                          ),
+                        );
+                      }
+                    },
+                    onLongPress: () {
+                      setState(() {
+                        _isSelecting = true;
+                        _selectedWorkouts.add(workout.id);
+                      });
+                    },
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    CreateWorkoutTemplateScreen(workout: workout),
+                              ),
+                            );
+                          },
                         ),
-                      );
-                    }
-                  },
-                  onLongPress: () {
-                    setState(() {
-                      _isSelecting = true;
-                      _selectedWorkouts.add(workout.id);
-                    });
-                  },
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.edit),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  CreateWorkoutTemplateScreen(workout: workout),
-                            ),
-                          );
-                        },
-                      ),
-
-                    ],
-                  ),
-                );
-              },
-            );
-          }
-        },
-      ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            }
+          }),
+        );
+      },
     );
   }
 
