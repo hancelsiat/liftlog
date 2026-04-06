@@ -324,6 +324,7 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
                 decoration: const InputDecoration(
                   labelText: 'Workout Title',
                   border: OutlineInputBorder(),
+                  icon: Icon(Icons.title),
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
