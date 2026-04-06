@@ -335,7 +335,7 @@ class ApiService {
   }
 
   Future<List<Workout>> getTrainerWorkouts() async {
-    final response = await _get('/workouts/my-creations');
+    final response = await _get('/workouts/trainer');
     final List<dynamic> workoutsJson = response['workouts'];
     return workoutsJson.map((json) => Workout.fromJson(json)).toList();
   }
