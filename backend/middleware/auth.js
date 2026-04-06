@@ -36,13 +36,14 @@ const checkRole = (roles) => {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    // If roles includes 'all', allow access
-    // Otherwise, check if user's role is in the allowed roles
-    if (!roles.map(role => role.toLowerCase()).includes('all') && !roles.map(role => role.toLowerCase()).includes(req.user.role.toLowerCase())) {
+    const userRole = req.user.role.toLowerCase();
+    const allowedRoles = roles.map(r => r.toLowerCase());
+
+    if (allowedRoles.includes('all') || allowedRoles.includes(userRole)) {
+      next();
+    } else {
       return res.status(403).json({ error: 'Access denied' });
     }
-
-    next();
   };
 };
 
