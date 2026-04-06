@@ -38,7 +38,7 @@ const checkRole = (roles) => {
 
     // If roles includes 'all', allow access
     // Otherwise, check if user's role is in the allowed roles
-    if (roles[0].toLowerCase() !== 'all' && !roles.map(role => role.toLowerCase()).includes(req.user.role.toLowerCase())) {
+    if (!roles.map(role => role.toLowerCase()).includes('all') && !roles.map(role => role.toLowerCase()).includes(req.user.role.toLowerCase())) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
