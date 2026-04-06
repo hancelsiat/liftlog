@@ -81,6 +81,15 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
+router.get('/trainer', verifyToken, checkRole(['trainer']), async (req, res) => {
+  try {
+    const workouts = await Workout.find({ trainer: req.user._id });
+    res.json({ workouts });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get available trainers for members
 router.get('/trainers/available', verifyToken, checkRole(['all']), async (req, res) => {
   try {
