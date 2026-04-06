@@ -48,9 +48,7 @@ router.get('/', verifyToken, async (req, res) => {
   try {
     const {
       startDate,
-      endDate,
-      limit = 10,
-      page = 1
+      endDate
     } = req.query;
 
     const query = { user: req.user._id };
@@ -64,17 +62,15 @@ router.get('/', verifyToken, async (req, res) => {
 
     const workouts = await Workout.find(query)
       .populate('trainer', 'username')
-      .sort({ date: -1 })
-      .limit(Number(limit))
-      .skip((page - 1) * limit);
+      .sort({ date: -1 });
 
     const total = await Workout.countDocuments(query);
 
     res.json({
       workouts,
       totalWorkouts: total,
-      currentPage: page,
-      totalPages: Math.ceil(total / limit)
+      currentPage: 1,
+      totalPages: 1
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
