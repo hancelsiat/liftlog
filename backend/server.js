@@ -96,7 +96,7 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 // Initialize Supabase client
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
 // Make Supabase client available in app locals
 app.locals.supabase = supabase;

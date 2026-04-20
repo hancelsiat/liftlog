@@ -102,6 +102,24 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  Future<bool> resendVerificationEmail(String email) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _apiService.resendVerificationEmail(email);
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   void clearError() {
     _error = null;
     notifyListeners();

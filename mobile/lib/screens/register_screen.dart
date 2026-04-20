@@ -5,6 +5,7 @@ import '../models/user.dart';
 import '../utils/app_theme.dart';
 import 'login_screen.dart';
 import 'dashboard_screen.dart';
+import 'check_email_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -479,116 +480,12 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
       );
 
       if (success && mounted) {
-        // Check if trainer registration (requires admin approval)
-        if (_selectedRole == UserRole.trainer) {
-          // Show success dialog for trainer - don't auto-login
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (context) => AlertDialog(
-              backgroundColor: AppTheme.cardBackground,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      gradient: AppTheme.accentGradient,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(Icons.check_circle, color: Colors.white, size: 32),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      'Registration Successful!',
-                      style: TextStyle(color: AppTheme.textPrimary, fontSize: 18),
-                    ),
-                  ),
-                ],
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Your trainer account has been created.',
-                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppTheme.infoColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: AppTheme.infoColor.withOpacity(0.3),
-                        width: 1,
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.admin_panel_settings, color: AppTheme.infoColor, size: 20),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Next Steps:',
-                              style: TextStyle(
-                                color: AppTheme.textPrimary.withOpacity(0.9),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '1. Wait for admin approval\n2. You will be notified once approved\n3. Login after approval',
-                          style: TextStyle(
-                            color: AppTheme.textSecondary.withOpacity(0.9),
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(builder: (context) => const LoginScreen()),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text('Go to Login'),
-                ),
-              ],
-            ),
-          );
-        } else {
-          // Member registration - proceed to dashboard
-          Navigator.pushReplacement(
-            context,
-            PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) => const DashboardScreen(),
-              transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                return FadeTransition(opacity: animation, child: child);
-              },
-              transitionDuration: const Duration(milliseconds: 500),
-            ),
-          );
-        }
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CheckEmailScreen(email: _emailController.text.trim()),
+          ),
+        );
       }
     }
   }

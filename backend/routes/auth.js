@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const { verifyToken, checkRole, generateToken } = require('../middleware/auth');
+const { sendVerificationEmail } = require('../services/emailService');
 
 // User Registration
 router.post('/register', async (req, res) => {
@@ -42,17 +43,21 @@ router.post('/register', async (req, res) => {
       membershipExpiration: membershipExpiration || 
         new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Default 30 days
       profile,
-      isEmailVerified: true, // No email verification needed - admin approval is the gate
+      isEmailVerified: false, // Email verification is now required
       isApproved: role === 'member' // Members are auto-approved, trainers need admin approval
     });
 
+    const verificationToken = user.generateEmailVerificationToken();
     await user.save();
+
+    await sendVerificationEmail(user.email, verificationToken);
 
     // If trainer, return message about pending approval
     if (role === 'trainer') {
       return res.status(201).json({ 
-        message: 'Trainer account created successfully. Your account is pending admin approval.',
+        message: 'Trainer account created successfully. Please check your email to verify your account. Your account is also pending admin approval.',
         requiresApproval: true,
+        requiresEmailVerification: true,
         user: {
           id: user._id,
           username: user.username,
@@ -64,12 +69,9 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    // Generate JWT token for members (auto-approved)
-    const token = generateToken(user);
-
     res.status(201).json({ 
-      message: 'User registered successfully', 
-      token,
+      message: 'User registered successfully. Please check your email to verify your account.', 
+      requiresEmailVerification: true,
       user: {
         id: user._id,
         username: user.username,
@@ -139,6 +141,14 @@ router.post('/login', async (req, res) => {
     if (role && role !== 'all' && user.role !== role) {
       return res.status(403).json({
         error: `Access denied. You are registered as a ${user.role}, not as a ${role}.`
+      });
+    }
+
+    // Check if email is verified
+    if (!user.isEmailVerified) {
+      return res.status(401).json({ 
+        error: 'Please verify your email address before logging in.',
+        emailNotVerified: true
       });
     }
 
@@ -374,6 +384,30 @@ router.patch('/membership/:userId',
     } catch (error) {
       res.status(400).json({ error: error.message });
     }
+});
+
+router.post('/resend-verification', async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (user.isEmailVerified) {
+      return res.status(400).json({ error: 'Email is already verified' });
+    }
+
+    const verificationToken = user.generateEmailVerificationToken();
+    await user.save();
+
+    await sendVerificationEmail(user.email, verificationToken);
+
+    res.json({ message: 'Verification email resent successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 module.exports = router;

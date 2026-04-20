@@ -32,39 +32,39 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
   // Predefined exercises by category
   final Map<String, List<Map<String, dynamic>>> _predefinedExercises = {
     'strength': [
-      {'name': 'Bench Press', 'icon': Icons.fitness_center, 'defaultSets': 3, 'defaultReps': 10},
-      {'name': 'Squats', 'icon': Icons.accessibility_new, 'defaultSets': 4, 'defaultReps': 12},
-      {'name': 'Deadlift', 'icon': Icons.fitness_center, 'defaultSets': 3, 'defaultReps': 8},
-      {'name': 'Shoulder Press', 'icon': Icons.fitness_center, 'defaultSets': 3, 'defaultReps': 10},
-      {'name': 'Bicep Curls', 'icon': Icons.fitness_center, 'defaultSets': 3, 'defaultReps': 12},
-      {'name': 'Tricep Dips', 'icon': Icons.fitness_center, 'defaultSets': 3, 'defaultReps': 12},
-      {'name': 'Lat Pulldown', 'icon': Icons.fitness_center, 'defaultSets': 3, 'defaultReps': 10},
-      {'name': 'Leg Press', 'icon': Icons.accessibility_new, 'defaultSets': 3, 'defaultReps': 12},
-      {'name': 'Lunges', 'icon': Icons.accessibility_new, 'defaultSets': 3, 'defaultReps': 10},
-      {'name': 'Pull-ups', 'icon': Icons.fitness_center, 'defaultSets': 3, 'defaultReps': 8},
-      {'name': 'Push-ups', 'icon': Icons.fitness_center, 'defaultSets': 3, 'defaultReps': 15},
-      {'name': 'Plank', 'icon': Icons.self_improvement, 'defaultSets': 3, 'defaultReps': 1},
+      {'name': 'Bench Press', 'icon': Icons.fitness_center, 'intensity': 'moderate', 'defaultSets': 3, 'defaultReps': 10},
+      {'name': 'Squats', 'icon': Icons.accessibility_new, 'intensity': 'moderate', 'defaultSets': 4, 'defaultReps': 12},
+      {'name': 'Deadlift', 'icon': Icons.fitness_center, 'intensity': 'high', 'defaultSets': 3, 'defaultReps': 8},
+      {'name': 'Shoulder Press', 'icon': Icons.fitness_center, 'intensity': 'moderate', 'defaultSets': 3, 'defaultReps': 10},
+      {'name': 'Bicep Curls', 'icon': Icons.fitness_center, 'intensity': 'low', 'defaultSets': 3, 'defaultReps': 12},
+      {'name': 'Tricep Dips', 'icon': Icons.fitness_center, 'intensity': 'low', 'defaultSets': 3, 'defaultReps': 12},
+      {'name': 'Lat Pulldown', 'icon': Icons.fitness_center, 'intensity': 'moderate', 'defaultSets': 3, 'defaultReps': 10},
+      {'name': 'Leg Press', 'icon': Icons.accessibility_new, 'intensity': 'moderate', 'defaultSets': 3, 'defaultReps': 12},
+      {'name': 'Lunges', 'icon': Icons.accessibility_new, 'intensity': 'low', 'defaultSets': 3, 'defaultReps': 10},
+      {'name': 'Pull-ups', 'icon': Icons.fitness_center, 'intensity': 'high', 'defaultSets': 3, 'defaultReps': 8},
+      {'name': 'Push-ups', 'icon': Icons.fitness_center, 'intensity': 'moderate', 'defaultSets': 3, 'defaultReps': 15},
+      {'name': 'Plank', 'icon': Icons.self_improvement, 'intensity': 'low', 'defaultSets': 3, 'defaultReps': 1},
     ],
     'cardio': [
-      {'name': 'Running', 'icon': Icons.directions_run, 'defaultSets': 1, 'defaultReps': 30},
-      {'name': 'Cycling', 'icon': Icons.directions_bike, 'defaultSets': 1, 'defaultReps': 30},
-      {'name': 'Jump Rope', 'icon': Icons.sports, 'defaultSets': 3, 'defaultReps': 100},
-      {'name': 'Burpees', 'icon': Icons.fitness_center, 'defaultSets': 3, 'defaultReps': 15},
-      {'name': 'Mountain Climbers', 'icon': Icons.fitness_center, 'defaultSets': 3, 'defaultReps': 20},
-      {'name': 'High Knees', 'icon': Icons.directions_run, 'defaultSets': 3, 'defaultReps': 30},
-      {'name': 'Jumping Jacks', 'icon': Icons.sports, 'defaultSets': 3, 'defaultReps': 30},
+      {'name': 'Running', 'icon': Icons.directions_run, 'intensity': 'moderate', 'defaultSets': 1, 'defaultReps': 30},
+      {'name': 'Cycling', 'icon': Icons.directions_bike, 'intensity': 'moderate', 'defaultSets': 1, 'defaultReps': 30},
+      {'name': 'Jump Rope', 'icon': Icons.sports, 'intensity': 'high', 'defaultSets': 3, 'defaultReps': 100},
+      {'name': 'Burpees', 'icon': Icons.fitness_center, 'intensity': 'high', 'defaultSets': 3, 'defaultReps': 15},
+      {'name': 'Mountain Climbers', 'icon': Icons.fitness_center, 'intensity': 'high', 'defaultSets': 3, 'defaultReps': 20},
+      {'name': 'High Knees', 'icon': Icons.directions_run, 'intensity': 'moderate', 'defaultSets': 3, 'defaultReps': 30},
+      {'name': 'Jumping Jacks', 'icon': Icons.sports, 'intensity': 'low', 'defaultSets': 3, 'defaultReps': 30},
     ],
     'flexibility': [
-      {'name': 'Yoga Flow', 'icon': Icons.self_improvement, 'defaultSets': 1, 'defaultReps': 20},
-      {'name': 'Stretching', 'icon': Icons.self_improvement, 'defaultSets': 1, 'defaultReps': 15},
-      {'name': 'Hamstring Stretch', 'icon': Icons.self_improvement, 'defaultSets': 2, 'defaultReps': 1},
-      {'name': 'Quad Stretch', 'icon': Icons.self_improvement, 'defaultSets': 2, 'defaultReps': 1},
-      {'name': 'Shoulder Stretch', 'icon': Icons.self_improvement, 'defaultSets': 2, 'defaultReps': 1},
+      {'name': 'Yoga Flow', 'icon': Icons.self_improvement, 'intensity': 'low', 'defaultSets': 1, 'defaultReps': 20},
+      {'name': 'Stretching', 'icon': Icons.self_improvement, 'intensity': 'low', 'defaultSets': 1, 'defaultReps': 15},
+      {'name': 'Hamstring Stretch', 'icon': Icons.self_improvement, 'intensity': 'low', 'defaultSets': 2, 'defaultReps': 1},
+      {'name': 'Quad Stretch', 'icon': Icons.self_improvement, 'intensity': 'low', 'defaultSets': 2, 'defaultReps': 1},
+      {'name': 'Shoulder Stretch', 'icon': Icons.self_improvement, 'intensity': 'low', 'defaultSets': 2, 'defaultReps': 1},
     ],
     'mixed': [
-      {'name': 'Circuit Training', 'icon': Icons.fitness_center, 'defaultSets': 3, 'defaultReps': 12},
-      {'name': 'HIIT', 'icon': Icons.sports, 'defaultSets': 4, 'defaultReps': 30},
-      {'name': 'CrossFit WOD', 'icon': Icons.fitness_center, 'defaultSets': 1, 'defaultReps': 1},
+      {'name': 'Circuit Training', 'icon': Icons.fitness_center, 'intensity': 'moderate', 'defaultSets': 3, 'defaultReps': 12},
+      {'name': 'HIIT', 'icon': Icons.sports, 'intensity': 'high', 'defaultSets': 4, 'defaultReps': 30},
+      {'name': 'CrossFit WOD', 'icon': Icons.fitness_center, 'intensity': 'high', 'defaultSets': 1, 'defaultReps': 1},
     ],
   };
 
@@ -88,6 +88,11 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
   }
 
   void _showExerciseSelector() {
+    // Filter exercises based on selected category and intensity
+    final filteredExercises = (_predefinedExercises[_category] ?? [])
+        .where((exercise) => exercise['intensity'] == _intensity)
+        .toList();
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -109,10 +114,10 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
               ),
               child: Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Select Exercises',
-                      style: TextStyle(
+                      'Select Exercises (${_category.toUpperCase()})',
+                      style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
@@ -131,25 +136,19 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
                 controller: scrollController,
                 padding: const EdgeInsets.all(16),
                 children: [
-                  ..._categories.map((category) {
-                    final exercises = _predefinedExercises[category] ?? [];
-                    if (exercises.isEmpty) return const SizedBox.shrink();
-                    
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: Text(
-                            category.toUpperCase(),
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey,
-                            ),
-                          ),
+                  if (filteredExercises.isEmpty)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(32.0),
+                        child: Text(
+                          'No exercises found for the selected category and intensity.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey),
                         ),
-                        ...exercises.map((exercise) => Card(
+                      ),
+                    )
+                  else
+                    ...filteredExercises.map((exercise) => Card(
                           margin: const EdgeInsets.only(bottom: 8),
                           child: ListTile(
                             leading: Icon(
@@ -168,18 +167,15 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
                             },
                           ),
                         )),
-                        const SizedBox(height: 16),
-                      ],
-                    );
-                  }),
+                  const SizedBox(height: 16),
                   // Custom exercise option
                   Card(
-                    color: Colors.blue.shade50,
+                    color: Colors.blue.shade100,
                     child: ListTile(
                       leading: const Icon(Icons.edit, color: Colors.blue),
-                      title: const Text('Custom Exercise'),
-                      subtitle: const Text('Create your own exercise'),
-                      trailing: const Icon(Icons.arrow_forward),
+                      title: const Text('Custom Exercise', style: TextStyle(color: Colors.black)),
+                      subtitle: const Text('Create your own exercise', style: TextStyle(color: Colors.black54)),
+                      trailing: const Icon(Icons.arrow_forward, color: Colors.black),
                       onTap: () {
                         Navigator.pop(context);
                         _addCustomExercise();
@@ -195,12 +191,27 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
     );
   }
 
+  Map<String, int> _getSetsAndRepsForIntensity(String intensity) {
+    switch (intensity) {
+      case 'low':
+        return {'sets': 3, 'reps': 15};
+      case 'moderate':
+        return {'sets': 3, 'reps': 10};
+      case 'high':
+        return {'sets': 4, 'reps': 8};
+      default:
+        return {'sets': 3, 'reps': 10};
+    }
+  }
+
   void _addPredefinedExercise(Map<String, dynamic> exercise) {
+    final setsAndReps = _getSetsAndRepsForIntensity(_intensity);
+
     setState(() {
       _exercises.add({
         'name': exercise['name'],
-        'sets': exercise['defaultSets'],
-        'reps': exercise['defaultReps'],
+        'sets': setsAndReps['sets'],
+        'reps': setsAndReps['reps'],
         'weight': 0,
         'notes': '',
       });

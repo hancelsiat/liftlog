@@ -13,7 +13,7 @@ const { verifyToken } = require('../middleware/auth'); // adjust to your auth mi
 
 // init supabase
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SERVICE_KEY = process.env.SUPABASE_KEY;
 const BUCKET = process.env.SUPABASE_BUCKET || 'video';
 
 if (!SUPABASE_URL || !SERVICE_KEY) {

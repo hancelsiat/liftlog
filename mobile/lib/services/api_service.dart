@@ -325,6 +325,10 @@ class ApiService {
     return response;
   }
 
+  Future<void> resendVerificationEmail(String email) async {
+    await _post('/auth/resend-verification', {'email': email});
+  }
+
   Future<Map<String, dynamic>> login(String email, String password) async {
     final response = await _post('/auth/login', {
       'email': email,

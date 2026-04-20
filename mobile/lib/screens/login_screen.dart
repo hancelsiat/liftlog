@@ -335,11 +335,12 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
   void _login() async {
     if (_formKey.currentState!.validate()) {
-      final success = await Provider.of<AuthProvider>(context, listen: false)
-          .login(
-            _emailController.text.trim(),
-            _passwordController.text
-          );
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final success = await authProvider.login(
+        _emailController.text.trim(),
+        _passwordController.text
+      );
+
       if (success && mounted) {
         // Navigate to dashboard with fade transition
         Navigator.pushReplacement(
@@ -350,6 +351,27 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
               return FadeTransition(opacity: animation, child: child);
             },
             transitionDuration: const Duration(milliseconds: 500),
+          ),
+        );
+      } else if (authProvider.error?.contains('Please verify your email') ?? false) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Email Not Verified'),
+            content: const Text('Please verify your email address before logging in. Would you like to resend the verification email?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () {
+                  authProvider.resendVerificationEmail(_emailController.text.trim());
+                  Navigator.of(context).pop();
+                },
+                child: const Text('Resend'),
+              ),
+            ],
           ),
         );
       }
