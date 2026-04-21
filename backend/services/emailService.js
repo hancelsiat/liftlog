@@ -1,12 +1,12 @@
 const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
-  host: 'smtp.sender.net',
-  port: 587,
-  secure: false, // true for 465, false for other ports
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true, // true for 465, false for other ports
   auth: {
-    user: 'sender', // Your Sender username
-    pass: process.env.SENDER_API_KEY, // Your Sender API key
+    user: 'lftlogapp@gmail.com', // Your new Gmail address
+    pass: process.env.GMAIL_APP_PASSWORD, // Your new App Password
   },
 });
 
@@ -14,11 +14,12 @@ const sendVerificationEmail = async (to, token) => {
   const verificationUrl = `https://liftlog-7.onrender.com/api/auth/verify-email/${token}`;
 
   const mailOptions = {
-    from: '"LiftLog" <no-reply@liftlog.app>',
+    from: '"LiftLog" <lftlogapp@gmail.com>',
     to,
     subject: 'Verify Your Email Address',
     html: `
-      <p>Please click the link below to verify your email address:</p>
+      <h1>Email Verification</h1>
+      <p>Thank you for registering with LiftLog. Please click the link below to verify your email address:</p>
       <a href="${verificationUrl}">${verificationUrl}</a>
     `,
   };
