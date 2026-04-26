@@ -13,6 +13,7 @@ import 'settings_screen.dart';
 import 'user_management_screen.dart';
 import 'create_workout_template_screen.dart';
 import 'manage_workouts_screen.dart';
+import 'admin_users_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -466,7 +467,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           gradient: AppTheme.primaryGradient,
           onTap: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const UserManagementScreen()),
+            MaterialPageRoute(builder: (context) => const AdminUsersScreen()),
           ),
         ),
         const SizedBox(height: 16),
