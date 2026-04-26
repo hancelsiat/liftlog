@@ -203,12 +203,19 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                gradient: AppTheme.primaryGradient,
+                color: Colors.white.withOpacity(0.8),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.fitness_center, size: 20, color: Colors.white),
+              child: ClipOval(
+                child: Image.asset(
+                  'assets/fitness_logo.webp',
+                  height: 24,
+                  width: 24,
+                  fit: BoxFit.cover,
+                ),
+              ),
             ),
             const SizedBox(width: 12),
             const Text(
