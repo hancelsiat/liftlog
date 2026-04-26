@@ -98,7 +98,7 @@ router.get('/verify-email/:token', async (req, res) => {
     });
 
     if (!user) {
-      return res.status(400).send('<h1>Error</h1><p>Invalid or expired verification link.</p>');
+      return res.status(400).sendFile(path.join(__dirname, '..', 'templates', 'verificationExpired.html'));
     }
 
     user.isEmailVerified = true;
