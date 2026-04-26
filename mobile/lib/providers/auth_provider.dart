@@ -115,8 +115,8 @@ class AuthProvider with ChangeNotifier {
     }
   }
   
-  Future<User> approveTrainer(String userId, bool isApproved) async {
-    final user = await _apiService.approveTrainer(userId, isApproved);
+  Future<User> approveTrainer(String userId, bool isApproved, {String? rejectionReason}) async {
+    final user = await _apiService.approveTrainer(userId, isApproved, rejectionReason: rejectionReason);
     notifyListeners();
     return user;
   }

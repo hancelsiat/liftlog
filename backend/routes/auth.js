@@ -6,7 +6,7 @@ const multer = require('multer');
 const { createClient } = require('@supabase/supabase-js');
 const User = require('../models/User');
 const { verifyToken, checkRole, generateToken } = require('../middleware/auth');
-const { sendVerificationEmail } = require('../services/emailService');
+const { sendVerificationEmail, sendApprovalEmail, sendRejectionEmail } = require('../services/emailService');
 
 // Initialize Supabase
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
@@ -267,7 +267,7 @@ router.delete('/users/:id', verifyToken, checkRole(['admin']), async (req, res) 
 // Admin: Approve/Reject trainer
 router.patch('/users/:id/approve', verifyToken, checkRole(['admin']), async (req, res) => {
   try {
-    const { isApproved } = req.body;
+    const { isApproved, rejectionReason } = req.body;
     const user = await User.findById(req.params.id);
 
     if (!user || user.role !== 'trainer') {
@@ -276,6 +276,12 @@ router.patch('/users/:id/approve', verifyToken, checkRole(['admin']), async (req
 
     user.isApproved = isApproved;
     await user.save();
+
+    if (isApproved) {
+      await sendApprovalEmail(user.email, user.username);
+    } else {
+      await sendRejectionEmail(user.email, user.username, rejectionReason || 'No reason provided.');
+    }
 
     res.json({ message: `Trainer has been ${isApproved ? 'approved' : 'rejected'}.`, user });
   } catch (error) {

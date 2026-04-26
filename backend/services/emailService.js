@@ -15,12 +15,8 @@ const transporter = nodemailer.createTransport({
 
 const sendVerificationEmail = async (to, token) => {
   const verificationUrl = `https://liftlog-7.onrender.com/api/auth/verify-email/${token}`;
-
-  // Read the HTML template
   const templatePath = path.join(__dirname, '..', 'templates', 'verificationEmail.html');
   let htmlContent = fs.readFileSync(templatePath, 'utf8');
-
-  // Replace the placeholder with the actual verification URL
   htmlContent = htmlContent.replace('{{verificationUrl}}', verificationUrl);
 
   const mailOptions = {
@@ -33,4 +29,35 @@ const sendVerificationEmail = async (to, token) => {
   await transporter.sendMail(mailOptions);
 };
 
-module.exports = { sendVerificationEmail };
+const sendApprovalEmail = async (to, username) => {
+  const templatePath = path.join(__dirname, '..', 'templates', 'approvalEmail.html');
+  let htmlContent = fs.readFileSync(templatePath, 'utf8');
+  htmlContent = htmlContent.replace('{{username}}', username);
+
+  const mailOptions = {
+    from: '"LiftLog" <lftlogapp@gmail.com>',
+    to,
+    subject: 'Your Trainer Account has been Approved!',
+    html: htmlContent,
+  };
+
+  await transporter.sendMail(mailOptions);
+};
+
+const sendRejectionEmail = async (to, username, rejectionReason) => {
+  const templatePath = path.join(__dirname, '..', 'templates', 'rejectionEmail.html');
+  let htmlContent = fs.readFileSync(templatePath, 'utf8');
+  htmlContent = htmlContent.replace('{{username}}', username);
+  htmlContent = htmlContent.replace('{{rejectionReason}}', rejectionReason);
+
+  const mailOptions = {
+    from: '"LiftLog" <lftlogapp@gmail.com>',
+    to,
+    subject: 'An Update on Your Trainer Application',
+    html: htmlContent,
+  };
+
+  await transporter.sendMail(mailOptions);
+};
+
+module.exports = { sendVerificationEmail, sendApprovalEmail, sendRejectionEmail };

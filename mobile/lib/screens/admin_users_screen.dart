@@ -56,33 +56,51 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
               final user = users[index];
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: ListTile(
-                  isThreeLine: true,
-                  title: Text(user.username),
-                  subtitle: Text(user.email),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (user.role == UserRole.trainer && user.credentialImageUrl.isNotEmpty)
-                        IconButton(
-                          icon: const Icon(Icons.badge_outlined, color: Colors.blue),
-                          tooltip: 'View Credential',
-                          onPressed: () => _viewCredential(user.credentialImageUrl),
-                        ),
-                      if (user.role == UserRole.trainer && !user.isApproved)
-                        ElevatedButton(
-                          onPressed: () => _approveTrainer(user.id),
-                          child: const Text('Approve'),
-                        ),
-                      IconButton(
-                        icon: const Icon(Icons.edit, color: Colors.green),
-                        tooltip: 'Edit User',
-                        onPressed: () => _editUser(context, user),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        tooltip: 'Delete User',
-                        onPressed: () => _deleteUser(context, user.id),
+                      Text(user.username, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 4),
+                      Text(user.email, style: const TextStyle(fontSize: 14, color: Colors.grey)),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          if (user.role == UserRole.trainer && user.credentialImageUrl.isNotEmpty)
+                            IconButton(
+                              icon: const Icon(Icons.badge_outlined, color: Colors.blue),
+                              tooltip: 'View Credential',
+                              onPressed: () => _viewCredential(user.credentialImageUrl),
+                            ),
+                          if (user.role == UserRole.trainer && !user.isApproved)
+                            Row(
+                              children: [
+                                ElevatedButton(
+                                  onPressed: () => _approveTrainer(user.id, true, context),
+                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                                  child: const Text('Approve'),
+                                ),
+                                const SizedBox(width: 8),
+                                ElevatedButton(
+                                  onPressed: () => _showRejectionDialog(context, user.id),
+                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                                  child: const Text('Reject'),
+                                ),
+                              ],
+                            ),
+                          IconButton(
+                            icon: const Icon(Icons.edit, color: Colors.green),
+                            tooltip: 'Edit User',
+                            onPressed: () => _editUser(context, user),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            tooltip: 'Delete User',
+                            onPressed: () => _deleteUser(context, user.id),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -105,21 +123,53 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     }
   }
 
-  void _approveTrainer(String userId) async {
+  void _approveTrainer(String userId, bool approve, BuildContext context, {String? rejectionReason}) async {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      await authProvider.approveTrainer(userId, true);
+      await authProvider.approveTrainer(userId, approve, rejectionReason: rejectionReason);
       setState(() {
         _usersFuture = _fetchUsers(); // Refresh the list
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Trainer approved successfully!'), backgroundColor: Colors.green),
+        SnackBar(content: Text('Trainer ${approve ? 'approved' : 'rejected'} successfully!'), backgroundColor: Colors.green),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error approving trainer: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Error updating trainer: $e'), backgroundColor: Colors.red),
       );
     }
+  }
+
+  void _showRejectionDialog(BuildContext context, String userId) {
+    final rejectionReasonController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Reject Trainer'),
+          content: TextField(
+            controller: rejectionReasonController,
+            decoration: const InputDecoration(hintText: "Reason for rejection"),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                final reason = rejectionReasonController.text;
+                if (reason.isNotEmpty) {
+                  _approveTrainer(userId, false, context, rejectionReason: reason);
+                  Navigator.of(context).pop();
+                }
+              },
+              child: const Text('Reject'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _editUser(BuildContext context, User user) {

@@ -1,0 +1,39 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Update</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; }
+        .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .header { background-color: #e74c3c; color: #ffffff; padding: 40px; text-align: center; }
+        .header h1 { margin: 0; font-size: 28px; }
+        .content { padding: 40px; color: #333333; line-height: 1.6; }
+        .content p { margin: 0 0 20px; }
+        .reason { background-color: #ecf0f1; padding: 20px; border-radius: 5px; margin-bottom: 20px; }
+        .footer { background-color: #ecf0f1; padding: 20px; text-align: center; font-size: 12px; color: #7f8c8d; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Account Application Update</h1>
+        </div>
+        <div class="content">
+            <p>Hello {{username}},</p>
+            <p>Thank you for your interest in becoming a trainer on LiftLog. After careful review, we are unable to approve your application at this time.</p>
+            <div class="reason">
+                <p><strong>Reason for rejection:</strong></p>
+                <p>{{rejectionReason}}</p>
+            </div>
+            <p>If you believe this was a mistake or have updated credentials, please feel free to contact our support team.</p>
+            <p>Thanks,<br>The LiftLog Team</p>
+        </div>
+        <div class="footer">
+            <p>&copy; 2026 LiftLog. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>
