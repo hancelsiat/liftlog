@@ -174,4 +174,138 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// Get User Profile (Authenticated Route)
+router.get('/profile', verifyToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select('-password');
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update User Profile (Authenticated Route)
+router.patch('/profile', verifyToken, async (req, res) => {
+  try {
+    const updates = req.body;
+    const user = await User.findByIdAndUpdate(
+      req.user._id, 
+      updates, 
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    res.json(user);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Admin: Get all users (Admin Only)
+router.get('/users',
+  verifyToken,
+  checkRole(['admin']),
+  async (req, res) => {
+    try {
+      const {
+        page = 1,
+        limit = 10,
+        role,
+        search
+      } = req.query;
+
+      const query = {};
+
+      if (role) query.role = role;
+      if (search) {
+        query.$or = [
+          { username: { $regex: search, $options: 'i' } },
+          { email: { $regex: search, $options: 'i' } }
+        ];
+      }
+
+      const users = await User.find(query)
+        .select('-password')
+        .limit(Number(limit))
+        .skip((page - 1) * limit)
+        .sort({ createdAt: -1 });
+
+      const total = await User.countDocuments(query);
+
+      res.json({
+        users,
+        totalUsers: total,
+        currentPage: Number(page),
+        totalPages: Math.ceil(total / limit)
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+});
+
+// Admin: Update user
+router.patch('/users/:id', verifyToken, checkRole(['admin']), async (req, res) => {
+  try {
+    const user = await User.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json(user);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Admin: Delete user
+router.delete('/users/:id', verifyToken, checkRole(['admin']), async (req, res) => {
+  try {
+    const user = await User.findByIdAndDelete(req.params.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin: Approve/Reject trainer
+router.patch('/users/:id/approve', verifyToken, checkRole(['admin']), async (req, res) => {
+  try {
+    const { isApproved } = req.body;
+    const user = await User.findById(req.params.id);
+
+    if (!user || user.role !== 'trainer') {
+      return res.status(404).json({ error: 'Trainer not found' });
+    }
+
+    user.isApproved = isApproved;
+    await user.save();
+
+    res.json({ message: `Trainer has been ${isApproved ? 'approved' : 'rejected'}.`, user });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Resend Verification Email
+router.post('/resend-verification', async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (user.isEmailVerified) {
+      return res.status(400).json({ error: 'Email is already verified' });
+    }
+
+    const verificationToken = user.generateEmailVerificationToken();
+    await user.save();
+
+    await sendVerificationEmail(user.email, verificationToken);
+
+    res.json({ message: 'Verification email resent successfully.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
