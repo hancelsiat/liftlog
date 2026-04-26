@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../providers/auth_provider.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
+import 'edit_user_screen.dart';
 
 class AdminUsersScreen extends StatefulWidget {
   const AdminUsersScreen({super.key});
@@ -24,8 +25,6 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   }
 
   Future<List<User>> _fetchUsers() async {
-    // This is a simplified fetch. In a real app, you'd use a dedicated provider method
-    // that handles pagination, errors, etc.
     final response = await _apiService.getUsers(); 
     final usersData = response['users'] as List;
     return usersData.map((data) => User.fromJson(data)).toList();
@@ -74,6 +73,16 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                           onPressed: () => _approveTrainer(user.id),
                           child: const Text('Approve'),
                         ),
+                      IconButton(
+                        icon: const Icon(Icons.edit, color: Colors.green),
+                        tooltip: 'Edit User',
+                        onPressed: () => _editUser(context, user),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        tooltip: 'Delete User',
+                        onPressed: () => _deleteUser(context, user.id),
+                      ),
                     ],
                   ),
                 ),
@@ -110,5 +119,56 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         SnackBar(content: Text('Error approving trainer: $e'), backgroundColor: Colors.red),
       );
     }
+  }
+
+  void _editUser(BuildContext context, User user) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditUserScreen(user: user),
+      ),
+    ).then((_) => setState(() {
+      _usersFuture = _fetchUsers();
+    }));
+  }
+
+  void _deleteUser(BuildContext context, String userId) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Delete User'),
+          content: const Text('Are you sure you want to delete this user?'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('Delete'),
+              onPressed: () async {
+                try {
+                  await _apiService.deleteUser(userId);
+                  setState(() {
+                    _usersFuture = _fetchUsers();
+                  });
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('User deleted successfully!'), backgroundColor: Colors.green),
+                  );
+                } catch (e) {
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error deleting user: $e'), backgroundColor: Colors.red),
+                  );
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 }
