@@ -1,3 +1,5 @@
+
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
@@ -17,7 +19,7 @@ class AuthProvider with ChangeNotifier {
     String email,
     String password,
     String username,
-    {UserRole role = UserRole.member}
+    {UserRole role = UserRole.member, File? credentialFile}
   ) async {
     _isLoading = true;
     _error = null;
@@ -28,20 +30,17 @@ class AuthProvider with ChangeNotifier {
         email,
         password,
         username,
-        role: role
+        role: role,
+        credentialFile: credentialFile,
       );
 
-      // Check if user data is returned in the registration response
       if (response.containsKey('user') && response['user'] != null) {
         _user = User.fromJson(response['user']);
       }
 
-      // Only load profile for members (auto-approved)
-      // Trainers need admin approval, so don't auto-login
       if (role == UserRole.member) {
         await loadProfile();
       } else {
-        // For trainers, clear any stored token since they can't login yet
         await _apiService.removeToken();
         _user = null;
       }
@@ -63,11 +62,8 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await _apiService.login(email, password);
-
-      // Always load profile after successful login to get complete user data
+      await _apiService.login(email, password);
       await loadProfile();
-
       _isLoading = false;
       notifyListeners();
       return true;
@@ -86,7 +82,6 @@ class AuthProvider with ChangeNotifier {
       return true;
     } catch (e) {
       _error = e.toString();
-      // If token is invalid, clear user and token
       if (e.toString().contains('Authentication required')) {
         _user = null;
         await _apiService.removeToken();
@@ -118,6 +113,12 @@ class AuthProvider with ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+  
+  Future<User> approveTrainer(String userId, bool isApproved) async {
+    final user = await _apiService.approveTrainer(userId, isApproved);
+    notifyListeners();
+    return user;
   }
 
   void clearError() {

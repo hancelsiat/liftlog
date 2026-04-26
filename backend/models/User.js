@@ -57,7 +57,11 @@ const UserSchema = new mongoose.Schema({
     age: Number,
     weight: Number,
     height: Number
-  }
+    },
+    credentialImageUrl: {
+      type: String,
+      default: ''
+    }
 }, {
   timestamps: true
 });

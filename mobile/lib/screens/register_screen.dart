@@ -1,10 +1,12 @@
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart';
+import 'dart:io';
 import '../providers/auth_provider.dart';
 import '../models/user.dart';
 import '../utils/app_theme.dart';
 import 'login_screen.dart';
-import 'dashboard_screen.dart';
 import 'check_email_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -21,6 +23,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
   final _usernameController = TextEditingController();
   bool _obscurePassword = true;
   UserRole _selectedRole = UserRole.member;
+  File? _credentialFile;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
@@ -35,6 +38,15 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
     _animationController.forward();
+  }
+
+  Future<void> _pickCredential() async {
+    final result = await FilePicker.platform.pickFiles(type: FileType.image);
+    if (result != null) {
+      setState(() {
+        _credentialFile = File(result.files.single.path!);
+      });
+    }
   }
 
   @override
@@ -58,37 +70,25 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Header
                       _buildHeader(),
                       const SizedBox(height: 40),
-
-                      // Register Card
                       Container(
                         decoration: AppTheme.glassMorphism,
                         padding: const EdgeInsets.all(24),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            // Role Selection
                             _buildRoleSelection(),
                             const SizedBox(height: 24),
-
-                            // Username Field
+                            if (_selectedRole == UserRole.trainer)
+                              _buildCredentialPicker(),
                             _buildUsernameField(),
                             const SizedBox(height: 16),
-
-                            // Email Field
                             _buildEmailField(),
                             const SizedBox(height: 16),
-
-                            // Password Field
                             _buildPasswordField(),
                             const SizedBox(height: 30),
-
-                            // Register Button
                             _buildRegisterButton(authProvider),
-                            
-                            // Error Message
                             if (authProvider.error != null) ...[
                               const SizedBox(height: 16),
                               _buildErrorMessage(authProvider.error!),
@@ -96,10 +96,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                           ],
                         ),
                       ),
-                      
                       const SizedBox(height: 24),
-
-                      // Login Link
                       _buildLoginLink(),
                     ],
                   ),
@@ -110,6 +107,80 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
         ),
       ),
     );
+  }
+
+  Widget _buildCredentialPicker() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Upload Trainer Credential',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 12),
+        InkWell(
+          onTap: _pickCredential,
+          child: Container(
+            height: 150,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceColor.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.surfaceColor.withOpacity(0.5)),
+            ),
+            child: _credentialFile != null
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.file(_credentialFile!, fit: BoxFit.cover),
+                  )
+                : const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.cloud_upload_outlined, color: AppTheme.textSecondary, size: 40),
+                      SizedBox(height: 8),
+                      Text('Tap to select an image', style: TextStyle(color: AppTheme.textSecondary)),
+                    ],
+                  ),
+          ),
+        ),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  void _register() async {
+    Provider.of<AuthProvider>(context, listen: false).clearError();
+
+    if (_formKey.currentState!.validate()) {
+      if (_selectedRole == UserRole.trainer && _credentialFile == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please upload your trainer credential.')),
+        );
+        return;
+      }
+
+      final success = await Provider.of<AuthProvider>(context, listen: false)
+          .register(
+        _emailController.text.trim(), 
+        _passwordController.text, 
+        _usernameController.text.trim(),
+        role: _selectedRole,
+        credentialFile: _credentialFile,
+      );
+
+      if (success && mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CheckEmailScreen(email: _emailController.text.trim()),
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildHeader() {
@@ -350,21 +421,27 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
   }
 
   Widget _buildRegisterButton(AuthProvider authProvider) {
+    bool canRegister = !authProvider.isLoading;
+    if (_selectedRole == UserRole.trainer && _credentialFile == null) {
+      canRegister = false;
+    }
+
     return Container(
       height: 56,
       decoration: BoxDecoration(
-        gradient: AppTheme.secondaryGradient,
+        gradient: canRegister ? AppTheme.secondaryGradient : AppTheme.disabledGradient,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(
-            color: AppTheme.secondaryColor.withOpacity(0.4),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
+          if(canRegister)
+            BoxShadow(
+              color: AppTheme.secondaryColor.withOpacity(0.4),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
         ],
       ),
       child: ElevatedButton(
-        onPressed: authProvider.isLoading ? null : _register,
+        onPressed: canRegister ? _register : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
@@ -465,29 +542,6 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
         ),
       ],
     );
-  }
-
-  void _register() async {
-    Provider.of<AuthProvider>(context, listen: false).clearError();
-
-    if (_formKey.currentState!.validate()) {
-      final success = await Provider.of<AuthProvider>(context, listen: false)
-          .register(
-        _emailController.text.trim(), 
-        _passwordController.text, 
-        _usernameController.text.trim(),
-        role: _selectedRole,
-      );
-
-      if (success && mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => CheckEmailScreen(email: _emailController.text.trim()),
-          ),
-        );
-      }
-    }
   }
 
   @override
