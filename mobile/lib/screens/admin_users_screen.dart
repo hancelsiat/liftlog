@@ -57,6 +57,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: ListTile(
+                  isThreeLine: true,
                   title: Text(user.username),
                   subtitle: Text(user.email),
                   trailing: Row(
