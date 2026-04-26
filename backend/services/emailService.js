@@ -1,4 +1,7 @@
+
 const nodemailer = require('nodemailer');
+const fs = require('fs');
+const path = require('path');
 
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
@@ -13,15 +16,18 @@ const transporter = nodemailer.createTransport({
 const sendVerificationEmail = async (to, token) => {
   const verificationUrl = `https://liftlog-7.onrender.com/api/auth/verify-email/${token}`;
 
+  // Read the HTML template
+  const templatePath = path.join(__dirname, '..', 'templates', 'verificationEmail.html');
+  let htmlContent = fs.readFileSync(templatePath, 'utf8');
+
+  // Replace the placeholder with the actual verification URL
+  htmlContent = htmlContent.replace('{{verificationUrl}}', verificationUrl);
+
   const mailOptions = {
     from: '"LiftLog" <lftlogapp@gmail.com>',
     to,
     subject: 'Verify Your Email Address',
-    html: `
-      <h1>Email Verification</h1>
-      <p>Thank you for registering with LiftLog. Please click the link below to verify your email address:</p>
-      <a href="${verificationUrl}">${verificationUrl}</a>
-    `,
+    html: htmlContent,
   };
 
   await transporter.sendMail(mailOptions);

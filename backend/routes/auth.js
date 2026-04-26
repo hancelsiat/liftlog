@@ -1,5 +1,7 @@
+
 const express = require('express');
 const router = express.Router();
+const path = require('path'); // Import path module
 const User = require('../models/User');
 const { verifyToken, checkRole, generateToken } = require('../middleware/auth');
 const { sendVerificationEmail } = require('../services/emailService');
@@ -96,7 +98,7 @@ router.get('/verify-email/:token', async (req, res) => {
     });
 
     if (!user) {
-      return res.status(400).json({ error: 'Invalid or expired verification token' });
+      return res.status(400).send('<h1>Error</h1><p>Invalid or expired verification link.</p>');
     }
 
     user.isEmailVerified = true;
@@ -104,17 +106,11 @@ router.get('/verify-email/:token', async (req, res) => {
     user.emailVerificationExpires = null;
     await user.save();
 
-    res.json({ 
-      message: 'Email verified successfully. Your account is pending admin approval.',
-      user: {
-        id: user._id,
-        email: user.email,
-        isEmailVerified: user.isEmailVerified,
-        isApproved: user.isApproved
-      }
-    });
+    // Send the beautiful success page
+    res.sendFile(path.join(__dirname, '..', 'templates', 'verificationSuccess.html'));
+
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).send('<h1>Error</h1><p>An error occurred during verification. Please try again later.</p>');
   }
 });
 
@@ -249,143 +245,7 @@ router.get('/users',
     }
 });
 
-// Admin: Update user details (Admin Only)
-router.patch('/users/:userId',
-  verifyToken,
-  checkRole(['admin']),
-  async (req, res) => {
-    try {
-      const { userId } = req.params;
-      const updates = req.body;
-
-      // Allow password updates for admin
-      const user = await User.findById(userId);
-
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      // If password is being updated, hash it
-      if (updates.password) {
-        user.password = updates.password;
-        await user.save();
-        delete updates.password; // Remove from updates to avoid double processing
-      }
-
-      // Update other fields
-      Object.keys(updates).forEach(key => {
-        if (key !== 'password') {
-          user[key] = updates[key];
-        }
-      });
-
-      await user.save();
-
-      res.json({
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        profile: user.profile,
-        membershipExpiration: user.membershipExpiration,
-        isEmailVerified: user.isEmailVerified,
-        isApproved: user.isApproved
-      });
-    } catch (error) {
-      res.status(400).json({ error: error.message });
-    }
-});
-
-// Admin: Approve trainer account (Admin Only)
-router.patch('/users/:userId/approve',
-  verifyToken,
-  checkRole(['admin']),
-  async (req, res) => {
-    try {
-      const { userId } = req.params;
-      const { isApproved } = req.body;
-
-      const user = await User.findById(userId);
-
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      if (user.role !== 'trainer') {
-        return res.status(400).json({ error: 'Only trainer accounts can be approved' });
-      }
-
-      user.isApproved = isApproved;
-      await user.save();
-
-      res.json({
-        message: `Trainer account ${isApproved ? 'approved' : 'rejected'}`,
-        user: {
-          id: user._id,
-          username: user.username,
-          email: user.email,
-          role: user.role,
-          isEmailVerified: user.isEmailVerified,
-          isApproved: user.isApproved
-        }
-      });
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-});
-
-// Admin: Delete user (Admin Only)
-router.delete('/users/:userId',
-  verifyToken,
-  checkRole(['admin']),
-  async (req, res) => {
-    try {
-      const { userId } = req.params;
-
-      const user = await User.findById(userId);
-
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      // Prevent admin from deleting themselves
-      if (userId === req.user._id.toString()) {
-        return res.status(400).json({ error: 'Cannot delete your own account' });
-      }
-
-      await user.remove();
-
-      res.json({ message: 'User deleted successfully' });
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-});
-
-// Admin: Manage User Membership (Admin Only)
-router.patch('/membership/:userId',
-  verifyToken,
-  checkRole(['admin']),
-  async (req, res) => {
-    try {
-      const { userId } = req.params;
-      const { membershipExpiration } = req.body;
-
-      const user = await User.findByIdAndUpdate(
-        userId,
-        { membershipExpiration },
-        { new: true, runValidators: true }
-      ).select('-password');
-
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      res.json(user);
-    } catch (error) {
-      res.status(400).json({ error: error.message });
-    }
-});
-
+// Resend Verification Email
 router.post('/resend-verification', async (req, res) => {
   try {
     const { email } = req.body;
@@ -404,7 +264,7 @@ router.post('/resend-verification', async (req, res) => {
 
     await sendVerificationEmail(user.email, verificationToken);
 
-    res.json({ message: 'Verification email resent successfully' });
+    res.json({ message: 'Verification email resent successfully.' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
