@@ -98,6 +98,18 @@ class ApiService {
     await prefs.remove('token');
   }
 
+  Future<Map<String, dynamic>> _get(String endpoint) async {
+    final token = await getToken();
+    final response = await http.get(
+      Uri.parse('$baseUrl$endpoint'),
+      headers: {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
+    );
+    return _handleResponse(response);
+  }
+
   Future<Map<String, dynamic>> _post(String endpoint, Map<String, dynamic> body) async {
     final token = await getToken();
     final response = await http.post(
