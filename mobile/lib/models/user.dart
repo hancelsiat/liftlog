@@ -1,3 +1,4 @@
+
 enum UserRole {
   member,
   trainer,
@@ -13,6 +14,7 @@ class User {
   final UserProfile? profile;
   final bool isEmailVerified;
   final bool isApproved;
+  final String credentialImageUrl;
 
   User({
     required this.id,
@@ -23,10 +25,10 @@ class User {
     this.profile,
     this.isEmailVerified = false,
     this.isApproved = false,
+    this.credentialImageUrl = ''
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
-    // Convert string role to enum, default to member if not specified
     UserRole role;
     switch (json['role']?.toLowerCase()) {
       case 'trainer':
@@ -48,6 +50,7 @@ class User {
       profile: json['profile'] != null ? UserProfile.fromJson(json['profile']) : null,
       isEmailVerified: json['isEmailVerified'] ?? false,
       isApproved: json['isApproved'] ?? false,
+      credentialImageUrl: json['credentialImageUrl'] ?? '',
     );
   }
 
@@ -61,6 +64,7 @@ class User {
       'profile': profile?.toJson(),
       'isEmailVerified': isEmailVerified,
       'isApproved': isApproved,
+      'credentialImageUrl': credentialImageUrl,
     };
   }
 }
