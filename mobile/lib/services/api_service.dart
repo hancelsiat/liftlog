@@ -426,10 +426,12 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  Future<User> approveTrainer(String userId, bool isApproved) async {
-    final response = await _patch('/auth/users/$userId/approve', {
+  Future<User> approveTrainer(String userId, bool isApproved, {String? rejectionReason}) async {
+    final body = {
       'isApproved': isApproved,
-    });
+      if (rejectionReason != null) 'rejectionReason': rejectionReason,
+    };
+    final response = await _patch('/auth/users/$userId/approve', body);
     return User.fromJson(response['user']);
   }
 }
