@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 
 class AppTheme {
@@ -38,6 +39,12 @@ class AppTheme {
     colors: [Color(0xFF1A1A2E), Color(0xFF16213E), Color(0xFF0F3460)],
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
+  );
+
+  static const LinearGradient disabledGradient = LinearGradient(
+    colors: [Colors.grey, Colors.grey],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
   );
 
   // Text Colors

@@ -66,6 +66,23 @@ class ApiService {
     _baseUrl = 'http://$detectedIP:5000/api';
   }
 
+  static void setBaseUrl(String url) {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      _baseUrl = '$url/api';
+    } else {
+      _baseUrl = 'http://$url:5000/api';
+    }
+  }
+
+  static String getCurrentBaseUrl() {
+    return _baseUrl;
+  }
+
+  static void updatePCIP(String newIP) {
+    CURRENT_PC_IP = newIP;
+    _networkConfigs['pc'] = newIP;
+  }
+
   Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('token');
@@ -104,6 +121,31 @@ class ApiService {
       },
       body: jsonEncode(body),
     );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> _delete(String endpoint) async {
+    final token = await getToken();
+    final response = await http.delete(
+      Uri.parse('$baseUrl$endpoint'),
+      headers: {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
+    );
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> _deleteWithBody(String endpoint, Map<String, dynamic> body) async {
+    final token = await getToken();
+    final request = http.Request('DELETE', Uri.parse('$baseUrl$endpoint'));
+    request.headers.addAll({
+      'Content-Type': 'application/json',
+      if (token != null) 'Authorization': 'Bearer $token',
+    });
+    request.body = jsonEncode(body);
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
     return _handleResponse(response);
   }
 
@@ -164,9 +206,212 @@ class ApiService {
     final response = await _get('/auth/profile');
     return User.fromJson(response);
   }
+  
+  Future<List<Workout>> getWorkouts() async {
+    final response = await _get('/workouts');
+    final List<dynamic> workoutsJson = response['workouts'];
+    return workoutsJson.map((json) => Workout.fromJson(json)).toList();
+  }
 
-  Future<Map<String, dynamic>> getUsers() async {
-    return _get('/auth/users');
+  Future<Workout> createWorkout(String name, String description, List<String> exercises) async {
+    final response = await _post('/workouts', {
+      'name': name,
+      'description': description,
+      'exercises': exercises,
+    });
+    return Workout.fromJson(response['workout'] as Map<String, dynamic>);
+  }
+
+  Future<Workout> updateWorkout(String id, String name, String description, List<Map<String, dynamic>> exercises) async {
+    final response = await _patch('/workouts/$id', {
+      'name': name,
+      'description': description,
+      'exercises': exercises,
+    });
+    return Workout.fromJson(response['workout'] as Map<String, dynamic>);
+  }
+
+  Future<void> deleteWorkout(String workoutId) async {
+    await _delete('/workouts/$workoutId');
+  }
+
+  Future<void> deleteWorkouts(List<String> workoutIds) async {
+    await _deleteWithBody('/workouts', {'workoutIds': workoutIds});
+  }
+
+  Future<List<Map<String, dynamic>>> getAvailableTrainers() async {
+    final response = await _get('/workouts/trainers/available');
+    final List<dynamic> trainersJson = response['trainers'];
+    return trainersJson.map((json) => json as Map<String, dynamic>).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> getWorkoutsByTrainer(String trainerId) async {
+    final response = await _get('/workouts/trainer/$trainerId');
+    final List<dynamic> workoutsJson = response['workouts'];
+    return workoutsJson.map((json) => json as Map<String, dynamic>).toList();
+  }
+
+  Future<Map<String, dynamic>> canUpdateProgress() async {
+    return _get('/progress/can-update');
+  }
+
+  Future<List<Progress>> getProgressHistory() async {
+    final response = await _get('/progress');
+    final List<dynamic> progressJson = response['progress'];
+    return progressJson.map((json) => Progress.fromJson(json)).toList();
+  }
+
+  Future<Progress> createProgressPartial({
+    double? bmi,
+    double? caloriesIntake,
+    double? calorieDeficit,
+  }) async {
+    final Map<String, dynamic> body = {};
+    if (bmi != null) body['bmi'] = bmi;
+    if (caloriesIntake != null) body['caloriesIntake'] = caloriesIntake;
+    if (calorieDeficit != null) body['calorieDeficit'] = calorieDeficit;
+    final response = await _post('/progress', body);
+    return Progress.fromJson(response['progress']);
+  }
+
+  Future<List<ExerciseVideo>> getExerciseVideos() async {
+    final response = await _get('/videos');
+    final List<dynamic> videosJson = response['videos'];
+    return videosJson.map((json) => ExerciseVideo.fromJson(json)).toList();
+  }
+
+  Future<Map<String, dynamic>> uploadVideo({
+    required String jwt,
+    required String title,
+    required String exerciseType,
+    String? description,
+    bool isPublic = true,
+  }) async {
+    final result = await FilePicker.platform.pickFiles(type: FileType.video, withData: true);
+    if (result == null || result.files.isEmpty) {
+      return {'success': false, 'message': 'No file selected'};
+    }
+    final file = result.files.first;
+    final filename = file.name.isNotEmpty ? file.name : 'video_${DateTime.now().millisecondsSinceEpoch}.mp4';
+    final bytes = file.bytes;
+    final path = file.path;
+    final mimeType = lookupMimeType(filename) ?? 'video/mp4';
+    final parts = mimeType.split('/');
+    final contentType = MediaType(parts[0], parts.length > 1 ? parts[1] : 'mp4');
+    MultipartFile mpFile;
+    if (bytes != null) {
+      mpFile = MultipartFile.fromBytes(bytes, filename: filename, contentType: contentType);
+    } else if (path != null) {
+      mpFile = await MultipartFile.fromFile(path, filename: filename, contentType: contentType);
+    } else {
+      return {'success': false, 'message': 'Unable to read file bytes or path'};
+    }
+    final form = FormData.fromMap({
+      'title': title.trim(),
+      'exerciseType': exerciseType.trim().toLowerCase(),
+      if (description != null) 'description': description.trim(),
+      'isPublic': isPublic.toString(),
+      'video': mpFile,
+    });
+    final dio = Dio();
+    dio.options.headers['Authorization'] = 'Bearer $jwt';
+    final response = await dio.post('$baseUrl/videos', data: form);
+    return {'success': true, 'data': response.data};
+  }
+
+  Future<ExerciseVideo> uploadVideoFromDrive({
+    required String fileId,
+    required String accessToken,
+    required Map<String, dynamic> metadata,
+    String? userId,
+  }) async {
+    final token = await getToken();
+    final response = await http.post(
+      Uri.parse('$baseUrl/videos/upload-drive'),
+      headers: {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
+      body: json.encode({
+        'fileId': fileId,
+        'accessToken': accessToken,
+        'userId': userId,
+        ...metadata,
+      }),
+    );
+    final responseBody = jsonDecode(response.body);
+    return ExerciseVideo.fromJson(responseBody['video']);
+  }
+
+  Future<List<ExerciseVideo>> getTrainerVideos() async {
+    final response = await _get('/videos/trainer');
+    final List<dynamic> videosJson = response['videos'];
+    return videosJson.map((json) => ExerciseVideo.fromJson(json)).toList();
+  }
+
+  Future<void> deleteVideo(String videoId) async {
+    await _delete('/videos/$videoId');
+  }
+
+  Future<Map<String, dynamic>> getUsers({String? role, String? search, int page = 1, int limit = 10}) async {
+    final queryParams = <String, String>{};
+    if (role != null) queryParams['role'] = role;
+    if (search != null) queryParams['search'] = search;
+    queryParams['page'] = page.toString();
+    queryParams['limit'] = limit.toString();
+    final uri = Uri.parse('$baseUrl/auth/users').replace(queryParameters: queryParams);
+    return _getUri(uri.toString());
+  }
+
+  Future<User> updateUser(String userId, Map<String, dynamic> updates) async {
+    final response = await _patch('/auth/users/$userId', updates);
+    return User.fromJson(response);
+  }
+
+  Future<void> deleteUser(String userId) async {
+    await _delete('/auth/users/$userId');
+  }
+
+  Future<Workout> createWorkoutTemplate({
+    required String title,
+    required String description,
+    required List<Map<String, dynamic>> exercises,
+    String? category,
+    String? intensity,
+    int? duration,
+    int? caloriesBurned,
+    String? trainerId,
+  }) async {
+    final response = await _post('/workouts/template', {
+      'title': title,
+      'description': description,
+      'exercises': exercises,
+      'category': category ?? 'mixed',
+      'intensity': intensity ?? 'moderate',
+      'duration': duration,
+      'caloriesBurned': caloriesBurned,
+      'isPublic': true,
+      if (trainerId != null) 'trainer': trainerId,
+    });
+    return Workout.fromJson(response['workout'] as Map<String, dynamic>);
+  }
+
+  Future<List<Workout>> getTrainerWorkouts() async {
+    final response = await _get('/workouts/trainer');
+    final List<dynamic> workoutsJson = response['workouts'];
+    return workoutsJson.map((json) => Workout.fromJson(json)).toList();
+  }
+
+  Future<Map<String, dynamic>> _getUri(String url) async {
+    final token = await getToken();
+    final response = await http.get(
+      Uri.parse(url),
+      headers: {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
+    );
+    return _handleResponse(response);
   }
 
   Future<User> approveTrainer(String userId, bool isApproved) async {
@@ -174,17 +419,5 @@ class ApiService {
       'isApproved': isApproved,
     });
     return User.fromJson(response['user']);
-  }
-
-  Future<Map<String, dynamic>> _get(String endpoint) async {
-    final token = await getToken();
-    final response = await http.get(
-      Uri.parse('$baseUrl$endpoint'),
-      headers: {
-        'Content-Type': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token',
-      },
-    );
-    return _handleResponse(response);
   }
 }
