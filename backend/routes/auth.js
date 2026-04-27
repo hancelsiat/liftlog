@@ -328,4 +328,27 @@ router.post('/resend-verification', async (req, res) => {
   }
 });
 
+// Member: Select a trainer
+router.post('/select-trainer', verifyToken, checkRole(['member']), async (req, res) => {
+  try {
+    const { trainerId } = req.body;
+    const member = await User.findById(req.user._id);
+    const trainer = await User.findById(trainerId);
+
+    if (!trainer || trainer.role !== 'trainer') {
+      return res.status(404).json({ error: 'Trainer not found' });
+    }
+
+    member.trainer = trainerId;
+    await member.save();
+
+    trainer.clients.push(member._id);
+    await trainer.save();
+
+    res.json({ message: 'Trainer selected successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;

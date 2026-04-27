@@ -452,4 +452,8 @@ class ApiService {
   Future<void> markWorkoutAsComplete(String workoutId) async {
     await _post('/workouts/$workoutId/complete', {});
   }
+
+  Future<void> selectTrainer(String trainerId) async {
+    await _post('/auth/select-trainer', {'trainerId': trainerId});
+  }
 }
