@@ -80,7 +80,7 @@ router.get('/', verifyToken, async (req, res) => {
 
 router.get('/trainer', verifyToken, checkRole(['trainer']), async (req, res) => {
   try {
-    const workouts = await Workout.find({ trainer: req.user._id, isTemplate: true });
+    const workouts = await Workout.find({ trainer: req.user._id, isTemplate: true }).populate('trainer', 'username _id');
     res.json({ workouts });
   } catch (error) {
     res.status(500).json({ error: error.message });
