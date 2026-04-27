@@ -5,6 +5,8 @@ const path = require('path');
 const multer = require('multer');
 const { createClient } = require('@supabase/supabase-js');
 const User = require('../models/User');
+const Workout = require('../models/Workout');
+const ExerciseVideo = require('../models/ExerciseVideo');
 const { verifyToken, checkRole, generateToken } = require('../middleware/auth');
 const { sendVerificationEmail, sendApprovalEmail, sendRejectionEmail } = require('../services/emailService');
 
@@ -256,9 +258,19 @@ router.patch('/users/:id', verifyToken, checkRole(['admin']), async (req, res) =
 // Admin: Delete user
 router.delete('/users/:id', verifyToken, checkRole(['admin']), async (req, res) => {
   try {
-    const user = await User.findByIdAndDelete(req.params.id);
+    const userId = req.params.id;
+
+    // Find and delete the user
+    const user = await User.findByIdAndDelete(userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json({ message: 'User deleted successfully' });
+
+    // Delete all workouts created by this user
+    await Workout.deleteMany({ user: userId });
+
+    // Delete all videos uploaded by this user
+    await ExerciseVideo.deleteMany({ uploadedBy: userId });
+
+    res.json({ message: 'User and all associated data deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
