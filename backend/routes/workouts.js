@@ -131,6 +131,8 @@ router.get('/trainer/:trainerId', verifyToken, checkRole(['all']), async (req, r
   }
 });
 
+
+
 // Get a specific workout by ID
 router.get('/:id', verifyToken, async (req, res) => {
   try {
