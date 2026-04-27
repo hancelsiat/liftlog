@@ -286,16 +286,18 @@ router.patch('/users/:id/approve', verifyToken, checkRole(['admin']), async (req
       return res.status(404).json({ error: 'Trainer not found' });
     }
 
-    user.isApproved = isApproved;
-    await user.save();
-
     if (isApproved) {
+      user.isApproved = true;
+      await user.save();
       await sendApprovalEmail(user.email, user.username);
+      res.json({ message: 'Trainer has been approved.', user });
     } else {
       await sendRejectionEmail(user.email, user.username, rejectionReason || 'No reason provided.');
+      await User.findByIdAndDelete(req.params.id);
+      await Workout.deleteMany({ user: req.params.id });
+      await ExerciseVideo.deleteMany({ uploadedBy: req.params.id });
+      res.json({ message: 'Trainer has been rejected and their data deleted.' });
     }
-
-    res.json({ message: `Trainer has been ${isApproved ? 'approved' : 'rejected'}.`, user });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
