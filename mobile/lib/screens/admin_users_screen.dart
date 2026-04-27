@@ -17,19 +17,31 @@ class AdminUsersScreen extends StatefulWidget {
 }
 
 class _AdminUsersScreenState extends State<AdminUsersScreen> {
-  late Future<List<User>> _usersFuture;
+  late Future<Map<UserRole, List<User>>> _usersFuture;
   final ApiService _apiService = ApiService();
 
   @override
   void initState() {
     super.initState();
-    _usersFuture = _fetchUsers();
+    _usersFuture = _fetchAndGroupUsers();
   }
 
-  Future<List<User>> _fetchUsers() async {
+  Future<Map<UserRole, List<User>>> _fetchAndGroupUsers() async {
     final response = await _apiService.getUsers();
     final usersData = response['users'] as List;
-    return usersData.map((data) => User.fromJson(data)).toList();
+    final users = usersData.map((data) => User.fromJson(data)).toList();
+
+    final Map<UserRole, List<User>> groupedUsers = {
+      UserRole.trainer: [],
+      UserRole.member: [],
+      UserRole.admin: [],
+    };
+
+    for (var user in users) {
+      groupedUsers[user.role]!.add(user);
+    }
+
+    return groupedUsers;
   }
 
   @override
@@ -38,7 +50,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
       appBar: AppBar(
         title: const Text('Manage Users'),
       ),
-      body: FutureBuilder<List<User>>(
+      body: FutureBuilder<Map<UserRole, List<User>>>(
         future: _usersFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -51,34 +63,57 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
             return const Center(child: Text('No users found.'));
           }
 
-          final users = snapshot.data!;
-          return ListView.builder(
-            itemCount: users.length,
-            itemBuilder: (context, index) {
-              final user = users[index];
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(user.username, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 4),
-                      Text(user.email, style: const TextStyle(fontSize: 14, color: Colors.grey)),
-                      const SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: _buildActionButtons(user, context),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
+          final groupedUsers = snapshot.data!;
+          final trainers = groupedUsers[UserRole.trainer]!;
+          final members = groupedUsers[UserRole.member]!;
+
+          return ListView(
+            children: [
+              _buildUserSection('Trainers', trainers),
+              _buildUserSection('Members', members),
+            ],
           );
         },
       ),
+    );
+  }
+
+  Widget _buildUserSection(String title, List<User> users) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text(title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+        ),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: users.length,
+          itemBuilder: (context, index) {
+            final user = users[index];
+            return Card(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(user.username, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    Text(user.email, style: const TextStyle(fontSize: 14, color: Colors.grey)),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: _buildActionButtons(user, context),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 
@@ -161,7 +196,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       await authProvider.approveTrainer(context, userId, approve, rejectionReason: rejectionReason);
       setState(() {
-        _usersFuture = _fetchUsers();
+        _usersFuture = _fetchAndGroupUsers();
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Trainer ${approve ? 'approved' : 'rejected'} successfully!'), backgroundColor: Colors.green),
@@ -210,7 +245,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         builder: (context) => EditUserScreen(user: user),
       ),
     ).then((_) => setState(() {
-      _usersFuture = _fetchUsers();
+      _usersFuture = _fetchAndGroupUsers();
     }));
   }
 
@@ -234,7 +269,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                 try {
                   await _apiService.deleteUser(userId);
                   setState(() {
-                    _usersFuture = _fetchUsers();
+                    _usersFuture = _fetchAndGroupUsers();
                   });
                   Navigator.of(context).pop();
                   ScaffoldMessenger.of(context).showSnackBar(

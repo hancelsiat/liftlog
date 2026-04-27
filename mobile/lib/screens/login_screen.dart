@@ -78,11 +78,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                             // Login Button
                             _buildLoginButton(authProvider),
                             
-                            // Error Message
-                            if (authProvider.error != null) ...[
-                              const SizedBox(height: 16),
-                              _buildErrorMessage(authProvider.error!),
-                            ],
+
                           ],
                         ),
                       ),
