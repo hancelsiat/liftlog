@@ -28,13 +28,13 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
     _user = Provider.of<AuthProvider>(context, listen: false).user;
     if (_user != null) {
       _loadFuture = _user!.trainer != null
-          ? _fetchAssignedWorkouts(_user!.id)
+          ? _fetchAssignedWorkouts()
           : _loadTrainers();
     }
   }
 
-  Future<void> _fetchAssignedWorkouts(String userId) async {
-    final response = await _apiService.getClientProgress(userId);
+  Future<void> _fetchAssignedWorkouts() async {
+    final response = await _apiService.getAssignedWorkouts();
     if (mounted) {
       setState(() {
         _assignedWorkouts = (response as List).map((data) => Workout.fromJson(data)).toList();

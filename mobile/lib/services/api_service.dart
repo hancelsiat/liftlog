@@ -453,6 +453,11 @@ class ApiService {
     await _post('/workouts/$workoutId/complete', {});
   }
 
+  Future<List<dynamic>> getAssignedWorkouts() async {
+    final response = await _get('/workouts/my-plan');
+    return response as List<dynamic>;
+  }
+
   Future<void> selectTrainer(String trainerId) async {
     await _post('/auth/select-trainer', {'trainerId': trainerId});
   }

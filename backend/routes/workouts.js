@@ -270,7 +270,17 @@ router.get('/user/:userId',
       });
     } catch (error) {
       res.status(500).json({ error: error.message });
-    }
+  }
+});
+
+// Member: Get assigned workouts
+router.get('/my-plan', verifyToken, checkRole(['member']), async (req, res) => {
+  try {
+    const workouts = await Workout.find({ assignedTo: req.user._id });
+    res.json(workouts);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Mark a workout as complete
