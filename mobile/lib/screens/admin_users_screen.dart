@@ -7,6 +7,7 @@ import '../models/user.dart';
 import '../services/api_service.dart';
 import '../utils/error_handler.dart';
 import 'edit_user_screen.dart';
+import 'credential_viewer_screen.dart';
 
 class AdminUsersScreen extends StatefulWidget {
   const AdminUsersScreen({super.key});
@@ -91,7 +92,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
             IconButton(
               icon: const Icon(Icons.badge_outlined, color: Colors.blue),
               tooltip: 'View Credential',
-              onPressed: () => _viewCredential(user.credentialImageUrl),
+              onPressed: () => _viewCredential(context, user.credentialImageUrl),
             ),
           );
         }
@@ -146,18 +147,19 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     return buttons;
   }
 
-  void _viewCredential(String url) async {
-    if (await canLaunchUrl(Uri.parse(url))) {
-      await launchUrl(Uri.parse(url));
-    } else {
-      showErrorSnackBar(context, 'Could not open credential URL: $url');
-    }
+  void _viewCredential(BuildContext context, String imageUrl) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CredentialViewerScreen(imageUrl: imageUrl),
+      ),
+    );
   }
 
   void _approveTrainer(String userId, bool approve, BuildContext context, {String? rejectionReason}) async {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      await authProvider.approveTrainer(userId, approve, rejectionReason: rejectionReason);
+      await authProvider.approveTrainer(context, userId, approve, rejectionReason: rejectionReason);
       setState(() {
         _usersFuture = _fetchUsers();
       });
