@@ -98,7 +98,7 @@ class ApiService {
     await prefs.remove('token');
   }
 
-  Future<Map<String, dynamic>> _get(String endpoint) async {
+  Future<dynamic> _get(String endpoint) async {
     final token = await getToken();
     final response = await http.get(
       Uri.parse('$baseUrl$endpoint'),
@@ -161,7 +161,7 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  Map<String, dynamic> _handleResponse(http.Response response) {
+  dynamic _handleResponse(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return jsonDecode(response.body);
     } else {
@@ -414,7 +414,7 @@ class ApiService {
     return workoutsJson.map((json) => Workout.fromJson(json)).toList();
   }
 
-  Future<Map<String, dynamic>> _getUri(String url) async {
+  Future<dynamic> _getUri(String url) async {
     final token = await getToken();
     final response = await http.get(
       Uri.parse(url),
