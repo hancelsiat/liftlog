@@ -264,7 +264,7 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> canUpdateProgress() async {
-    return _get('/progress/can-update');
+    return await _get('/progress/can-update') as Map<String, dynamic>;
   }
 
   Future<List<Progress>> getProgressHistory() async {
@@ -372,7 +372,7 @@ class ApiService {
     queryParams['page'] = page.toString();
     queryParams['limit'] = limit.toString();
     final uri = Uri.parse('$baseUrl/auth/users').replace(queryParameters: queryParams);
-    return _getUri(uri.toString());
+    return await _getUri(uri.toString()) as Map<String, dynamic>;
   }
 
   Future<User> updateUser(String userId, Map<String, dynamic> updates) async {

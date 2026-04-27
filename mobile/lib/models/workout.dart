@@ -7,6 +7,8 @@ class Workout {
   final String description;
   final DateTime date;
   final List<Exercise> exercises;
+  final String title;
+  final DateTime? completedAt;
 
   Workout({
     required this.id,
@@ -15,6 +17,8 @@ class Workout {
     required this.description,
     required this.date,
     required this.exercises,
+    required this.title,
+    this.completedAt,
   });
 
   factory Workout.fromJson(Map<String, dynamic> json) {
@@ -27,6 +31,8 @@ class Workout {
       exercises: json['exercises'] != null
           ? (json['exercises'] as List<dynamic>).map((e) => Exercise.fromJson(e as Map<String, dynamic>)).toList()
           : [],
+      title: json['title'] ?? 'Unnamed Workout',
+      completedAt: json['completedAt'] != null ? DateTime.tryParse(json['completedAt']) : null,
     );
   }
 
@@ -38,6 +44,8 @@ class Workout {
       'description': description,
       'date': date.toIso8601String(),
       'exercises': exercises.map((e) => e.toJson()).toList(),
+      'title': title,
+      'completedAt': completedAt?.toIso8601String(),
     };
   }
 }

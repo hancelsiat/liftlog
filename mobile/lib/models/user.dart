@@ -15,6 +15,7 @@ class User {
   final bool isEmailVerified;
   final bool isApproved;
   final String credentialImageUrl;
+  final String? privateNotes;
 
   User({
     required this.id,
@@ -25,7 +26,8 @@ class User {
     this.profile,
     this.isEmailVerified = false,
     this.isApproved = false,
-    this.credentialImageUrl = ''
+    this.credentialImageUrl = '',
+    this.privateNotes,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -51,6 +53,7 @@ class User {
       isEmailVerified: json['isEmailVerified'] ?? false,
       isApproved: json['isApproved'] ?? false,
       credentialImageUrl: json['credentialImageUrl'] ?? '',
+      privateNotes: json['privateNotes'],
     );
   }
 
@@ -65,6 +68,7 @@ class User {
       'isEmailVerified': isEmailVerified,
       'isApproved': isApproved,
       'credentialImageUrl': credentialImageUrl,
+      'privateNotes': privateNotes,
     };
   }
 }
