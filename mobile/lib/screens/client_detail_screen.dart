@@ -6,6 +6,7 @@ import '../models/workout.dart';
 import '../services/api_service.dart';
 import '../utils/app_theme.dart';
 import 'assign_workout_screen.dart';
+import 'create_workout_template_screen.dart';
 
 class ClientDetailScreen extends StatefulWidget {
   final User client;
@@ -41,6 +42,22 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error removing client: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  void _deleteWorkout(String workoutId) async {
+    try {
+      await _apiService.deleteWorkout(workoutId);
+      setState(() {
+        _progressFuture = _fetchProgress();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Workout deleted successfully!'), backgroundColor: Colors.green),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error deleting workout: $e'), backgroundColor: Colors.red),
       );
     }
   }
@@ -133,7 +150,30 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                 subtitle: Text('Assigned on: $formattedDate', style: const TextStyle(color: Colors.white70)),
                 trailing: workout.completedAt != null
                     ? const Icon(Icons.check_circle, color: Colors.green)
-                    : const Icon(Icons.radio_button_unchecked, color: Colors.grey),
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit, color: Colors.blue),
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => CreateWorkoutTemplateScreen(workout: workout),
+                                ),
+                              ).then((_) {
+                                setState(() {
+                                  _progressFuture = _fetchProgress();
+                                });
+                              });
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () => _deleteWorkout(workout.id),
+                          ),
+                        ],
+                      ),
               ),
             );
           },
