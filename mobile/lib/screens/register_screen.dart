@@ -165,6 +165,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
 
       final success = await Provider.of<AuthProvider>(context, listen: false)
           .register(
+        context,
         _emailController.text.trim(), 
         _passwordController.text, 
         _usernameController.text.trim(),

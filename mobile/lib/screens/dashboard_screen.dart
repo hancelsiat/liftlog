@@ -49,7 +49,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Future<void> _loadUserProfile() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     try {
-      await authProvider.loadProfile();
+      await authProvider.loadProfile(context);
       _animationController.forward();
     } catch (e) {
       // If profile loading fails due to invalid token, logout and redirect to login

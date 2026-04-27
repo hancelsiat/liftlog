@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -337,6 +338,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     if (_formKey.currentState!.validate()) {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final success = await authProvider.login(
+        context,
         _emailController.text.trim(),
         _passwordController.text
       );
@@ -366,7 +368,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
               ),
               TextButton(
                 onPressed: () {
-                  authProvider.resendVerificationEmail(_emailController.text.trim());
+                  authProvider.resendVerificationEmail(context, _emailController.text.trim());
                   Navigator.of(context).pop();
                 },
                 child: const Text('Resend'),
