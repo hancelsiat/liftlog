@@ -10,6 +10,7 @@ class Workout {
   final String title;
   final DateTime? completedAt;
   final String? trainerName;
+  final String? trainerId;
 
   Workout({
     required this.id,
@@ -21,12 +22,15 @@ class Workout {
     required this.title,
     this.completedAt,
     this.trainerName,
+    this.trainerId,
   });
 
   factory Workout.fromJson(Map<String, dynamic> json) {
     String? trainerName;
+    String? trainerId;
     if (json['trainer'] != null && json['trainer'] is Map) {
       trainerName = json['trainer']['username'];
+      trainerId = json['trainer']['_id'];
     }
 
     return Workout(
@@ -41,6 +45,7 @@ class Workout {
       title: json['title'] ?? 'Unnamed Workout',
       completedAt: json['completedAt'] != null ? DateTime.tryParse(json['completedAt']) : null,
       trainerName: trainerName,
+      trainerId: trainerId,
     );
   }
 

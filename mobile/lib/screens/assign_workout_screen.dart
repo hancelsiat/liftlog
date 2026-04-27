@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:liftlog_mobile/models/workout.dart';
 import 'package:liftlog_mobile/services/api_service.dart';
 import 'package:liftlog_mobile/utils/app_theme.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 
 class AssignWorkoutScreen extends StatefulWidget {
   final String memberId;
@@ -23,9 +25,9 @@ class _AssignWorkoutScreenState extends State<AssignWorkoutScreen> {
   }
 
   Future<List<Workout>> _fetchWorkoutTemplates() async {
-    // We can reuse the getTrainerWorkouts endpoint
+    final trainerId = Provider.of<AuthProvider>(context, listen: false).user?.id;
     final response = await _apiService.getTrainerWorkouts();
-    return response;
+    return response.where((workout) => workout.trainerId == trainerId).toList();
   }
 
   void _assignWorkout(String workoutId) async {
