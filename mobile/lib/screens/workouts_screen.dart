@@ -16,12 +16,19 @@ class WorkoutsScreen extends StatefulWidget {
   State<WorkoutsScreen> createState() => _WorkoutsScreenState();
 }
 
-class _WorkoutsScreenState extends State<WorkoutsScreen> {
+class _WorkoutsScreenState extends State<WorkoutsScreen> with SingleTickerProviderStateMixin {
   final ApiService _apiService = ApiService();
   Future<void>? _loadFuture;
   List<Workout> _assignedWorkouts = [];
   List<Map<String, dynamic>> _trainers = [];
   User? _user;
+  TabController? _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
 
   @override
   void didChangeDependencies() {
@@ -32,6 +39,12 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
           ? _fetchAssignedWorkouts()
           : _loadTrainers();
     }
+  }
+
+  @override
+  void dispose() {
+    _tabController?.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchAssignedWorkouts() async {
@@ -130,6 +143,15 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
               tooltip: 'Choose Another Trainer',
             ),
         ],
+        bottom: _user?.trainer != null
+            ? TabBar(
+                controller: _tabController,
+                tabs: const [
+                  Tab(text: 'Assigned'),
+                  Tab(text: 'Completed'),
+                ],
+              )
+            : null,
       ),
       backgroundColor: AppTheme.darkBackground,
       body: FutureBuilder<void>(
@@ -143,7 +165,16 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
           }
 
           if (_user?.trainer != null) {
-            return _buildWorkoutsList();
+            final assigned = _assignedWorkouts.where((w) => w.completedAt == null).toList();
+            final completed = _assignedWorkouts.where((w) => w.completedAt != null).toList();
+
+            return TabBarView(
+              controller: _tabController,
+              children: [
+                _buildWorkoutsList(assigned, 'Your trainer has not assigned you a plan yet.'),
+                _buildWorkoutsList(completed, 'You have no completed workouts yet.'),
+              ],
+            );
           } else {
             return _buildTrainersList();
           }
@@ -180,17 +211,17 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
     );
   }
 
-  Widget _buildWorkoutsList() {
-    if (_assignedWorkouts.isEmpty) {
-      return const Center(
-        child: Text('Your trainer has not assigned you a plan yet.', style: TextStyle(color: Colors.white)),
+  Widget _buildWorkoutsList(List<Workout> workouts, String emptyMessage) {
+    if (workouts.isEmpty) {
+      return Center(
+        child: Text(emptyMessage, style: const TextStyle(color: Colors.white)),
       );
     }
 
     return ListView.builder(
-      itemCount: _assignedWorkouts.length,
+      itemCount: workouts.length,
       itemBuilder: (context, index) {
-        final workout = _assignedWorkouts[index];
+        final workout = workouts[index];
         final formattedDate = DateFormat.yMMMd().format(workout.date.toLocal());
 
         List<String> subtitleParts = ['Assigned on: $formattedDate'];
