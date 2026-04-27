@@ -59,7 +59,7 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
       if (mounted) {
         setState(() {
           _user = authProvider.user;
-          _loadFuture = _fetchAssignedWorkouts(_user!.id);
+          _loadFuture = _fetchAssignedWorkouts();
         });
       }
     } catch (e) {
@@ -128,7 +128,7 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
   Widget _buildWorkoutsList() {
     if (_assignedWorkouts.isEmpty) {
       return const Center(
-        child: Text('Your trainer has not assigned you a plan yet.', style: TextStyle(color: Colors.white)),
+        child: Text('Your trainer has not assigned you a plan yet.', style: const TextStyle(color: Colors.white)),
       );
     }
 
@@ -154,7 +154,7 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
               ).then((_) {
                 // Refresh the list after a workout session
                 setState(() {
-                  _loadFuture = _fetchAssignedWorkouts(_user!.id);
+                  _loadFuture = _fetchAssignedWorkouts();
                 });
               });
             },
