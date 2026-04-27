@@ -17,14 +17,22 @@ class ClientDetailScreen extends StatefulWidget {
   State<ClientDetailScreen> createState() => _ClientDetailScreenState();
 }
 
-class _ClientDetailScreenState extends State<ClientDetailScreen> {
+class _ClientDetailScreenState extends State<ClientDetailScreen> with SingleTickerProviderStateMixin {
   late Future<List<Workout>> _progressFuture;
   final ApiService _apiService = ApiService();
+  TabController? _tabController;
 
   @override
   void initState() {
     super.initState();
     _progressFuture = _fetchProgress();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController?.dispose();
+    super.dispose();
   }
 
   Future<List<Workout>> _fetchProgress() async {
@@ -99,9 +107,40 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
             },
           ),
         ],
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(text: 'Assigned'),
+            Tab(text: 'Completed'),
+          ],
+        ),
       ),
       backgroundColor: AppTheme.darkBackground,
-      body: _buildProgressTab(),
+      body: FutureBuilder<List<Workout>>(
+        future: _progressFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.white)));
+          }
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return const Center(child: Text('No workouts assigned yet.', style: TextStyle(color: Colors.white)));
+          }
+
+          final assigned = snapshot.data!.where((w) => w.completedAt == null).toList();
+          final completed = snapshot.data!.where((w) => w.completedAt != null).toList();
+
+          return TabBarView(
+            controller: _tabController,
+            children: [
+              _buildWorkoutsList(assigned, 'No workouts assigned yet.'),
+              _buildWorkoutsList(completed, 'No completed workouts yet.'),
+            ],
+          );
+        },
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           Navigator.push(
@@ -122,61 +161,51 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
     );
   }
 
-  Widget _buildProgressTab() {
-    return FutureBuilder<List<Workout>>(
-      future: _progressFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.white)));
-        }
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(child: Text('No workouts assigned yet.', style: TextStyle(color: Colors.white)));
-        }
+  Widget _buildWorkoutsList(List<Workout> workouts, String emptyMessage) {
+    if (workouts.isEmpty) {
+      return Center(
+        child: Text(emptyMessage, style: const TextStyle(color: Colors.white)),
+      );
+    }
 
-        final workouts = snapshot.data!;
-        return ListView.builder(
-          itemCount: workouts.length,
-          itemBuilder: (context, index) {
-            final workout = workouts[index];
-            final formattedDate = DateFormat.yMMMd().format(workout.date.toLocal());
-            return Card(
-              color: AppTheme.cardBackground,
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: ListTile(
-                title: Text(workout.title, style: const TextStyle(color: Colors.white)),
-                subtitle: Text('Assigned on: $formattedDate', style: const TextStyle(color: Colors.white70)),
-                trailing: workout.completedAt != null
-                    ? const Icon(Icons.check_circle, color: Colors.green)
-                    : Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.edit, color: Colors.blue),
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => CreateWorkoutTemplateScreen(workout: workout),
-                                ),
-                              ).then((_) {
-                                setState(() {
-                                  _progressFuture = _fetchProgress();
-                                });
-                              });
-                            },
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete, color: Colors.red),
-                            onPressed: () => _deleteWorkout(workout.id),
-                          ),
-                        ],
+    return ListView.builder(
+      itemCount: workouts.length,
+      itemBuilder: (context, index) {
+        final workout = workouts[index];
+        final formattedDate = DateFormat.yMMMd().format(workout.date.toLocal());
+        return Card(
+          color: AppTheme.cardBackground,
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: ListTile(
+            title: Text(workout.title, style: const TextStyle(color: Colors.white)),
+            subtitle: Text('Assigned on: $formattedDate', style: const TextStyle(color: Colors.white70)),
+            trailing: workout.completedAt != null
+                ? const Icon(Icons.check_circle, color: Colors.green)
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit, color: Colors.blue),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => CreateWorkoutTemplateScreen(workout: workout),
+                            ),
+                          ).then((_) {
+                            setState(() {
+                              _progressFuture = _fetchProgress();
+                            });
+                          });
+                        },
                       ),
-              ),
-            );
-          },
+                      IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () => _deleteWorkout(workout.id),
+                      ),
+                    ],
+                  ),
+          ),
         );
       },
     );
