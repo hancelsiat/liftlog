@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/user.dart';
@@ -7,6 +6,7 @@ import '../services/api_service.dart';
 import '../utils/app_theme.dart';
 import 'assign_workout_screen.dart';
 import 'create_workout_template_screen.dart';
+import 'workout_detail_screen.dart';
 
 class ClientDetailScreen extends StatefulWidget {
   final User client;
@@ -205,6 +205,16 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with SingleTick
                       ),
                     ],
                   ),
+            onTap: () {
+              if (workout.completedAt != null) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => WorkoutDetailScreen(workout: workout),
+                  ),
+                );
+              }
+            },
           ),
         );
       },

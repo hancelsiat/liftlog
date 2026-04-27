@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -8,6 +7,7 @@ import '../models/user.dart';
 import '../models/workout.dart';
 import '../utils/app_theme.dart';
 import 'workout_session_screen.dart';
+import 'workout_detail_screen.dart';
 
 class WorkoutsScreen extends StatefulWidget {
   const WorkoutsScreen({super.key});
@@ -244,17 +244,26 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> with SingleTickerProvid
                 ? const Icon(Icons.check_circle, color: Colors.green)
                 : const Icon(Icons.play_circle_outline, color: AppTheme.primaryColor),
             onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => WorkoutSessionScreen(workout: workout),
-                ),
-              ).then((_) {
-                // Refresh the list after a workout session
-                setState(() {
-                  _loadFuture = _fetchAssignedWorkouts();
+              if (workout.completedAt != null) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => WorkoutDetailScreen(workout: workout),
+                  ),
+                );
+              } else {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => WorkoutSessionScreen(workout: workout),
+                  ),
+                ).then((_) {
+                  // Refresh the list after a workout session
+                  setState(() {
+                    _loadFuture = _fetchAssignedWorkouts();
+                  });
                 });
-              });
+              }
             },
           ),
         );
