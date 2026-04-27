@@ -14,6 +14,7 @@ import 'user_management_screen.dart';
 import 'create_workout_template_screen.dart';
 import 'manage_workouts_screen.dart';
 import 'admin_users_screen.dart';
+import 'trainer_clients_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -444,6 +445,17 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const TrainerVideosScreen()),
+          ),
+        ),
+        const SizedBox(height: 16),
+        _buildPremiumCard(
+          title: 'My Clients',
+          subtitle: 'Manage your assigned members',
+          icon: Icons.group,
+          gradient: AppTheme.tertiaryGradient, // You may need to define this gradient
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const TrainerClientsScreen()),
           ),
         ),
         const SizedBox(height: 16),

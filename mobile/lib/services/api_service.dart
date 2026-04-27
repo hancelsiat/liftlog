@@ -434,4 +434,18 @@ class ApiService {
     final response = await _patch('/auth/users/$userId/approve', body);
     return User.fromJson(response['user']);
   }
+
+  Future<List<dynamic>> getClients() async {
+    final response = await _get('/clients');
+    return response as List<dynamic>;
+  }
+
+  Future<List<dynamic>> getClientProgress(String clientId) async {
+    final response = await _get('/clients/$clientId/progress');
+    return response as List<dynamic>;
+  }
+
+  Future<void> saveClientNotes(String clientId, String notes) async {
+    await _post('/clients/$clientId/notes', {'notes': notes});
+  }
 }
