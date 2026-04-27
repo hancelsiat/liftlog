@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../utils/app_theme.dart';
+import '../utils/error_handler.dart';
 
 class CheckEmailScreen extends StatefulWidget {
   final String email;
@@ -74,13 +75,17 @@ class _CheckEmailScreenState extends State<CheckEmailScreen> {
               ),
               const SizedBox(height: 20),
               ElevatedButton(
-                onPressed: _isButtonDisabled ? null : () {
-                  Provider.of<AuthProvider>(context, listen: false).resendVerificationEmail(widget.email);
-                  setState(() {
-                    _countdown = 60;
-                    _isButtonDisabled = true;
-                  });
-                  startTimer();
+                onPressed: _isButtonDisabled ? null : () async {
+                  try {
+                    await Provider.of<AuthProvider>(context, listen: false).resendVerificationEmail(context, widget.email);
+                    setState(() {
+                      _countdown = 60;
+                      _isButtonDisabled = true;
+                    });
+                    startTimer();
+                  } catch (e) {
+                    // The error is already handled by the provider, but you could add more specific UI changes here if needed
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _isButtonDisabled ? Colors.grey : AppTheme.primaryColor,

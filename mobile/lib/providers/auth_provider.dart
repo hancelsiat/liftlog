@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
+import '../utils/error_handler.dart';
 
 class AuthProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
@@ -15,12 +16,7 @@ class AuthProvider with ChangeNotifier {
   String? get error => _error;
   bool get isAuthenticated => _user != null;
 
-  Future<bool> register(
-    String email,
-    String password,
-    String username,
-    {UserRole role = UserRole.member, File? credentialFile}
-  ) async {
+  Future<bool> register(BuildContext context, String email, String password, String username, {UserRole role = UserRole.member, File? credentialFile}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -39,7 +35,7 @@ class AuthProvider with ChangeNotifier {
       }
 
       if (role == UserRole.member) {
-        await loadProfile();
+        await loadProfile(context);
       } else {
         await _apiService.removeToken();
         _user = null;
@@ -50,32 +46,34 @@ class AuthProvider with ChangeNotifier {
       return true;
     } catch (e) {
       _error = e.toString();
+      showErrorSnackBar(context, _error!);
       _isLoading = false;
       notifyListeners();
       return false;
     }
   }
 
-  Future<bool> login(String email, String password) async {
+  Future<bool> login(BuildContext context, String email, String password) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
       await _apiService.login(email, password);
-      await loadProfile();
+      await loadProfile(context);
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
       _error = e.toString();
+      showErrorSnackBar(context, _error!);
       _isLoading = false;
       notifyListeners();
       return false;
     }
   }
 
-  Future<bool> loadProfile() async {
+  Future<bool> loadProfile(BuildContext context) async {
     try {
       _user = await _apiService.getProfile();
       notifyListeners();
@@ -86,6 +84,7 @@ class AuthProvider with ChangeNotifier {
         _user = null;
         await _apiService.removeToken();
       }
+      showErrorSnackBar(context, _error!);
       notifyListeners();
       return false;
     }
@@ -97,7 +96,7 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> resendVerificationEmail(String email) async {
+  Future<bool> resendVerificationEmail(BuildContext context, String email) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -109,16 +108,22 @@ class AuthProvider with ChangeNotifier {
       return true;
     } catch (e) {
       _error = e.toString();
+      showErrorSnackBar(context, _error!);
       _isLoading = false;
       notifyListeners();
       return false;
     }
   }
   
-  Future<User> approveTrainer(String userId, bool isApproved, {String? rejectionReason}) async {
-    final user = await _apiService.approveTrainer(userId, isApproved, rejectionReason: rejectionReason);
-    notifyListeners();
-    return user;
+  Future<User> approveTrainer(BuildContext context, String userId, bool isApproved, {String? rejectionReason}) async {
+    try {
+      final user = await _apiService.approveTrainer(userId, isApproved, rejectionReason: rejectionReason);
+      notifyListeners();
+      return user;
+    } catch (e) {
+      showErrorSnackBar(context, e.toString());
+      rethrow;
+    }
   }
 
   void clearError() {

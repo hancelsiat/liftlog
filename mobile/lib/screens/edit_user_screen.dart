@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
 import '../utils/app_theme.dart';
+import '../utils/error_handler.dart';
 
 class EditUserScreen extends StatefulWidget {
   final User user;
@@ -124,9 +125,7 @@ class _EditUserScreenState extends State<EditUserScreen> {
         );
         Navigator.of(context).pop();
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error updating user: $e'), backgroundColor: Colors.red),
-        );
+        showErrorSnackBar(context, e.toString());
       }
     }
   }

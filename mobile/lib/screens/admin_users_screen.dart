@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../providers/auth_provider.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
+import '../utils/error_handler.dart';
 import 'edit_user_screen.dart';
 
 class AdminUsersScreen extends StatefulWidget {
@@ -149,9 +150,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     if (await canLaunchUrl(Uri.parse(url))) {
       await launchUrl(Uri.parse(url));
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not open credential URL: $url')),
-      );
+      showErrorSnackBar(context, 'Could not open credential URL: $url');
     }
   }
 
@@ -166,9 +165,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         SnackBar(content: Text('Trainer ${approve ? 'approved' : 'rejected'} successfully!'), backgroundColor: Colors.green),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating trainer: $e'), backgroundColor: Colors.red),
-      );
+      showErrorSnackBar(context, e.toString());
     }
   }
 
@@ -243,9 +240,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                   );
                 } catch (e) {
                   Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error deleting user: $e'), backgroundColor: Colors.red),
-                  );
+                  showErrorSnackBar(context, e.toString());
                 }
               },
             ),
