@@ -342,7 +342,9 @@ router.post('/select-trainer', verifyToken, checkRole(['member']), async (req, r
     member.trainer = trainerId;
     await member.save();
 
-    trainer.clients.push(member._id);
+    if (!trainer.clients.includes(member._id)) {
+      trainer.clients.push(member._id);
+    }
     await trainer.save();
 
     res.json({ message: 'Trainer selected successfully' });

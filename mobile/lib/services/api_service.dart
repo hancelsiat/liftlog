@@ -461,4 +461,8 @@ class ApiService {
   Future<void> selectTrainer(String trainerId) async {
     await _post('/auth/select-trainer', {'trainerId': trainerId});
   }
+
+  Future<void> assignWorkoutToClient(String memberId, String workoutId) async {
+    await _post('/clients/$memberId/assign-workout', {'workoutId': workoutId});
+  }
 }

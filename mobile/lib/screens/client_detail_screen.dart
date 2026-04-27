@@ -4,6 +4,7 @@ import '../models/user.dart';
 import '../models/workout.dart';
 import '../services/api_service.dart';
 import '../utils/app_theme.dart';
+import 'assign_workout_screen.dart';
 
 class ClientDetailScreen extends StatefulWidget {
   final User client;
@@ -66,6 +67,23 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
             _buildNotesTab(),
           ],
         ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => AssignWorkoutScreen(memberId: widget.client.id),
+              ),
+            ).then((_) {
+              // Refresh progress when coming back
+              setState(() {
+                _progressFuture = _fetchProgress();
+              });
+            });
+          },
+          child: const Icon(Icons.assignment),
+          backgroundColor: AppTheme.primaryColor,
+        ),
       ),
     );
   }
@@ -81,7 +99,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
           return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.white)));
         }
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(child: Text('No workouts assigned yet.', style: TextStyle(color: Colors.white)));
+          return const Center(child: Text('No workouts assigned yet.', style: const TextStyle(color: Colors.white)));
         }
 
         final workouts = snapshot.data!;
