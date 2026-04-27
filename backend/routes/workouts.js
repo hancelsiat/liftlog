@@ -133,6 +133,8 @@ router.get('/trainer/:trainerId', verifyToken, checkRole(['all']), async (req, r
 
 
 
+
+
 // Get a specific workout by ID
 router.get('/:id', verifyToken, async (req, res) => {
   try {
@@ -141,8 +143,6 @@ router.get('/:id', verifyToken, async (req, res) => {
     if (!workout) {
       return res.status(404).json({ error: 'Workout not found' });
     }
-
-
 
     res.json(workout);
   } catch (error) {
