@@ -103,6 +103,16 @@ router.get('/trainers/available', verifyToken, checkRole(['all']), async (req, r
   }
 });
 
+// Member: Get assigned workouts
+router.get('/my-plan', verifyToken, checkRole(['member']), async (req, res) => {
+  try {
+    const workouts = await Workout.find({ assignedTo: req.user._id });
+    res.json(workouts);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get workouts by trainer (Member Route)
 router.get('/trainer/:trainerId', verifyToken, checkRole(['all']), async (req, res) => {
   try {
@@ -130,12 +140,6 @@ router.get('/trainer/:trainerId', verifyToken, checkRole(['all']), async (req, r
     res.status(500).json({ error: error.message });
   }
 });
-
-
-
-
-
-
 
 // Get a specific workout by ID
 router.get('/:id', verifyToken, async (req, res) => {
@@ -240,7 +244,7 @@ router.delete('/', verifyToken, checkRole(['trainer']), async (req, res) => {
 // Trainer: Get workouts for a specific user
 router.get('/user/:userId', 
   verifyToken, 
-  checkRole(['trainer', 'admin']), 
+  checkRole(['trainer', 'admin']),
   async (req, res) => {
     try {
       const { 
@@ -274,16 +278,6 @@ router.get('/user/:userId',
       });
     } catch (error) {
       res.status(500).json({ error: error.message });
-  }
-});
-
-// Member: Get assigned workouts
-router.get('/my-plan', verifyToken, checkRole(['member']), async (req, res) => {
-  try {
-    const workouts = await Workout.find({ assignedTo: req.user._id });
-    res.json(workouts);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
   }
 });
 
