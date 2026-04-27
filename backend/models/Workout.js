@@ -1,3 +1,4 @@
+
 const mongoose = require('mongoose');
 
 const ExerciseSchema = new mongoose.Schema({
@@ -72,6 +73,17 @@ const WorkoutSchema = new mongoose.Schema({
   isPublic: {
     type: Boolean,
     default: false
+  },
+  isTemplate: {
+    type: Boolean,
+    default: false
+  },
+  assignedTo: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  completedAt: {
+    type: Date
   },
   notes: {
     type: String,

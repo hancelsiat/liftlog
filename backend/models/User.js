@@ -1,3 +1,4 @@
+
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
@@ -26,6 +27,19 @@ const UserSchema = new mongoose.Schema({
     type: String,
     enum: ['member', 'trainer', 'admin'],
     default: 'member'
+  },
+  clients: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
+  trainer: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  privateNotes: {
+    type: String,
+    default: ''
   },
   isEmailVerified: {
     type: Boolean,

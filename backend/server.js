@@ -1,3 +1,4 @@
+
 require('dotenv').config(); // LOAD ENV VARS FIRST
 
 const express = require('express');
@@ -107,6 +108,8 @@ const workoutRoutes = require('./routes/workouts');
 const videoRoutes = require('./routes/videos');
 const progressRoutes = require('./routes/progress');
 const presignRoutes = require('./routes/presign');
+const planRoutes = require('./routes/plans');
+const clientRoutes = require('./routes/clients');
 // const videosCompleteRoutes = require('./routes/videos_complete');
 
 // Use Routes
@@ -115,6 +118,8 @@ app.use('/api/workouts', workoutRoutes);
 app.use('/api/videos', videoRoutes);
 app.use('/api/progress', progressRoutes);
 app.use('/api', presignRoutes);
+app.use('/api/plans', planRoutes);
+app.use('/api/clients', clientRoutes);
 // app.use('/api', videosCompleteRoutes);
 
 // Serve static files for uploaded videos

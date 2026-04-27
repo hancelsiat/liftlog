@@ -1,3 +1,4 @@
+
 const express = require('express');
 const router = express.Router();
 const Workout = require('../models/Workout');
@@ -270,6 +271,27 @@ router.get('/user/:userId',
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
+});
+
+// Mark a workout as complete
+router.post('/:workoutId/complete', verifyToken, checkRole(['member']), async (req, res) => {
+  try {
+    const workout = await Workout.findById(req.params.workoutId);
+    if (!workout) {
+      return res.status(404).json({ error: 'Workout not found' });
+    }
+
+    if (workout.assignedTo.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: 'You are not authorized to complete this workout' });
+    }
+
+    workout.completedAt = new Date();
+    await workout.save();
+
+    res.json({ message: 'Workout marked as complete', workout });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 module.exports = router;
