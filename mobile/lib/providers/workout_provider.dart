@@ -18,7 +18,7 @@ class WorkoutProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      _workouts = await _apiService.getWorkouts();
+      _workouts = await _apiService.getTrainerWorkouts();
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -28,9 +28,16 @@ class WorkoutProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> createWorkout(String name, String description, List<String> exercises) async {
+  Future<bool> createWorkout(String name, String description, List<Map<String, dynamic>> exercises, String category, String intensity, String trainerId) async {
     try {
-      final newWorkout = await _apiService.createWorkout(name, description, exercises);
+      final newWorkout = await _apiService.createWorkoutTemplate(
+        title: name,
+        description: description,
+        exercises: exercises,
+        category: category,
+        intensity: intensity,
+        trainerId: trainerId,
+      );
       _workouts.add(newWorkout);
       notifyListeners();
       return true;
@@ -57,10 +64,10 @@ class WorkoutProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> deleteWorkout(String id) async {
+  Future<bool> deleteWorkouts(List<String> ids) async {
     try {
-      await _apiService.deleteWorkout(id);
-      _workouts.removeWhere((w) => w.id == id);
+      await _apiService.deleteWorkouts(ids);
+      _workouts.removeWhere((w) => ids.contains(w.id));
       notifyListeners();
       return true;
     } catch (e) {

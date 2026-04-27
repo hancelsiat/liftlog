@@ -141,7 +141,7 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: ListTile(
             title: Text(workout.title, style: const TextStyle(color: Colors.white)),
-            subtitle: Text('Assigned on: ${workout.date.toLocal()}`.split(' ')[0]}', style: const TextStyle(color: Colors.white70)),
+            subtitle: Text('Assigned on: ${workout.date.toLocal().toString().split(' ')[0]}', style: const TextStyle(color: Colors.white70)),
             trailing: workout.completedAt != null
                 ? const Icon(Icons.check_circle, color: Colors.green)
                 : const Icon(Icons.play_circle_outline, color: AppTheme.primaryColor),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/workout_provider.dart';
 import '../services/api_service.dart';
 import '../models/workout.dart';
 import '../models/user.dart';
@@ -163,7 +164,7 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
                             trailing: const Icon(Icons.add_circle_outline),
                             onTap: () {
                               _addPredefinedExercise(exercise);
-                              Navigator.pop(context);
+                              Navigator.pop(context, true);
                             },
                           ),
                         )),
@@ -263,22 +264,23 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
     });
 
     try {
-      final apiService = ApiService();
+      final workoutProvider = Provider.of<WorkoutProvider>(context, listen: false);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
       if (widget.workout == null) {
-        final authProvider = Provider.of<AuthProvider>(context, listen: false);
-        await apiService.createWorkoutTemplate(
-          title: _titleController.text.trim(),
-          description: _descriptionController.text.trim(),
-          exercises: _exercises,
-          category: _category,
-          intensity: _intensity,
-          trainerId: authProvider.user!.id,
+        await workoutProvider.createWorkout(
+          _titleController.text.trim(),
+          _descriptionController.text.trim(),
+          _exercises,
+          _category,
+          _intensity,
+          authProvider.user!.id,
         );
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Workout template created successfully!')),
         );
       } else {
-        await apiService.updateWorkout(
+        await workoutProvider.updateWorkout(
           widget.workout!.id,
           _titleController.text.trim(),
           _descriptionController.text.trim(),
