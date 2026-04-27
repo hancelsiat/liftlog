@@ -1,6 +1,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../models/user.dart';
@@ -69,12 +70,66 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
     }
   }
 
+  void _showLeaveTrainerDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Choose Another Trainer'),
+          content: const Text('Are you sure you want to leave your current trainer?'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('Leave'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _leaveTrainer();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _leaveTrainer() async {
+    try {
+      await _apiService.leaveTrainer();
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      await authProvider.loadProfile(context);
+      if (mounted) {
+        setState(() {
+          _user = authProvider.user;
+          _assignedWorkouts.clear(); // Clear old workouts
+          _loadFuture = _loadTrainers();
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error leaving trainer: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(_user?.trainer != null ? 'My Plan' : 'Choose a Trainer'),
         backgroundColor: AppTheme.darkBackground,
+        actions: [
+          if (_user?.trainer != null)
+            IconButton(
+              icon: const Icon(Icons.exit_to_app),
+              onPressed: _showLeaveTrainerDialog,
+              tooltip: 'Choose Another Trainer',
+            ),
+        ],
       ),
       backgroundColor: AppTheme.darkBackground,
       body: FutureBuilder<void>(
@@ -128,7 +183,7 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
   Widget _buildWorkoutsList() {
     if (_assignedWorkouts.isEmpty) {
       return const Center(
-        child: Text('Your trainer has not assigned you a plan yet.', style: const TextStyle(color: Colors.white)),
+        child: Text('Your trainer has not assigned you a plan yet.', style: TextStyle(color: Colors.white)),
       );
     }
 
@@ -136,12 +191,13 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
       itemCount: _assignedWorkouts.length,
       itemBuilder: (context, index) {
         final workout = _assignedWorkouts[index];
+        final formattedDate = DateFormat.yMMMd().format(workout.date.toLocal());
         return Card(
           color: AppTheme.cardBackground,
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: ListTile(
             title: Text(workout.title, style: const TextStyle(color: Colors.white)),
-            subtitle: Text('Assigned on: ${workout.date.toLocal().toString().split(' ')[0]}', style: const TextStyle(color: Colors.white70)),
+            subtitle: Text('Assigned on: $formattedDate', style: const TextStyle(color: Colors.white70)),
             trailing: workout.completedAt != null
                 ? const Icon(Icons.check_circle, color: Colors.green)
                 : const Icon(Icons.play_circle_outline, color: AppTheme.primaryColor),
