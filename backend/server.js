@@ -110,6 +110,7 @@ const progressRoutes = require('./routes/progress');
 const presignRoutes = require('./routes/presign');
 const planRoutes = require('./routes/plans');
 const clientRoutes = require('./routes/clients');
+const memberRoutes = require('./routes/member');
 // const videosCompleteRoutes = require('./routes/videos_complete');
 
 // Use Routes
@@ -120,6 +121,7 @@ app.use('/api/progress', progressRoutes);
 app.use('/api', presignRoutes);
 app.use('/api/plans', planRoutes);
 app.use('/api/clients', clientRoutes);
+app.use('/api/member', memberRoutes);
 // app.use('/api', videosCompleteRoutes);
 
 // Serve static files for uploaded videos
