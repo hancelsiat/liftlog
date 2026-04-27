@@ -31,7 +31,7 @@ router.post('/template', verifyToken, checkRole(['trainer']), async (req, res) =
       description: req.body.description,
       exercises: req.body.exercises,
       trainer: req.user._id,
-      isPublic: true
+      isTemplate: true
     });
     await workout.save();
 
