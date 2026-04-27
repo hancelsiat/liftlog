@@ -445,9 +445,7 @@ class ApiService {
     return response as List<dynamic>;
   }
 
-  Future<void> saveClientNotes(String clientId, String notes) async {
-    await _post('/clients/$clientId/notes', {'notes': notes});
-  }
+
 
   Future<void> markWorkoutAsComplete(String workoutId) async {
     await _post('/workouts/$workoutId/complete', {});
@@ -468,5 +466,9 @@ class ApiService {
 
   Future<void> removeClient(String memberId) async {
     await _delete('/clients/$memberId/remove');
+  }
+
+  Future<void> leaveTrainer() async {
+    await _post('/member/leave-trainer', {});
   }
 }
