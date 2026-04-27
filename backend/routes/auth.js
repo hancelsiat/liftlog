@@ -304,7 +304,7 @@ router.patch('/users/:id/approve', verifyToken, checkRole(['admin']), async (req
 });
 
 // Resend Verification Email
-router.post('/resend-verification', async (req, res) => {
+router.post('/resend-verification', verifyToken, async (req, res) => {
   try {
     const { email } = req.body;
     const user = await User.findOne({ email });
