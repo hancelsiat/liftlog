@@ -12,11 +12,11 @@ router.post('/leave-trainer', verifyToken, checkRole(['member']), async (req, re
       return res.status(400).json({ error: 'You do not have a trainer.' });
     }
 
-    const trainer = await User.findById(member.trainer);
-    if (trainer) {
-      trainer.clients.pull(member._id);
-      await trainer.save();
-    }
+    // const trainer = await User.findById(member.trainer);
+    // if (trainer) {
+    //   trainer.clients.pull(member._id);
+    //   await trainer.save();
+    // }
 
     member.trainer = null;
     await member.save();

@@ -29,12 +29,26 @@ class _TrainerClientsScreenState extends State<TrainerClientsScreen> {
     return (response as List).map((data) => User.fromJson(data)).toList();
   }
 
+  void _refreshClients() {
+    setState(() {
+      _clientsFuture = _fetchClients();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final currentTrainerId = Provider.of<AuthProvider>(context, listen: false).user?.id;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Clients'),
         backgroundColor: AppTheme.darkBackground,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _refreshClients,
+          ),
+        ],
       ),
       backgroundColor: AppTheme.darkBackground,
       body: FutureBuilder<List<User>>(
@@ -55,6 +69,8 @@ class _TrainerClientsScreenState extends State<TrainerClientsScreen> {
             itemCount: clients.length,
             itemBuilder: (context, index) {
               final client = clients[index];
+              final bool hasLeft = client.trainer != currentTrainerId;
+
               return Card(
                 color: AppTheme.cardBackground,
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -64,14 +80,16 @@ class _TrainerClientsScreenState extends State<TrainerClientsScreen> {
                     child: Text(client.username[0].toUpperCase(), style: const TextStyle(color: Colors.white)),
                   ),
                   title: Text(client.username, style: const TextStyle(color: Colors.white)),
-                  subtitle: Text(client.email, style: const TextStyle(color: Colors.white70)),
+                  subtitle: hasLeft
+                      ? const Text('This client has left', style: TextStyle(color: Colors.red, fontStyle: FontStyle.italic))
+                      : Text(client.email, style: const TextStyle(color: Colors.white70)),
                   onTap: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => ClientDetailScreen(client: client),
                       ),
-                    );
+                    ).then((_) => _refreshClients());
                   },
                 ),
               );

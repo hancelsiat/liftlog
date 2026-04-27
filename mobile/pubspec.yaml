@@ -24,6 +24,7 @@ dependencies:
   dio: ^5.9.0
   mime: ^2.0.0
   dart_jsonwebtoken: ^3.3.1
+  intl: ^0.20.2
 
 dev_dependencies:
   flutter_test:
