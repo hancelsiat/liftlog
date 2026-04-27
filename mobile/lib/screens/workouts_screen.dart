@@ -192,12 +192,23 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
       itemBuilder: (context, index) {
         final workout = _assignedWorkouts[index];
         final formattedDate = DateFormat.yMMMd().format(workout.date.toLocal());
+
+        List<String> subtitleParts = ['Assigned on: $formattedDate'];
+        if (workout.trainerName != null) {
+          subtitleParts.add('by ${workout.trainerName}');
+        }
+        if (workout.completedAt != null) {
+          subtitleParts.add('Completed');
+        }
+
+        String subtitleText = subtitleParts.join(' | ');
+
         return Card(
           color: AppTheme.cardBackground,
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: ListTile(
             title: Text(workout.title, style: const TextStyle(color: Colors.white)),
-            subtitle: Text('Assigned on: $formattedDate', style: const TextStyle(color: Colors.white70)),
+            subtitle: Text(subtitleText, style: const TextStyle(color: Colors.white70)),
             trailing: workout.completedAt != null
                 ? const Icon(Icons.check_circle, color: Colors.green)
                 : const Icon(Icons.play_circle_outline, color: AppTheme.primaryColor),

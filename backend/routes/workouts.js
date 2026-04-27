@@ -106,7 +106,9 @@ router.get('/trainers/available', verifyToken, checkRole(['all']), async (req, r
 // Member: Get assigned workouts
 router.get('/my-plan', verifyToken, checkRole(['member']), async (req, res) => {
   try {
-    const workouts = await Workout.find({ assignedTo: req.user._id, isTemplate: false });
+    const workouts = await Workout.find({ assignedTo: req.user._id, isTemplate: false })
+      .populate('trainer', 'username')
+      .sort({ date: -1 });
     res.json(workouts);
   } catch (error) {
     res.status(500).json({ error: error.message });
