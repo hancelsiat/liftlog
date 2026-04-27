@@ -52,7 +52,7 @@ router.get('/', verifyToken, async (req, res) => {
       endDate
     } = req.query;
 
-    const query = { user: req.user._id };
+    const query = { user: req.user._id, isTemplate: { $ne: true } };
 
     if (startDate && endDate) {
       query.date = {
@@ -80,7 +80,7 @@ router.get('/', verifyToken, async (req, res) => {
 
 router.get('/trainer', verifyToken, checkRole(['trainer']), async (req, res) => {
   try {
-    const workouts = await Workout.find({ user: req.user._id, isTemplate: false });
+    const workouts = await Workout.find({ trainer: req.user._id, isTemplate: true });
     res.json({ workouts });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -106,7 +106,7 @@ router.get('/trainers/available', verifyToken, checkRole(['all']), async (req, r
 // Member: Get assigned workouts
 router.get('/my-plan', verifyToken, checkRole(['member']), async (req, res) => {
   try {
-    const workouts = await Workout.find({ trainer: req.user._id, isTemplate: true });
+    const workouts = await Workout.find({ assignedTo: req.user._id, isTemplate: false });
     res.json(workouts);
   } catch (error) {
     res.status(500).json({ error: error.message });

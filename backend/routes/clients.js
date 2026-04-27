@@ -56,7 +56,7 @@ router.post('/:memberId/assign-workout', verifyToken, checkRole(['trainer']), as
       ...workoutTemplate.toObject(),
       _id: undefined,
       isTemplate: false,
-      user: member._id,
+      assignedTo: member._id,
       date: new Date(),
     });
 
