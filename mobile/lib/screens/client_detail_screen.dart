@@ -45,6 +45,20 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
     }
   }
 
+  void _removeClient() async {
+    try {
+      await _apiService.removeClient(widget.client.id);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Client removed successfully!'), backgroundColor: Colors.green),
+      );
+      Navigator.of(context).pop();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error removing client: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
@@ -53,6 +67,37 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
         appBar: AppBar(
           title: Text(widget.client.username),
           backgroundColor: AppTheme.darkBackground,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red),
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (BuildContext context) {
+                    return AlertDialog(
+                      title: const Text('Remove Client'),
+                      content: const Text('Are you sure you want to remove this client?'),
+                      actions: <Widget>[
+                        TextButton(
+                          child: const Text('Cancel'),
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                          },
+                        ),
+                        TextButton(
+                          child: const Text('Remove', style: TextStyle(color: Colors.red)),
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            _removeClient();
+                          },
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
+            ),
+          ],
           bottom: const TabBar(
             tabs: [
               Tab(text: 'Progress'),

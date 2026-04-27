@@ -68,4 +68,28 @@ router.post('/:memberId/assign-workout', verifyToken, checkRole(['trainer']), as
   }
 });
 
+// Remove a client from a trainer
+router.delete('/:memberId/remove', verifyToken, checkRole(['trainer']), async (req, res) => {
+  try {
+    const trainer = await User.findById(req.user._id);
+    const member = await User.findById(req.params.memberId);
+
+    if (!member) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+
+    // Remove client from trainer's list
+    trainer.clients.pull(req.params.memberId);
+    await trainer.save();
+
+    // Clear trainer from member's profile
+    member.trainer = null;
+    await member.save();
+
+    res.json({ message: 'Client removed successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;

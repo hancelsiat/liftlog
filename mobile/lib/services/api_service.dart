@@ -465,4 +465,8 @@ class ApiService {
   Future<void> assignWorkoutToClient(String memberId, String workoutId) async {
     await _post('/clients/$memberId/assign-workout', {'workoutId': workoutId});
   }
+
+  Future<void> removeClient(String memberId) async {
+    await _delete('/clients/$memberId/remove');
+  }
 }
