@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -35,6 +34,20 @@ class _TrainerClientsScreenState extends State<TrainerClientsScreen> {
     });
   }
 
+  void _removeClient(String clientId) async {
+    try {
+      await _apiService.removeClient(clientId);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Client removed successfully!'), backgroundColor: Colors.green),
+      );
+      _refreshClients();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error removing client: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentTrainerId = Provider.of<AuthProvider>(context, listen: false).user?.id;
@@ -61,7 +74,7 @@ class _TrainerClientsScreenState extends State<TrainerClientsScreen> {
             return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.white)));
           }
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('You have no clients yet.', style: TextStyle(color: Colors.white)));
+            return const Center(child: Text('You have no clients yet.', style: const TextStyle(color: Colors.white)));
           }
 
           final clients = snapshot.data!;
@@ -83,6 +96,12 @@ class _TrainerClientsScreenState extends State<TrainerClientsScreen> {
                   subtitle: hasLeft
                       ? const Text('This client has left', style: TextStyle(color: Colors.red, fontStyle: FontStyle.italic))
                       : Text(client.email, style: const TextStyle(color: Colors.white70)),
+                  trailing: hasLeft
+                      ? IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () => _removeClient(client.id),
+                        )
+                      : null,
                   onTap: () {
                     Navigator.push(
                       context,

@@ -76,6 +76,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with SingleTick
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final currentTrainerId = authProvider.user?.id;
+    final bool hasLeft = widget.client.trainer != currentTrainerId;
 
     return Scaffold(
       appBar: AppBar(
@@ -146,20 +147,22 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with SingleTick
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => AssignWorkoutScreen(memberId: widget.client.id),
-            ),
-          ).then((_) {
-            // Refresh progress when coming back
-            setState(() {
-              _progressFuture = _fetchProgress();
-            });
-          });
-        },
+      floatingActionButton: hasLeft
+          ? null
+          : FloatingActionButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => AssignWorkoutScreen(memberId: widget.client.id),
+                  ),
+                ).then((_) {
+                  // Refresh progress when coming back
+                  setState(() {
+                    _progressFuture = _fetchProgress();
+                  });
+                });
+              },
         child: const Icon(Icons.assignment),
         backgroundColor: AppTheme.primaryColor,
       ),
@@ -195,7 +198,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with SingleTick
             ),
             trailing: workout.completedAt != null
                 ? const Icon(Icons.check_circle, color: Colors.green)
-                : isOwner
+                : isOwner && !hasLeft
                     ? Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
