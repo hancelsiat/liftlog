@@ -8,6 +8,7 @@ import '../models/workout.dart';
 import '../utils/app_theme.dart';
 import 'workout_session_screen.dart';
 import 'workout_detail_screen.dart';
+import 'rate_trainer_screen.dart';
 
 class WorkoutsScreen extends StatefulWidget {
   const WorkoutsScreen({super.key});
@@ -112,10 +113,20 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> with SingleTickerProvid
 
   Future<void> _leaveTrainer() async {
     try {
+      final String? formerTrainerId = _user?.trainer;
+      if (formerTrainerId == null) return;
+
       await _apiService.leaveTrainer();
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       await authProvider.loadProfile(context);
+
       if (mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => RateTrainerScreen(trainerId: formerTrainerId),
+          ),
+        );
+
         setState(() {
           _user = authProvider.user;
           _assignedWorkouts.clear(); // Clear old workouts

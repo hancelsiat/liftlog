@@ -16,6 +16,7 @@ import 'create_workout_template_screen.dart';
 import 'manage_workouts_screen.dart';
 import 'admin_users_screen.dart';
 import 'trainer_clients_screen.dart';
+import 'trainer_ratings_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -468,6 +469,17 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const ManageWorkoutsScreen()),
+          ),
+        ),
+        const SizedBox(height: 16),
+        _buildPremiumCard(
+          title: 'My Ratings',
+          subtitle: 'View feedback from clients',
+          icon: Icons.star,
+          gradient: AppTheme.primaryGradient,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const TrainerRatingsScreen()),
           ),
         ),
       ],

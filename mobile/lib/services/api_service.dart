@@ -11,6 +11,7 @@ import '../models/user.dart';
 import '../models/workout.dart';
 import '../models/progress.dart';
 import '../models/exercise_video.dart';
+import '../models/rating_stats.dart';
 
 class ApiService {
   static String _baseUrl = '';
@@ -470,5 +471,18 @@ class ApiService {
 
   Future<void> leaveTrainer() async {
     await _post('/member/leave-trainer', {});
+  }
+
+  Future<void> submitRating(String trainerId, int rating, String feedback) async {
+    await _post('/ratings', {
+      'trainerId': trainerId,
+      'rating': rating,
+      'feedback': feedback,
+    });
+  }
+
+  Future<RatingStats> getRatings() async {
+    final response = await _get('/ratings');
+    return RatingStats.fromJson(response);
   }
 }
