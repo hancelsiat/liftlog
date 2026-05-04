@@ -18,7 +18,7 @@ router.get('/', verifyToken, checkRole(['trainer']), async (req, res) => {
 // Get a client's progress
 router.get('/:memberId/progress', verifyToken, checkRole(['trainer']), async (req, res) => {
   try {
-    const progress = await Workout.find({ assignedTo: req.params.memberId });
+    const progress = await Workout.find({ assignedTo: req.params.memberId }).populate('trainer', 'username');
     res.json(progress);
   } catch (error) {
     res.status(500).json({ error: error.message });
