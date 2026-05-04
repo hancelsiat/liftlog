@@ -59,6 +59,14 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> with SingleTickerProvid
 
   Future<void> _loadTrainers() async {
     final trainers = await _apiService.getAvailableTrainers();
+    for (var trainer in trainers) {
+      try {
+        final ratingStats = await _apiService.getTrainerRating(trainer['_id']);
+        trainer['averageRating'] = ratingStats.averageRating;
+      } catch (e) {
+        trainer['averageRating'] = 0.0;
+      }
+    }
     if (mounted) {
       setState(() {
         _trainers = trainers;

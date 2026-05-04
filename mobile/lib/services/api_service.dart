@@ -253,7 +253,7 @@ class ApiService {
   }
 
   Future<List<Map<String, dynamic>>> getAvailableTrainers() async {
-    final response = await _get('/ratings/trainers/available');
+    final response = await _get('/workouts/trainers/available');
     final List<dynamic> trainersJson = response['trainers'];
     return trainersJson.map((json) => json as Map<String, dynamic>).toList();
   }
@@ -483,6 +483,11 @@ class ApiService {
 
   Future<RatingStats> getRatings() async {
     final response = await _get('/ratings');
+    return RatingStats.fromJson(response);
+  }
+
+  Future<RatingStats> getTrainerRating(String trainerId) async {
+    final response = await _get('/ratings/trainer/$trainerId');
     return RatingStats.fromJson(response);
   }
 }
