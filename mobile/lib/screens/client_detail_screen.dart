@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../models/user.dart';
 import '../models/workout.dart';
+import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../utils/app_theme.dart';
 import 'assign_workout_screen.dart';
@@ -72,6 +74,9 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with SingleTick
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final currentTrainerId = authProvider.user?.id;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.client.username),
@@ -135,8 +140,8 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with SingleTick
           return TabBarView(
             controller: _tabController,
             children: [
-              _buildWorkoutsList(assigned, 'No workouts assigned yet.'),
-              _buildWorkoutsList(completed, 'No completed workouts yet.'),
+              _buildWorkoutsList(assigned, 'No workouts assigned yet.', currentTrainerId),
+              _buildWorkoutsList(completed, 'No completed workouts yet.', currentTrainerId),
             ],
           );
         },
@@ -161,7 +166,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with SingleTick
     );
   }
 
-  Widget _buildWorkoutsList(List<Workout> workouts, String emptyMessage) {
+  Widget _buildWorkoutsList(List<Workout> workouts, String emptyMessage, String? currentTrainerId) {
     if (workouts.isEmpty) {
       return Center(
         child: Text(emptyMessage, style: const TextStyle(color: Colors.white)),
@@ -173,38 +178,49 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with SingleTick
       itemBuilder: (context, index) {
         final workout = workouts[index];
         final formattedDate = DateFormat.yMMMd().format(workout.date.toLocal());
+        final bool isOwner = workout.trainerId == currentTrainerId;
+
         return Card(
           color: AppTheme.cardBackground,
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: ListTile(
             title: Text(workout.title, style: const TextStyle(color: Colors.white)),
-            subtitle: Text('Assigned on: $formattedDate', style: const TextStyle(color: Colors.white70)),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Assigned on: $formattedDate', style: const TextStyle(color: Colors.white70)),
+                if (workout.trainerName != null)
+                  Text('by ${workout.trainerName}', style: const TextStyle(color: Colors.white70, fontStyle: FontStyle.italic)),
+              ],
+            ),
             trailing: workout.completedAt != null
                 ? const Icon(Icons.check_circle, color: Colors.green)
-                : Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.edit, color: Colors.blue),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => CreateWorkoutTemplateScreen(workout: workout),
-                            ),
-                          ).then((_) {
-                            setState(() {
-                              _progressFuture = _fetchProgress();
-                            });
-                          });
-                        },
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () => _deleteWorkout(workout.id),
-                      ),
-                    ],
-                  ),
+                : isOwner
+                    ? Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit, color: Colors.blue),
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => CreateWorkoutTemplateScreen(workout: workout),
+                                ),
+                              ).then((_) {
+                                setState(() {
+                                  _progressFuture = _fetchProgress();
+                                });
+                              });
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () => _deleteWorkout(workout.id),
+                          ),
+                        ],
+                      )
+                    : null,
             onTap: () {
               if (workout.completedAt != null) {
                 Navigator.push(
