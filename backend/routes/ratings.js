@@ -42,6 +42,39 @@ router.get('/', verifyToken, async (req, res) => {
     const sumOfRatings = ratings.reduce((acc, curr) => acc + curr.rating, 0);
     const averageRating = sumOfRatings / totalRatings;
     const ratingPercentage = (averageRating / 5) * 100;
+    console.log(`[ratings.js] trainerId: ${trainerId}, ratingPercentage: ${ratingPercentage}`);
+
+    res.json({
+      ratings,
+      averageRating: parseFloat(averageRating.toFixed(2)),
+      totalRatings,
+      ratingPercentage: parseFloat(ratingPercentage.toFixed(2)),
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get all ratings for a specific trainer
+router.get('/trainer/:trainerId', async (req, res) => {
+  try {
+    const { trainerId } = req.params;
+    const ratings = await Rating.find({ trainer: trainerId }).populate('member', 'username');
+
+    if (ratings.length === 0) {
+      return res.json({
+        ratings: [],
+        averageRating: 0,
+        totalRatings: 0,
+        ratingPercentage: 0,
+      });
+    }
+
+    const totalRatings = ratings.length;
+    const sumOfRatings = ratings.reduce((acc, curr) => acc + curr.rating, 0);
+    const averageRating = sumOfRatings / totalRatings;
+    const ratingPercentage = (averageRating / 5) * 100;
+    console.log(`[ratings.js] trainerId: ${trainerId}, ratingPercentage: ${ratingPercentage}`);
 
     res.json({
       ratings,

@@ -60,11 +60,12 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> with SingleTickerProvid
   Future<void> _loadTrainers() async {
     final trainers = await _apiService.getAvailableTrainers();
     for (var trainer in trainers) {
-      try {
+"""      try {
         final ratingStats = await _apiService.getTrainerRating(trainer['_id']);
-        trainer['averageRating'] = ratingStats.averageRating;
+        print('[workouts_screen.dart] ratingStats: ${ratingStats.ratingPercentage}');
+        trainer['ratingPercentage'] = ratingStats.ratingPercentage;"""
       } catch (e) {
-        trainer['averageRating'] = 0.0;
+        trainer['ratingPercentage'] = 0.0;
       }
     }
     if (mounted) {
@@ -226,7 +227,7 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> with SingleTickerProvid
               children: [
                 Text(trainer['username'], style: const TextStyle(color: Colors.white)),
                 Text(
-                  '${(trainer['averageRating'] ?? 0).toStringAsFixed(2)}%',
+                  '${(trainer['ratingPercentage'] ?? 0).toStringAsFixed(2)}%',
                   style: const TextStyle(color: Colors.white70),
                 ),
               ],
