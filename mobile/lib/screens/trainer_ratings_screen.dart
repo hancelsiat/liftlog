@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/rating_stats.dart';
 import '../services/api_service.dart';
+import 'package:liftlog/widgets/expandable_text.dart';
 import '../utils/app_theme.dart';
 
 class TrainerRatingsScreen extends StatefulWidget {
@@ -81,7 +82,7 @@ class _TrainerRatingsScreenState extends State<TrainerRatingsScreen> {
                           backgroundColor: AppTheme.primaryColor,
                           child: Text(rating.rating.toString(), style: const TextStyle(color: Colors.white)),
                         ),
-                        title: Text(rating.feedback ?? 'No feedback provided', style: const TextStyle(color: Colors.white)),
+                        title: ExpandableText(text: rating.feedback ?? 'No feedback provided'),
                         subtitle: Text(DateFormat.yMMMd().format(rating.createdAt), style: const TextStyle(color: Colors.white70)),
                       ),
                     );
