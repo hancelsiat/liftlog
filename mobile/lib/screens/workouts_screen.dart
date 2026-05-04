@@ -213,7 +213,16 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> with SingleTickerProvid
               backgroundColor: AppTheme.primaryColor,
               child: Text(trainer['username'][0].toUpperCase(), style: const TextStyle(color: Colors.white)),
             ),
-            title: Text(trainer['username'], style: const TextStyle(color: Colors.white)),
+            title: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(trainer['username'], style: const TextStyle(color: Colors.white)),
+                Text(
+                  '${(trainer['averageRating'] ?? 0).toStringAsFixed(2)}%',
+                  style: const TextStyle(color: Colors.white70),
+                ),
+              ],
+            ),
             subtitle: Text(trainer['email'], style: const TextStyle(color: Colors.white70)),
             onTap: () => _selectTrainer(trainer['_id']),
           ),

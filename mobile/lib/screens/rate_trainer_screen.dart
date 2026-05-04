@@ -91,6 +91,7 @@ class _RateTrainerScreenState extends State<RateTrainerScreen> {
                 ),
               ),
               style: const TextStyle(color: Colors.white),
+              maxLength: 500,
             ),
             const SizedBox(height: 40),
             ElevatedButton(
