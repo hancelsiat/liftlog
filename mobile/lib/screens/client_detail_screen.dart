@@ -141,8 +141,8 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with SingleTick
           return TabBarView(
             controller: _tabController,
             children: [
-              _buildWorkoutsList(assigned, 'No workouts assigned yet.', currentTrainerId),
-              _buildWorkoutsList(completed, 'No completed workouts yet.', currentTrainerId),
+              _buildWorkoutsList(assigned, 'No workouts assigned yet.', currentTrainerId, hasLeft),
+              _buildWorkoutsList(completed, 'No completed workouts yet.', currentTrainerId, hasLeft),
             ],
           );
         },
@@ -169,7 +169,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with SingleTick
     );
   }
 
-  Widget _buildWorkoutsList(List<Workout> workouts, String emptyMessage, String? currentTrainerId) {
+  Widget _buildWorkoutsList(List<Workout> workouts, String emptyMessage, String? currentTrainerId, bool hasLeft) {
     if (workouts.isEmpty) {
       return Center(
         child: Text(emptyMessage, style: const TextStyle(color: Colors.white)),
