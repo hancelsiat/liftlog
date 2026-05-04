@@ -59,11 +59,9 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> with SingleTickerProvid
 
   Future<void> _loadTrainers() async {
     final trainers = await _apiService.getAvailableTrainers();
-    for (var trainer in trainers) {
-"""      try {
+      try {
         final ratingStats = await _apiService.getTrainerRating(trainer['_id']);
-        print('[workouts_screen.dart] ratingStats: ${ratingStats.ratingPercentage}');
-        trainer['ratingPercentage'] = ratingStats.ratingPercentage;"""
+        trainer['ratingPercentage'] = ratingStats.ratingPercentage;
       } catch (e) {
         trainer['ratingPercentage'] = 0.0;
       }

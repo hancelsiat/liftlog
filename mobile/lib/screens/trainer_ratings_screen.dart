@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/rating_stats.dart';
 import '../services/api_service.dart';
-import 'package:liftlog/widgets/expandable_text.dart';
+import 'package:liftlog_mobile/widgets/expandable_text.dart';
 import '../utils/app_theme.dart';
 
 class TrainerRatingsScreen extends StatefulWidget {
