@@ -78,13 +78,16 @@ class _CheckEmailScreenState extends State<CheckEmailScreen> {
                 onPressed: _isButtonDisabled ? null : () async {
                   try {
                     await Provider.of<AuthProvider>(context, listen: false).resendVerificationEmail(context, widget.email);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Verification email resent successfully!'), backgroundColor: Colors.green),
+                    );
                     setState(() {
                       _countdown = 60;
                       _isButtonDisabled = true;
                     });
                     startTimer();
                   } catch (e) {
-                    // The error is already handled by the provider, but you could add more specific UI changes here if needed
+                    showErrorSnackBar(context, e.toString());
                   }
                 },
                 style: ElevatedButton.styleFrom(

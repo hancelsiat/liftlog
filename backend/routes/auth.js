@@ -79,9 +79,13 @@ router.post('/register', upload.single('credential'), async (req, res) => {
       credentialImageUrl: credentialImageUrl,
     });
 
-    const verificationToken = user.generateEmailVerificationToken();
-    await user.save();
-    sendVerificationEmail(user.email, verificationToken);
+    try {
+      const verificationToken = user.generateEmailVerificationToken();
+      await user.save();
+      await sendVerificationEmail(user.email, verificationToken);
+    } catch (emailError) {
+      console.error('Failed to send verification email:', emailError);
+    }
 
     let responseMessage = 'User registered successfully. Please check your email to verify your account.';
     if (role === 'trainer') {
