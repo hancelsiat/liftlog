@@ -11,6 +11,9 @@ const transporter = nodemailer.createTransport({
     user: 'lftlogapp@gmail.com',
     pass: process.env.GMAIL_APP_PASSWORD,
   },
+  dns: {
+    family: 4, // Force IPv4
+  },
   connectionTimeout: 10000, // 10 seconds
   greetingTimeout: 10000,   // 10 seconds
   socketTimeout: 10000,       // 10 seconds
