@@ -101,6 +101,8 @@ class ApiService {
 
   Future<dynamic> _get(String endpoint) async {
     final token = await getToken();
+    print('GET request to: $baseUrl$endpoint');
+    print('Token: $token');
     final response = await http.get(
       Uri.parse('$baseUrl$endpoint'),
       headers: {
@@ -163,6 +165,8 @@ class ApiService {
   }
 
   dynamic _handleResponse(http.Response response) {
+    print('Response status: ${response.statusCode}');
+    print('Response body: ${response.body}');
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return jsonDecode(response.body);
     } else {

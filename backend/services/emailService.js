@@ -4,26 +4,25 @@ const fs = require('fs');
 const path = require('path');
 
 const transporter = nodemailer.createTransport({
+  service: 'gmail',
   host: 'smtp.gmail.com',
-  port: 587, // Using port 587 with explicit TLS
-  secure: false, // Use 'true' for port 465, 'false' for all other ports
+  port: 465,
+  secure: true,
   auth: {
     user: 'lftlogapp@gmail.com',
     pass: process.env.GMAIL_APP_PASSWORD,
   },
-  dns: {
-    family: 4, // Force IPv4
-  },
-  connectionTimeout: 10000, // 10 seconds
-  greetingTimeout: 10000,   // 10 seconds
-  socketTimeout: 10000,       // 10 seconds
+  tls: {
+    rejectUnauthorized: false
+  }
 });
 
-console.log('Nodemailer transporter created with forced IPv4.');
+console.log('Nodemailer transporter created with updated settings.');
 
 transporter.verify(function(error, success) {
   if (error) {
-    console.log('Nodemailer transporter verification error:', error);
+    console.error('Nodemailer transporter verification error:', error.message);
+    console.error('Full error details:', error);
   } else {
     console.log('Nodemailer transporter is ready to send emails.');
   }
