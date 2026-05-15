@@ -200,24 +200,19 @@ class ApiService {
     }
   }
 
-  Future<void> resendVerificationEmail(String email) async {
-    await _postWithToken('/auth/resend-verification', {'email': email});
-  }
-
-  Future<Map<String, dynamic>> _postWithToken(String endpoint, Map<String, dynamic> body) async {
-    final token = await getToken();
-    if (token == null) {
-      throw Exception('Authentication token not found');
-    }
+  Future<Map<String, dynamic>> _postAnonymous(String endpoint, Map<String, dynamic> body) async {
     final response = await http.post(
       Uri.parse('$baseUrl$endpoint'),
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
       },
       body: jsonEncode(body),
     ).timeout(const Duration(seconds: 30));
     return _handleResponse(response);
+  }
+
+  Future<void> resendVerificationEmail(String email) async {
+    await _postAnonymous('/auth/resend-verification', {'email': email});
   }
 
   Future<Map<String, dynamic>> login(String email, String password) async {
