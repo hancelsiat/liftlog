@@ -81,7 +81,7 @@ router.post('/register', upload.single('credential'), async (req, res) => {
 
     const verificationToken = user.generateEmailVerificationToken();
     await user.save();
-    await sendVerificationEmail(user.email, verificationToken);
+    sendVerificationEmail(user.email, verificationToken);
 
     let responseMessage = 'User registered successfully. Please check your email to verify your account.';
     if (role === 'trainer') {

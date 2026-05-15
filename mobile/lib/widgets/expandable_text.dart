@@ -28,47 +28,54 @@ class _ExpandableTextState extends State<ExpandableText> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
-        final textSpan = TextSpan(
-          text: widget.text,
-          style: const TextStyle(color: Colors.white, fontSize: 14),
-        );
-
+        final textSpan = TextSpan(text: widget.text, style: const TextStyle(color: Colors.white, fontSize: 14));
         final textPainter = TextPainter(
           text: textSpan,
           maxLines: widget.trimLines,
           textDirection: TextDirection.ltr,
         );
-
         textPainter.layout(maxWidth: constraints.maxWidth);
 
         if (textPainter.didExceedMaxLines) {
           return Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 widget.text,
                 maxLines: _isExpanded ? null : widget.trimLines,
-                overflow: TextOverflow.ellipsis,
+                overflow: _isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
                 style: const TextStyle(color: Colors.white, fontSize: 14),
               ),
-              const SizedBox(height: 4),
-              GestureDetector(
-                onTap: _toggleExpanded,
-                child: Text(
-                  _isExpanded ? 'See Less' : 'See More...',
-                  style: const TextStyle(
-                    color: AppTheme.primaryColor,
-                    fontWeight: FontWeight.bold,
+              if (!_isExpanded) ...[
+                const SizedBox(height: 4),
+                GestureDetector(
+                  onTap: _toggleExpanded,
+                  child: const Text(
+                    'See More...',
+                    style: TextStyle(
+                      color: AppTheme.primaryColor,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-              ),
+              ] else ...[
+                const SizedBox(height: 4),
+                GestureDetector(
+                  onTap: _toggleExpanded,
+                  child: const Text(
+                    'See Less',
+                    style: TextStyle(
+                      color: AppTheme.primaryColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
             ],
           );
         } else {
-          return Text(
-            widget.text,
-            style: const TextStyle(color: Colors.white, fontSize: 14),
-          );
+          return Text(widget.text, style: const TextStyle(color: Colors.white, fontSize: 14));
         }
       },
     );

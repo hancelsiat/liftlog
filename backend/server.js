@@ -13,6 +13,7 @@ const app = express();
 const PORT = process.env.PORT || 10000;
 
 // Middleware
+app.set('trust proxy', true);
 app.use(cors({
   origin: '*', // Allow all origins
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],

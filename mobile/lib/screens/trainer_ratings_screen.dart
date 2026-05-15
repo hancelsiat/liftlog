@@ -77,13 +77,36 @@ class _TrainerRatingsScreenState extends State<TrainerRatingsScreen> {
                     return Card(
                       color: AppTheme.cardBackground,
                       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: AppTheme.primaryColor,
-                          child: Text(rating.rating.toString(), style: const TextStyle(color: Colors.white)),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                CircleAvatar(
+                                  backgroundColor: AppTheme.primaryColor,
+                                  child: Text(rating.rating.toString(), style: const TextStyle(color: Colors.white)),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      ExpandableText(text: rating.feedback ?? 'No feedback provided'),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        DateFormat.yMMMd().format(rating.createdAt),
+                                        style: const TextStyle(color: Colors.white70),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
-                        title: ExpandableText(text: rating.feedback ?? 'No feedback provided'),
-                        subtitle: Text(DateFormat.yMMMd().format(rating.createdAt), style: const TextStyle(color: Colors.white70)),
                       ),
                     );
                   },

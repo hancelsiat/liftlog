@@ -47,6 +47,7 @@ class _RateTrainerScreenState extends State<RateTrainerScreen> {
       appBar: AppBar(
         title: const Text('Rate Your Trainer'),
         backgroundColor: AppTheme.darkBackground,
+        automaticallyImplyLeading: false,
       ),
       backgroundColor: AppTheme.darkBackground,
       body: Padding(
