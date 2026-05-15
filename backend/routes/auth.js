@@ -79,12 +79,15 @@ router.post('/register', upload.single('credential'), async (req, res) => {
       credentialImageUrl: credentialImageUrl,
     });
 
+    const verificationToken = user.generateEmailVerificationToken();
+    await user.save();
+
     try {
-      const verificationToken = user.generateEmailVerificationToken();
-      await user.save();
       await sendVerificationEmail(user.email, verificationToken);
     } catch (emailError) {
       console.error('Failed to send verification email:', emailError);
+      // Optional: Add logic here to handle the email sending failure,
+      // like marking the user for a retry or logging to a specific monitoring service.
     }
 
     let responseMessage = 'User registered successfully. Please check your email to verify your account.';
