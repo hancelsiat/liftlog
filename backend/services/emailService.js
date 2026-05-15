@@ -19,6 +19,16 @@ const transporter = nodemailer.createTransport({
   socketTimeout: 10000,       // 10 seconds
 });
 
+console.log('Nodemailer transporter created with forced IPv4.');
+
+transporter.verify(function(error, success) {
+  if (error) {
+    console.log('Nodemailer transporter verification error:', error);
+  } else {
+    console.log('Nodemailer transporter is ready to send emails.');
+  }
+});
+
 const sendVerificationEmail = async (to, token) => {
   const verificationUrl = `https://liftlog-7.onrender.com/api/auth/verify-email/${token}`;
   const templatePath = path.join(__dirname, '..', 'templates', 'verificationEmail.html');
