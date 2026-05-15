@@ -22,24 +22,13 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await _apiService.register(
+      await _apiService.register(
         email,
         password,
         username,
         role: role,
         credentialFile: credentialFile,
       );
-
-      if (response.containsKey('user') && response['user'] != null) {
-        _user = User.fromJson(response['user']);
-      }
-
-      if (role == UserRole.member) {
-        await loadProfile(context);
-      } else {
-        await _apiService.removeToken();
-        _user = null;
-      }
 
       _isLoading = false;
       notifyListeners();
