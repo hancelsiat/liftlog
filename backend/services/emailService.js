@@ -5,12 +5,15 @@ const path = require('path');
 
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
-  port: 465,
-  secure: true, // true for 465, false for other ports
+  port: 587, // Using port 587 with explicit TLS
+  secure: false, // Use 'true' for port 465, 'false' for all other ports
   auth: {
-    user: 'lftlogapp@gmail.com', // Your new Gmail address
-    pass: process.env.GMAIL_APP_PASSWORD, // Your new App Password
+    user: 'lftlogapp@gmail.com',
+    pass: process.env.GMAIL_APP_PASSWORD,
   },
+  connectionTimeout: 10000, // 10 seconds
+  greetingTimeout: 10000,   // 10 seconds
+  socketTimeout: 10000,       // 10 seconds
 });
 
 const sendVerificationEmail = async (to, token) => {
