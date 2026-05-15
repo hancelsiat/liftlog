@@ -4,10 +4,9 @@ const fs = require('fs');
 const path = require('path');
 
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false, // use STARTTLS
+  host: 'smtp.ipv4.gmail.com',
+  port: 465,
+  secure: true,
   auth: {
     user: 'lftlogapp@gmail.com',
     pass: process.env.GMAIL_APP_PASSWORD,
