@@ -1,22 +1,15 @@
 
-const dns = require('dns');
 const nodemailer = require('nodemailer');
 const fs = require('fs');
 const path = require('path');
 
-dns.setDefaultResultOrder('ipv4first');
-
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true,
+  service: 'gmail',
   auth: {
     user: 'lftlogapp@gmail.com',
     pass: process.env.GMAIL_APP_PASSWORD,
   },
 });
-
-console.log('Nodemailer transporter created with updated settings.');
 
 transporter.verify(function(error, success) {
   if (error) {
