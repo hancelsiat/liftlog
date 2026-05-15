@@ -5,10 +5,14 @@ const path = require('path');
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true,
   auth: {
     user: 'lftlogapp@gmail.com',
     pass: process.env.GMAIL_APP_PASSWORD,
   },
+  connectionTimeout: 60000 // 60 seconds
 });
 
 transporter.verify(function(error, success) {
@@ -34,6 +38,7 @@ const sendVerificationEmail = async (to, token) => {
   };
 
   await transporter.sendMail(mailOptions);
+  console.log(`Verification email sent to ${to}`);
 };
 
 const sendApprovalEmail = async (to, username) => {
