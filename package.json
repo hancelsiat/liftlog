@@ -1,6 +1,8 @@
 {
   "dependencies": {
     "@supabase/supabase-js": "^2.83.0",
+    "axios": "^1.16.1",
+    "form-data": "^4.0.5",
     "multer": "^2.0.2"
   }
 }
