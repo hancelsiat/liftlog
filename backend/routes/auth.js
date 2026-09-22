@@ -37,9 +37,15 @@ router.post('/register', upload.single('credential'), async (req, res) => {
 
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
     if (existingUser) {
-      return res.status(400).json({ 
-        error: 'User already exists with this email or username' 
-      });
+      if (!existingUser.isEmailVerified) {
+        // If the existing user hasn't verified their email, delete the old unverified account
+        // so they can register again
+        await User.findByIdAndDelete(existingUser._id);
+      } else {
+        return res.status(400).json({ 
+          error: 'User already exists with this email or username' 
+        });
+      }
     }
 
     let credentialImageUrl = '';
