@@ -146,7 +146,9 @@ router.get('/trainer/:trainerId', verifyToken, checkRole(['all']), async (req, r
 // Get a specific workout by ID
 router.get('/:id', verifyToken, async (req, res) => {
   try {
-    const workout = await Workout.findById(req.params.id);
+    const workout = await Workout.findById(req.params.id)
+      .populate('trainer', 'username')
+      .populate('user', 'username');
 
     if (!workout) {
       return res.status(404).json({ error: 'Workout not found' });
@@ -266,6 +268,8 @@ router.get('/user/:userId',
       }
 
       const workouts = await Workout.find(query)
+        .populate('trainer', 'username')
+        .populate('user', 'username')
         .sort({ date: -1 })
         .limit(Number(limit))
         .skip((page - 1) * limit);
