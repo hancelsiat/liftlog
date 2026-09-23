@@ -88,17 +88,21 @@ router.post('/register', upload.single('credential'), async (req, res) => {
     const verificationToken = user.generateEmailVerificationToken();
     await user.save();
 
+    let emailResult = null;
     try {
-      await sendVerificationEmail(user.email, verificationToken);
+      emailResult = await sendVerificationEmail(user.email, verificationToken);
     } catch (emailError) {
       console.error('Failed to send verification email:', emailError);
-      // Optional: Add logic here to handle the email sending failure,
-      // like marking the user for a retry or logging to a specific monitoring service.
+      emailResult = { success: false, errors: [emailError.message] };
     }
 
     let responseMessage = 'User registered successfully. Please check your email to verify your account.';
     if (role === 'trainer') {
       responseMessage = 'Trainer account created. Please verify your email. Your account is also pending admin approval.';
+    }
+
+    if (!emailResult || !emailResult.success) {
+      responseMessage += ' (Note: Verification email failed to send. Please try resending.)';
     }
 
     res.status(201).json({ 
@@ -108,7 +112,8 @@ router.post('/register', upload.single('credential'), async (req, res) => {
         username: user.username,
         email: user.email,
         role: user.role
-      }
+      },
+      emailDebug: emailResult
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -333,9 +338,19 @@ router.post('/resend-verification', async (req, res) => {
     const verificationToken = user.generateEmailVerificationToken();
     await user.save();
 
-    await sendVerificationEmail(user.email, verificationToken);
+    const emailResult = await sendVerificationEmail(user.email, verificationToken);
 
-    res.json({ message: 'Verification email resent successfully.' });
+    if (!emailResult || !emailResult.success) {
+      return res.status(500).json({ 
+        error: 'Failed to send verification email.',
+        emailDebug: emailResult
+      });
+    }
+
+    res.json({ 
+      message: 'Verification email resent successfully.',
+      emailDebug: emailResult
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
