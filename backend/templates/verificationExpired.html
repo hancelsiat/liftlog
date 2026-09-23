@@ -40,10 +40,24 @@
             color: #555;
             line-height: 1.5;
         }
+        .btn {
+            display: inline-block;
+            margin-top: 30px;
+            padding: 12px 24px;
+            background-color: #e74c3c;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+        }
         .app-info {
             margin-top: 30px;
             font-size: 14px;
             color: #888;
+        }
+        .countdown {
+            font-weight: bold;
+            color: #e74c3c;
         }
     </style>
 </head>
@@ -51,8 +65,48 @@
     <div class="card">
         <div class="icon">&#10060;</div> <!-- Red X icon -->
         <h1>Verification Link Expired</h1>
-        <p>For your security, this verification link has expired. Please return to the app to request a new one.</p>
+        <p>For your security, this verification link has expired.</p>
+        <p>Redirecting you to the Login page to request a new OTP in <span class="countdown" id="countdown">5</span> seconds...</p>
+        
+        <a href="liftlog://login" class="btn" id="openAppBtn">Return to LiftLog Login</a>
+        
         <p class="app-info">You can request a new verification link from the login screen in the LiftLog app.</p>
     </div>
+
+    <script>
+        let seconds = 5;
+        const countdownEl = document.getElementById('countdown');
+        const openAppBtn = document.getElementById('openAppBtn');
+
+        const redirectToApp = () => {
+            // Try to deep link into Flutter app first
+            window.location.href = 'liftlog://login';
+            
+            setTimeout(() => {
+                window.close();
+            }, 1000);
+        };
+
+        const timer = setInterval(() => {
+            seconds--;
+            countdownEl.textContent = seconds;
+            if (seconds <= 0) {
+                clearInterval(timer);
+                redirectToApp();
+            }
+        }, 1000);
+
+        openAppBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            redirectToApp();
+        });
+
+        setTimeout(() => {
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = 'liftlog://login';
+            document.body.appendChild(iframe);
+        }, 100);
+    </script>
 </body>
 </html>
