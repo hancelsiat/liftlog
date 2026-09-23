@@ -152,7 +152,12 @@ router.post('/login', async (req, res) => {
     const { email, password, role } = req.body;
     const user = await User.findOne({ email });
 
-    if (!user || !(await user.comparePassword(password))) {
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid login credentials' });
+    }
+
+    const isPasswordValid = await user.comparePassword(password);
+    if (!isPasswordValid) {
       return res.status(401).json({ error: 'Invalid login credentials' });
     }
 
@@ -169,9 +174,11 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    // EXPLICIT Pending Admin Approval Check
     if (user.role === 'trainer' && !user.isApproved) {
       return res.status(403).json({ 
-        error: 'Your trainer account is pending admin approval.' 
+        error: 'Your trainer account is pending admin approval. Please wait for an administrator to review and approve your application.',
+        pendingApproval: true
       });
     }
 

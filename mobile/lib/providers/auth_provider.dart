@@ -10,15 +10,21 @@ class AuthProvider with ChangeNotifier {
   User? _user;
   bool _isLoading = false;
   String? _error;
+  bool _emailNotVerified = false;
+  bool _pendingApproval = false;
 
   User? get user => _user;
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get isAuthenticated => _user != null;
+  bool get emailNotVerified => _emailNotVerified;
+  bool get pendingApproval => _pendingApproval;
 
   Future<bool> register(BuildContext context, String email, String password, String username, {UserRole role = UserRole.member, File? credentialFile}) async {
     _isLoading = true;
     _error = null;
+    _emailNotVerified = false;
+    _pendingApproval = false;
     notifyListeners();
 
     try {
@@ -45,6 +51,8 @@ class AuthProvider with ChangeNotifier {
   Future<bool> login(BuildContext context, String email, String password) async {
     _isLoading = true;
     _error = null;
+    _emailNotVerified = false;
+    _pendingApproval = false;
     notifyListeners();
 
     try {
@@ -53,6 +61,20 @@ class AuthProvider with ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       return true;
+    } on ApiException catch (apiError) {
+      // Catch structured errors from the server
+      _error = apiError.message;
+      _emailNotVerified = apiError.emailNotVerified;
+      _pendingApproval = apiError.pendingApproval;
+      
+      // Only show generic snackbar if it's a normal error (not the special cases we handle in UI)
+      if (!_emailNotVerified && !_pendingApproval) {
+        showErrorSnackBar(context, _error!);
+      }
+      
+      _isLoading = false;
+      notifyListeners();
+      return false;
     } catch (e) {
       _error = e.toString();
       showErrorSnackBar(context, _error!);

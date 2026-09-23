@@ -1,4 +1,3 @@
-
 import 'dart:convert';
 import 'dart:io' show Platform, File, NetworkInterface, InternetAddressType;
 import 'package:http/http.dart' as http;
@@ -19,7 +18,7 @@ class ApiService {
   static final Map<String, String> _networkConfigs = {
     'pc': '192.168.1.16',
     'phone': '192.168.100.192',
-    'emulator': '10.0.2.2'
+    'emulator': '10.0.2.2',
   };
   static String CURRENT_PC_IP = '192.168.1.16';
 
@@ -27,7 +26,7 @@ class ApiService {
     try {
       final interfaces = await NetworkInterface.list(
         includeLoopback: false,
-        type: InternetAddressType.IPv4
+        type: InternetAddressType.IPv4,
       );
       for (var interface in interfaces) {
         for (var addr in interface.addresses) {
@@ -45,7 +44,7 @@ class ApiService {
   static Future<void> configureBaseUrl({
     String? manualIp,
     String? networkType,
-    String? renderUrl
+    String? renderUrl,
   }) async {
     if (renderUrl != null) {
       _baseUrl = '$renderUrl/api';
@@ -113,20 +112,28 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  Future<Map<String, dynamic>> _post(String endpoint, Map<String, dynamic> body) async {
+  Future<Map<String, dynamic>> _post(
+    String endpoint,
+    Map<String, dynamic> body,
+  ) async {
     final token = await getToken();
-    final response = await http.post(
-      Uri.parse('$baseUrl$endpoint'),
-      headers: {
-        'Content-Type': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode(body),
-    ).timeout(const Duration(seconds: 30));
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl$endpoint'),
+          headers: {
+            'Content-Type': 'application/json',
+            if (token != null) 'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode(body),
+        )
+        .timeout(const Duration(seconds: 30));
     return _handleResponse(response);
   }
 
-  Future<Map<String, dynamic>> _patch(String endpoint, Map<String, dynamic> body) async {
+  Future<Map<String, dynamic>> _patch(
+    String endpoint,
+    Map<String, dynamic> body,
+  ) async {
     final token = await getToken();
     final response = await http.patch(
       Uri.parse('$baseUrl$endpoint'),
@@ -151,7 +158,10 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  Future<Map<String, dynamic>> _deleteWithBody(String endpoint, Map<String, dynamic> body) async {
+  Future<Map<String, dynamic>> _deleteWithBody(
+    String endpoint,
+    Map<String, dynamic> body,
+  ) async {
     final token = await getToken();
     final request = http.Request('DELETE', Uri.parse('$baseUrl$endpoint'));
     request.headers.addAll({
@@ -170,48 +180,71 @@ class ApiService {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return jsonDecode(response.body);
     } else {
-      throw Exception('API Error: ${response.statusCode} - ${response.body}');
+      try {
+        final Map<String, dynamic> errorData = jsonDecode(response.body);
+        final errorMessage = errorData['error'] ?? 'Unknown error occurred';
+
+        // Throw a structured exception with details
+        throw ApiException(
+          message: errorMessage,
+          statusCode: response.statusCode,
+          emailNotVerified: errorData['emailNotVerified'] ?? false,
+          pendingApproval: errorData['pendingApproval'] ?? false,
+        );
+      } on FormatException {
+        // If response body is not valid JSON
+        throw Exception('API Error: ${response.statusCode} - ${response.body}');
+      }
     }
   }
 
   Future<Map<String, dynamic>> register(
     String email,
     String password,
-    String username,
-    {UserRole role = UserRole.member, File? credentialFile}
-  ) async {
-    var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/auth/register'));
+    String username, {
+    UserRole role = UserRole.member,
+    File? credentialFile,
+  }) async {
+    var request = http.MultipartRequest(
+      'POST',
+      Uri.parse('$baseUrl/auth/register'),
+    );
     request.fields['email'] = email;
     request.fields['password'] = password;
     request.fields['username'] = username;
     request.fields['role'] = role.toString().split('.').last;
 
     if (credentialFile != null) {
-      request.files.add(await http.MultipartFile.fromPath('credential', credentialFile.path));
+      request.files.add(
+        await http.MultipartFile.fromPath('credential', credentialFile.path),
+      );
     }
 
-    var response = await request.send();
+    var response = await request.send().timeout(const Duration(seconds: 30));
     var responseData = await response.stream.bytesToString();
-    
+
     if (response.statusCode >= 200 && response.statusCode < 300) {
-        final decodedResponse = jsonDecode(responseData);
-        if (decodedResponse.containsKey('token')) {
-            await setToken(decodedResponse['token']);
-        }
-        return decodedResponse;
+      final decodedResponse = jsonDecode(responseData);
+      if (decodedResponse.containsKey('token')) {
+        await setToken(decodedResponse['token']);
+      }
+      return decodedResponse;
     } else {
-        throw Exception('API Error: ${response.statusCode} - $responseData');
+      throw Exception('API Error: ${response.statusCode} - $responseData');
     }
   }
 
-  Future<Map<String, dynamic>> _postAnonymous(String endpoint, Map<String, dynamic> body) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl$endpoint'),
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode(body),
-    ).timeout(const Duration(seconds: 30));
+  Future<Map<String, dynamic>> _postAnonymous(
+    String endpoint,
+    Map<String, dynamic> body,
+  ) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl$endpoint'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(body),
+        )
+        .timeout(const Duration(seconds: 30));
     return _handleResponse(response);
   }
 
@@ -234,14 +267,18 @@ class ApiService {
     final response = await _get('/auth/profile');
     return User.fromJson(response);
   }
-  
+
   Future<List<Workout>> getWorkouts() async {
     final response = await _get('/workouts');
     final List<dynamic> workoutsJson = response['workouts'];
     return workoutsJson.map((json) => Workout.fromJson(json)).toList();
   }
 
-  Future<Workout> createWorkout(String name, String description, List<String> exercises) async {
+  Future<Workout> createWorkout(
+    String name,
+    String description,
+    List<String> exercises,
+  ) async {
     final response = await _post('/workouts', {
       'name': name,
       'description': description,
@@ -250,7 +287,12 @@ class ApiService {
     return Workout.fromJson(response['workout'] as Map<String, dynamic>);
   }
 
-  Future<Workout> updateWorkout(String id, String name, String description, List<Map<String, dynamic>> exercises) async {
+  Future<Workout> updateWorkout(
+    String id,
+    String name,
+    String description,
+    List<Map<String, dynamic>> exercises,
+  ) async {
     final response = await _patch('/workouts/$id', {
       'name': name,
       'description': description,
@@ -273,7 +315,9 @@ class ApiService {
     return trainersJson.map((json) => json as Map<String, dynamic>).toList();
   }
 
-  Future<List<Map<String, dynamic>>> getWorkoutsByTrainer(String trainerId) async {
+  Future<List<Map<String, dynamic>>> getWorkoutsByTrainer(
+    String trainerId,
+  ) async {
     final response = await _get('/workouts/trainer/$trainerId');
     final List<dynamic> workoutsJson = response['workouts'];
     return workoutsJson.map((json) => json as Map<String, dynamic>).toList();
@@ -315,22 +359,38 @@ class ApiService {
     String? description,
     bool isPublic = true,
   }) async {
-    final result = await FilePicker.platform.pickFiles(type: FileType.video, withData: true);
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.video,
+      withData: true,
+    );
     if (result == null || result.files.isEmpty) {
       return {'success': false, 'message': 'No file selected'};
     }
     final file = result.files.first;
-    final filename = file.name.isNotEmpty ? file.name : 'video_${DateTime.now().millisecondsSinceEpoch}.mp4';
+    final filename = file.name.isNotEmpty
+        ? file.name
+        : 'video_${DateTime.now().millisecondsSinceEpoch}.mp4';
     final bytes = file.bytes;
     final path = file.path;
     final mimeType = lookupMimeType(filename) ?? 'video/mp4';
     final parts = mimeType.split('/');
-    final contentType = MediaType(parts[0], parts.length > 1 ? parts[1] : 'mp4');
+    final contentType = MediaType(
+      parts[0],
+      parts.length > 1 ? parts[1] : 'mp4',
+    );
     MultipartFile mpFile;
     if (bytes != null) {
-      mpFile = MultipartFile.fromBytes(bytes, filename: filename, contentType: contentType);
+      mpFile = MultipartFile.fromBytes(
+        bytes,
+        filename: filename,
+        contentType: contentType,
+      );
     } else if (path != null) {
-      mpFile = await MultipartFile.fromFile(path, filename: filename, contentType: contentType);
+      mpFile = await MultipartFile.fromFile(
+        path,
+        filename: filename,
+        contentType: contentType,
+      );
     } else {
       return {'success': false, 'message': 'Unable to read file bytes or path'};
     }
@@ -381,13 +441,20 @@ class ApiService {
     await _delete('/videos/$videoId');
   }
 
-  Future<Map<String, dynamic>> getUsers({String? role, String? search, int page = 1, int limit = 10}) async {
+  Future<Map<String, dynamic>> getUsers({
+    String? role,
+    String? search,
+    int page = 1,
+    int limit = 10,
+  }) async {
     final queryParams = <String, String>{};
     if (role != null) queryParams['role'] = role;
     if (search != null) queryParams['search'] = search;
     queryParams['page'] = page.toString();
     queryParams['limit'] = limit.toString();
-    final uri = Uri.parse('$baseUrl/auth/users').replace(queryParameters: queryParams);
+    final uri = Uri.parse(
+      '$baseUrl/auth/users',
+    ).replace(queryParameters: queryParams);
     return await _getUri(uri.toString()) as Map<String, dynamic>;
   }
 
@@ -442,7 +509,11 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  Future<User> approveTrainer(String userId, bool isApproved, {String? rejectionReason}) async {
+  Future<User> approveTrainer(
+    String userId,
+    bool isApproved, {
+    String? rejectionReason,
+  }) async {
     final body = {
       'isApproved': isApproved,
       if (rejectionReason != null) 'rejectionReason': rejectionReason,
@@ -460,8 +531,6 @@ class ApiService {
     final response = await _get('/clients/$clientId/progress');
     return response as List<dynamic>;
   }
-
-
 
   Future<void> markWorkoutAsComplete(String workoutId) async {
     await _post('/workouts/$workoutId/complete', {});
@@ -488,7 +557,11 @@ class ApiService {
     await _post('/member/leave-trainer', {});
   }
 
-  Future<void> submitRating(String trainerId, int rating, String feedback) async {
+  Future<void> submitRating(
+    String trainerId,
+    int rating,
+    String feedback,
+  ) async {
     await _post('/ratings', {
       'trainerId': trainerId,
       'rating': rating,
@@ -504,5 +577,24 @@ class ApiService {
   Future<RatingStats> getTrainerRating(String trainerId) async {
     final response = await _get('/ratings/trainer/$trainerId');
     return RatingStats.fromJson(response);
+  }
+}
+
+class ApiException implements Exception {
+  final String message;
+  final int statusCode;
+  final bool emailNotVerified;
+  final bool pendingApproval;
+
+  ApiException({
+    required this.message,
+    required this.statusCode,
+    this.emailNotVerified = false,
+    this.pendingApproval = false,
+  });
+
+  @override
+  String toString() {
+    return message;
   }
 }

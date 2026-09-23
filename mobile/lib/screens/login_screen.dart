@@ -351,7 +351,51 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             transitionDuration: const Duration(milliseconds: 500),
           ),
         );
-      } else if (authProvider.error?.contains('Please verify your email') ?? false) {
+      } else if (authProvider.pendingApproval) {
+        showDialog(
+          context: context,
+          barrierDismissible: false, // User must tap button to dismiss, so they read the message
+          builder: (context) => AlertDialog(
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            icon: Icon(
+              Icons.hourglass_top_rounded,
+              color: Colors.amber[600],
+              size: 50,
+            ),
+            title: const Text(
+              'Waiting for Admin Approval',
+              style: TextStyle(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            content: const Text(
+              'Your trainer registration was successful, and your email is verified! However, an administrator needs to review and approve your account before you can log in.\n\nPlease be patient, as this usually takes less than 24 hours.',
+              textAlign: TextAlign.center,
+            ),
+            actions: [
+              Center(
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.amber[600],
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                    child: const Text('I Understand'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      } else if (authProvider.emailNotVerified) {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
