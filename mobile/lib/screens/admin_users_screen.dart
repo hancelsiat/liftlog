@@ -67,11 +67,20 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
           final trainers = groupedUsers[UserRole.trainer]!;
           final members = groupedUsers[UserRole.member]!;
 
-          return ListView(
-            children: [
-              _buildUserSection('Trainers', trainers),
-              _buildUserSection('Members', members),
-            ],
+          return RefreshIndicator(
+            onRefresh: () async {
+              setState(() {
+                _usersFuture = _fetchAndGroupUsers();
+              });
+              await _usersFuture;
+            },
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: [
+                _buildUserSection('Trainers', trainers),
+                _buildUserSection('Members', members),
+              ],
+            ),
           );
         },
       ),
