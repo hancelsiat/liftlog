@@ -131,7 +131,7 @@ router.post('/', verifyToken, async (req, res) => {
     // If there are any restrictions, return error immediately
     if (Object.keys(restrictions).length > 0) {
       return res.status(400).json({
-        error: 'Update restricted',
+        error: 'You need to wait before updating this information again.',
         restrictions
       });
     }
@@ -139,7 +139,7 @@ router.post('/', verifyToken, async (req, res) => {
     // If no fields to update, return error
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({
-        error: 'No fields to update'
+        error: 'Please provide at least one piece of information to update.'
       });
     }
 
@@ -306,12 +306,12 @@ router.get('/:id', verifyToken, async (req, res) => {
     const progress = await Progress.findById(req.params.id);
 
     if (!progress) {
-      return res.status(404).json({ error: 'Progress entry not found' });
+      return res.status(404).json({ error: 'We could not find this progress entry.' });
     }
 
     // Ensure user can only access their own progress
     if (progress.user.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ error: 'Unauthorized access' });
+      return res.status(403).json({ error: 'You do not have permission to view this progress entry.' });
     }
 
     res.json(progress);
@@ -326,12 +326,12 @@ router.patch('/:id', verifyToken, async (req, res) => {
     const progress = await Progress.findById(req.params.id);
 
     if (!progress) {
-      return res.status(404).json({ error: 'Progress entry not found' });
+      return res.status(404).json({ error: 'We could not find this progress entry to update.' });
     }
 
     // Ensure user can only update their own progress
     if (progress.user.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ error: 'Unauthorized to update this progress entry' });
+      return res.status(403).json({ error: 'You do not have permission to update this progress entry.' });
     }
 
     const updatedProgress = await Progress.findByIdAndUpdate(
@@ -355,12 +355,12 @@ router.delete('/:id', verifyToken, async (req, res) => {
     const progress = await Progress.findById(req.params.id);
 
     if (!progress) {
-      return res.status(404).json({ error: 'Progress entry not found' });
+      return res.status(404).json({ error: 'We could not find this progress entry to delete.' });
     }
 
     // Ensure user can only delete their own progress
     if (progress.user.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ error: 'Unauthorized to delete this progress entry' });
+      return res.status(403).json({ error: 'You do not have permission to delete this progress entry.' });
     }
 
     await progress.remove();

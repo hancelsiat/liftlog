@@ -31,7 +31,7 @@ router.post('/:memberId/notes', verifyToken, checkRole(['trainer']), async (req,
     const { notes } = req.body;
     const client = await User.findById(req.params.memberId);
     if (!client) {
-      return res.status(404).json({ error: 'Client not found' });
+      return res.status(404).json({ error: 'We could not find this client in our records.' });
     }
     client.privateNotes = notes;
     await client.save();
@@ -49,7 +49,7 @@ router.post('/:memberId/assign-workout', verifyToken, checkRole(['trainer']), as
     const workoutTemplate = await Workout.findById(workoutId);
 
     if (!member || !workoutTemplate) {
-      return res.status(404).json({ error: 'Member or Workout not found' });
+      return res.status(404).json({ error: 'The requested member or workout could not be found.' });
     }
 
     const workoutInstance = new Workout({
@@ -75,7 +75,7 @@ router.delete('/:memberId/remove', verifyToken, checkRole(['trainer']), async (r
     const member = await User.findById(req.params.memberId);
 
     if (!member) {
-      return res.status(404).json({ error: 'Member not found' });
+      return res.status(404).json({ error: 'We could not find this member in our records.' });
     }
 
     // Remove client from trainer's list

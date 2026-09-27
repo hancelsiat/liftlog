@@ -7,7 +7,7 @@ const verifyToken = async (req, res, next) => {
     const token = req.header('Authorization')?.replace('Bearer ', '');
     
     if (!token) {
-      return res.status(401).json({ error: 'No token provided' });
+      return res.status(401).json({ error: 'Please log in to access this feature.' });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -19,13 +19,13 @@ const verifyToken = async (req, res, next) => {
 
 
     if (!user) {
-      return res.status(401).json({ error: 'Invalid token' });
+      return res.status(401).json({ error: 'Your session has expired. Please log in again.' });
     }
 
     req.user = user;
     next();
   } catch (error) {
-    res.status(401).json({ error: 'Please authenticate' });
+    res.status(401).json({ error: 'Please log in to continue.' });
   }
 };
 
@@ -33,7 +33,7 @@ const verifyToken = async (req, res, next) => {
 const checkRole = (roles) => {
   return (req, res, next) => {
     if (!req.user) {
-      return res.status(401).json({ error: 'Authentication required' });
+      return res.status(401).json({ error: 'Please log in to access this feature.' });
     }
 
     const userRole = req.user.role.toLowerCase();
@@ -42,7 +42,7 @@ const checkRole = (roles) => {
     if (allowedRoles.includes('all') || allowedRoles.includes(userRole)) {
       next();
     } else {
-      return res.status(403).json({ error: 'Access denied' });
+      return res.status(403).json({ error: 'You do not have permission to perform this action.' });
     }
   };
 };

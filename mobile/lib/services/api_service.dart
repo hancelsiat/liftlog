@@ -182,7 +182,10 @@ class ApiService {
     } else {
       try {
         final Map<String, dynamic> errorData = jsonDecode(response.body);
-        final errorMessage = errorData['error'] ?? 'Unknown error occurred';
+        final errorMessage =
+            errorData['error'] ??
+            errorData['message'] ??
+            'Something went wrong. Please try again later.';
 
         // Throw a structured exception with details
         throw ApiException(
@@ -191,9 +194,11 @@ class ApiService {
           emailNotVerified: errorData['emailNotVerified'] ?? false,
           pendingApproval: errorData['pendingApproval'] ?? false,
         );
-      } on FormatException {
-        // If response body is not valid JSON
-        throw Exception('API Error: ${response.statusCode} - ${response.body}');
+      } catch (e) {
+        if (e is ApiException) rethrow;
+        throw Exception(
+          'We encountered an unexpected error. Please check your connection and try again.',
+        );
       }
     }
   }
@@ -230,7 +235,16 @@ class ApiService {
       }
       return decodedResponse;
     } else {
-      throw Exception('API Error: ${response.statusCode} - $responseData');
+      dynamic errorData;
+      try {
+        errorData = jsonDecode(responseData);
+      } catch (_) {}
+      final errorMessage = errorData is Map
+          ? (errorData['error'] ??
+                errorData['message'] ??
+                'We encountered an error. Please try again.')
+          : 'We encountered an unexpected error. Please check your connection and try again.';
+      throw Exception(errorMessage);
     }
   }
 

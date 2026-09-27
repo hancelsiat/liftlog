@@ -96,7 +96,7 @@ router.post('/', verifyToken, upload.single('video'), async (req, res) => {
 
     if (!req.file || !req.file.buffer) {
       console.error('No file or buffer present');
-      return res.status(400).json({ error: 'No video file uploaded (field name must be "video")' });
+      return res.status(400).json({ error: 'Please select a video file to upload.' });
     }
 
     const { title, exerciseType, description, difficulty, duration, tags, isPublic } = req.body;
@@ -105,10 +105,10 @@ router.post('/', verifyToken, upload.single('video'), async (req, res) => {
     const parsedExerciseType = exerciseType ? String(exerciseType).trim().toLowerCase() : 'strength'; // default, convert to lowercase
 
     if (!parsedTitle) {
-      return res.status(400).json({ error: 'title required' });
+      return res.status(400).json({ error: 'Please provide a title for the video.' });
     }
     if (!req.user || !req.user._id) {
-      return res.status(401).json({ error: 'Unauthorized: no user' });
+      return res.status(401).json({ error: 'Please log in to upload videos.' });
     }
 
     // Prepare safe names
@@ -225,7 +225,7 @@ router.post('/', verifyToken, upload.single('video'), async (req, res) => {
 router.get('/trainer', verifyToken, async (req, res) => {
   try {
     if (!req.user || !req.user._id) {
-      return res.status(401).json({ error: 'Unauthorized: no user' });
+      return res.status(401).json({ error: 'Please log in to view your videos.' });
     }
 
     const videos = await ExerciseVideo.find({ trainer: req.user._id }).sort({ createdAt: -1 });
@@ -332,17 +332,17 @@ router.delete('/:id', verifyToken, async (req, res) => {
   try {
     const videoId = req.params.id;
     if (!req.user || !req.user._id) {
-      return res.status(401).json({ error: 'Unauthorized: no user' });
+      return res.status(401).json({ error: 'Please log in to delete videos.' });
     }
 
     const video = await ExerciseVideo.findById(videoId);
     if (!video) {
-      return res.status(404).json({ error: 'Video not found' });
+      return res.status(404).json({ error: 'We could not find this video to delete.' });
     }
 
     // Check if the user is the trainer who uploaded the video
     if (video.trainer.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ error: 'Forbidden: You can only delete your own videos' });
+      return res.status(403).json({ error: 'You do not have permission to delete this video.' });
     }
 
     // Delete from Supabase storage

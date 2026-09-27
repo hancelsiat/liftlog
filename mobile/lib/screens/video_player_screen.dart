@@ -47,6 +47,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         throw Exception('Invalid video URL');
       }
 
+      if (cleanedUrl.contains('drive.google.com')) {
+        throw Exception('This video cannot be played because it is a Google Drive link. Please use a direct video link.');
+      }
+
       // Initialize the video player controller with the network URL
       _controller = VideoPlayerController.networkUrl(
         Uri.parse(cleanedUrl),

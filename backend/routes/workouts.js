@@ -151,7 +151,7 @@ router.get('/:id', verifyToken, async (req, res) => {
       .populate('user', 'username');
 
     if (!workout) {
-      return res.status(404).json({ error: 'Workout not found' });
+      return res.status(404).json({ error: 'We could not find this workout.' });
     }
 
     res.json(workout);
@@ -168,7 +168,7 @@ router.patch('/:id', verifyToken, checkRole(['member', 'trainer']), async (req, 
     const workout = await Workout.findById(req.params.id);
 
     if (!workout) {
-      return res.status(404).json({ error: 'Workout not found' });
+      return res.status(404).json({ error: 'We could not find this workout to update.' });
     }
 
     // Authorization check (copied from admin logic)
@@ -176,7 +176,7 @@ router.patch('/:id', verifyToken, checkRole(['member', 'trainer']), async (req, 
     const canTrainerEdit = req.user.role === 'trainer' && !!workout.user;
 
     if (!isOwner && !canTrainerEdit) {
-      return res.status(403).json({ error: 'Unauthorized to update this workout' });
+      return res.status(403).json({ error: 'You do not have permission to update this workout.' });
     }
 
     const updatedWorkout = await Workout.findByIdAndUpdate(
@@ -201,7 +201,7 @@ router.delete('/:id', verifyToken, checkRole(['member', 'trainer']), async (req,
     const workout = await Workout.findById(req.params.id);
 
     if (!workout) {
-      return res.status(404).json({ error: 'Workout not found' });
+      return res.status(404).json({ error: 'We could not find this workout to delete.' });
     }
 
     // Authorization check (copied from update logic)
@@ -209,7 +209,7 @@ router.delete('/:id', verifyToken, checkRole(['member', 'trainer']), async (req,
     const canTrainerDelete = req.user.role === 'trainer' && !!workout.user;
 
     if (!isOwner && !canTrainerDelete) {
-      return res.status(403).json({ error: 'Unauthorized to delete this workout' });
+      return res.status(403).json({ error: 'You do not have permission to delete this workout.' });
     }
 
     // Now, remove the workout
@@ -292,11 +292,11 @@ router.post('/:workoutId/complete', verifyToken, checkRole(['member']), async (r
   try {
     const workout = await Workout.findById(req.params.workoutId);
     if (!workout) {
-      return res.status(404).json({ error: 'Workout not found' });
+      return res.status(404).json({ error: 'We could not find this workout.' });
     }
 
     if (workout.assignedTo.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ error: 'You are not authorized to complete this workout' });
+      return res.status(403).json({ error: 'You do not have permission to mark this workout as complete.' });
     }
 
     workout.completedAt = new Date();

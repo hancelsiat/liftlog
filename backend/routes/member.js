@@ -9,7 +9,7 @@ router.post('/leave-trainer', verifyToken, checkRole(['member']), async (req, re
   try {
     const member = await User.findById(req.user._id);
     if (!member.trainer) {
-      return res.status(400).json({ error: 'You do not have a trainer.' });
+      return res.status(400).json({ error: 'You are not currently assigned to a trainer.' });
     }
 
     // const trainer = await User.findById(member.trainer);
