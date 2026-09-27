@@ -17,7 +17,8 @@ class WorkoutsScreen extends StatefulWidget {
   State<WorkoutsScreen> createState() => _WorkoutsScreenState();
 }
 
-class _WorkoutsScreenState extends State<WorkoutsScreen> with SingleTickerProviderStateMixin {
+class _WorkoutsScreenState extends State<WorkoutsScreen>
+    with SingleTickerProviderStateMixin {
   final ApiService _apiService = ApiService();
   Future<void>? _loadFuture;
   List<Workout> _assignedWorkouts = [];
@@ -52,7 +53,9 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> with SingleTickerProvid
     final response = await _apiService.getAssignedWorkouts();
     if (mounted) {
       setState(() {
-        _assignedWorkouts = (response as List).map((data) => Workout.fromJson(data)).toList();
+        _assignedWorkouts = (response as List)
+            .map((data) => Workout.fromJson(data))
+            .toList();
       });
     }
   }
@@ -70,6 +73,12 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> with SingleTickerProvid
       trainers.add(trainer);
     }
     if (mounted) {
+      // Sort trainers by rating descending
+      trainers.sort(
+        (a, b) => (b['ratingPercentage'] ?? 0.0).compareTo(
+          a['ratingPercentage'] ?? 0.0,
+        ),
+      );
       setState(() {
         _trainers = trainers;
       });
@@ -89,7 +98,10 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> with SingleTickerProvid
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error selecting trainer: $e'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text('Error selecting trainer: $e'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
@@ -100,7 +112,9 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> with SingleTickerProvid
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Choose Another Trainer'),
-          content: const Text('Are you sure you want to leave your current trainer?'),
+          content: const Text(
+            'Are you sure you want to leave your current trainer?',
+          ),
           actions: <Widget>[
             TextButton(
               child: const Text('Cancel'),
@@ -145,7 +159,10 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> with SingleTickerProvid
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error leaving trainer: $e'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text('Error leaving trainer: $e'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
@@ -182,18 +199,33 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> with SingleTickerProvid
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.white)));
+            return Center(
+              child: Text(
+                'Error: ${snapshot.error}',
+                style: const TextStyle(color: Colors.white),
+              ),
+            );
           }
 
           if (_user?.trainer != null) {
-            final assigned = _assignedWorkouts.where((w) => w.completedAt == null).toList();
-            final completed = _assignedWorkouts.where((w) => w.completedAt != null).toList();
+            final assigned = _assignedWorkouts
+                .where((w) => w.completedAt == null)
+                .toList();
+            final completed = _assignedWorkouts
+                .where((w) => w.completedAt != null)
+                .toList();
 
             return TabBarView(
               controller: _tabController,
               children: [
-                _buildWorkoutsList(assigned, 'Your trainer has not assigned you a plan yet.'),
-                _buildWorkoutsList(completed, 'You have no completed workouts yet.'),
+                _buildWorkoutsList(
+                  assigned,
+                  'Your trainer has not assigned you a plan yet.',
+                ),
+                _buildWorkoutsList(
+                  completed,
+                  'You have no completed workouts yet.',
+                ),
               ],
             );
           } else {
@@ -207,34 +239,182 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> with SingleTickerProvid
   Widget _buildTrainersList() {
     if (_trainers.isEmpty) {
       return const Center(
-        child: Text('No trainers available', style: TextStyle(color: Colors.white)),
+        child: Text(
+          'No trainers available',
+          style: TextStyle(color: Colors.white),
+        ),
       );
     }
 
     return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 16),
       itemCount: _trainers.length,
       itemBuilder: (context, index) {
         final trainer = _trainers[index];
-        return Card(
-          color: AppTheme.cardBackground,
+        final double rating = trainer['ratingPercentage']?.toDouble() ?? 0.0;
+        final bool isTopRated = rating >= 80.0;
+
+        return Container(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: AppTheme.primaryColor,
-              child: Text(trainer['username'][0].toUpperCase(), style: const TextStyle(color: Colors.white)),
-            ),
-            title: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(trainer['username'], style: const TextStyle(color: Colors.white)),
-                Text(
-                  '${(trainer['ratingPercentage'] ?? 0).toStringAsFixed(2)}%',
-                  style: const TextStyle(color: Colors.white70),
+          decoration: AppTheme.glassMorphism.copyWith(
+            border: isTopRated
+                ? Border.all(
+                    color: AppTheme.secondaryColor.withOpacity(0.8),
+                    width: 1.5,
+                  )
+                : Border.all(color: Colors.white.withOpacity(0.1), width: 1),
+            boxShadow: isTopRated
+                ? AppTheme.glowShadow
+                : [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: () => _selectTrainer(trainer['_id']),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  children: [
+                    // Avatar
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        gradient: isTopRated
+                            ? AppTheme.secondaryGradient
+                            : AppTheme.primaryGradient,
+                        shape: BoxShape.circle,
+                        boxShadow: isTopRated
+                            ? [
+                                BoxShadow(
+                                  color: AppTheme.secondaryColor.withOpacity(
+                                    0.4,
+                                  ),
+                                  blurRadius: 10,
+                                  spreadRadius: 1,
+                                ),
+                              ]
+                            : null,
+                      ),
+                      child: Center(
+                        child: Text(
+                          trainer['username'][0].toUpperCase(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+
+                    // Details
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  trainer['username'],
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (isTopRated)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.secondaryColor.withOpacity(
+                                      0.2,
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: AppTheme.secondaryColor
+                                          .withOpacity(0.5),
+                                    ),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.star,
+                                        color: AppTheme.secondaryColor,
+                                        size: 14,
+                                      ),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'Top Rated',
+                                        style: TextStyle(
+                                          color: AppTheme.secondaryColor,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            trainer['email'],
+                            style: TextStyle(
+                              color: AppTheme.textSecondary.withOpacity(0.8),
+                              fontSize: 14,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.thumb_up_alt_outlined,
+                                size: 16,
+                                color: isTopRated
+                                    ? AppTheme.secondaryColor
+                                    : AppTheme.primaryColor,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                '${rating.toStringAsFixed(1)}% Approval Rating',
+                                style: TextStyle(
+                                  color: isTopRated
+                                      ? AppTheme.textPrimary
+                                      : AppTheme.textSecondary,
+                                  fontSize: 14,
+                                  fontWeight: isTopRated
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
-            subtitle: Text(trainer['email'], style: const TextStyle(color: Colors.white70)),
-            onTap: () => _selectTrainer(trainer['_id']),
           ),
         );
       },
@@ -268,11 +448,20 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> with SingleTickerProvid
           color: AppTheme.cardBackground,
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: ListTile(
-            title: Text(workout.title, style: const TextStyle(color: Colors.white)),
-            subtitle: Text(subtitleText, style: const TextStyle(color: Colors.white70)),
+            title: Text(
+              workout.title,
+              style: const TextStyle(color: Colors.white),
+            ),
+            subtitle: Text(
+              subtitleText,
+              style: const TextStyle(color: Colors.white70),
+            ),
             trailing: workout.completedAt != null
                 ? const Icon(Icons.check_circle, color: Colors.green)
-                : const Icon(Icons.play_circle_outline, color: AppTheme.primaryColor),
+                : const Icon(
+                    Icons.play_circle_outline,
+                    color: AppTheme.primaryColor,
+                  ),
             onTap: () {
               if (workout.completedAt != null) {
                 Navigator.push(
@@ -285,7 +474,8 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> with SingleTickerProvid
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => WorkoutSessionScreen(workout: workout),
+                    builder: (context) =>
+                        WorkoutSessionScreen(workout: workout),
                   ),
                 ).then((_) {
                   // Refresh the list after a workout session
