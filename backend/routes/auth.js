@@ -322,7 +322,7 @@ router.delete('/users/:id', verifyToken, checkRole(['admin']), async (req, res) 
     await Workout.deleteMany({ user: userId });
 
     // Delete all videos uploaded by this user
-    await ExerciseVideo.deleteMany({ uploadedBy: userId });
+    await ExerciseVideo.deleteMany({ trainer: userId });
 
     res.json({ message: 'User and all associated data deleted successfully' });
   } catch (error) {
@@ -349,7 +349,7 @@ router.patch('/users/:id/approve', verifyToken, checkRole(['admin']), async (req
       await sendRejectionEmail(user.email, user.username, rejectionReason || 'No reason provided.');
       await User.findByIdAndDelete(req.params.id);
       await Workout.deleteMany({ user: req.params.id });
-      await ExerciseVideo.deleteMany({ uploadedBy: req.params.id });
+      await ExerciseVideo.deleteMany({ trainer: req.params.id });
       res.json({ message: 'Trainer has been rejected and their data deleted.' });
     }
   } catch (error) {
