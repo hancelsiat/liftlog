@@ -20,13 +20,13 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   List<Progress> _progressHistory = [];
   bool _isLoading = false;
-  
+
   // BMI status
   bool _canUpdateBmi = true;
   int _daysUntilNextBmiUpdate = 0;
   DateTime? _bmiNextAllowedDate;
   String _bmiUpdateMessage = '';
-  
+
   // Calories status
   bool _canUpdateCalories = true;
   int _hoursUntilNextCaloriesUpdate = 0;
@@ -59,7 +59,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     try {
       final apiService = ApiService();
       final status = await apiService.canUpdateProgress();
-      
+
       setState(() {
         // BMI status
         final bmiStatus = status['bmi'] as Map<String, dynamic>?;
@@ -69,14 +69,16 @@ class _ProgressScreenState extends State<ProgressScreen> {
         if (bmiStatus?['nextAllowedDate'] != null) {
           _bmiNextAllowedDate = DateTime.parse(bmiStatus!['nextAllowedDate']);
         }
-        
+
         // Calories status
         final caloriesStatus = status['calories'] as Map<String, dynamic>?;
         _canUpdateCalories = caloriesStatus?['canUpdate'] ?? true;
         _hoursUntilNextCaloriesUpdate = caloriesStatus?['hoursUntilNext'] ?? 0;
         _caloriesUpdateMessage = caloriesStatus?['message'] ?? '';
         if (caloriesStatus?['nextAllowedDate'] != null) {
-          _caloriesNextAllowedDate = DateTime.parse(caloriesStatus!['nextAllowedDate']);
+          _caloriesNextAllowedDate = DateTime.parse(
+            caloriesStatus!['nextAllowedDate'],
+          );
         }
       });
     } catch (e) {
@@ -103,7 +105,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
       });
       if (e.toString().contains('Authentication required')) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Session expired. Please log in again.')),
+          const SnackBar(
+            content: Text('Session expired. Please log in again.'),
+          ),
         );
         Navigator.of(context).pushReplacementNamed('/login');
       } else {
@@ -139,7 +143,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('BMI updated successfully! Next update available in 7 days.'),
+            content: Text(
+              'BMI updated successfully! Next update available in 7 days.',
+            ),
             backgroundColor: Colors.green,
           ),
         );
@@ -181,7 +187,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Calories updated successfully! Next update available in 24 hours.'),
+            content: Text(
+              'Calories updated successfully! Next update available in 24 hours.',
+            ),
             backgroundColor: Colors.green,
           ),
         );
@@ -204,9 +212,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Progress'),
-      ),
+      appBar: AppBar(title: const Text('My Progress')),
       body: RefreshIndicator(
         onRefresh: _refreshAll,
         child: SingleChildScrollView(
@@ -214,88 +220,104 @@ class _ProgressScreenState extends State<ProgressScreen> {
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // BMI Section
-              _buildBmiSection(),
-              const SizedBox(height: 24),
-              
-              // Calories Section
-              _buildCaloriesSection(),
-              const SizedBox(height: 30),
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // BMI Section
+                _buildBmiSection(),
+                const SizedBox(height: 24),
 
-              // Progress Charts
-              const Text(
-                'Progress Charts',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
+                // Calories Section
+                _buildCaloriesSection(),
+                const SizedBox(height: 30),
 
-              if (_progressHistory.isNotEmpty) ...[
-                // BMI Chart
-                _buildChartCard(
-                  title: 'BMI Over Time',
-                  chart: _buildLineChart(
-                    data: _progressHistory.where((p) => p.bmi != null).map((p) => p.bmi!).toList(),
-                    color: Colors.blue,
-                  ),
+                // Progress Charts
+                const Text(
+                  'Progress Charts',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
+                const SizedBox(height: 16),
 
-                // Calories Intake Chart
-                _buildChartCard(
-                  title: 'Calories Intake Over Time',
-                  chart: _buildLineChart(
-                    data: _progressHistory.where((p) => p.caloriesIntake != null).map((p) => p.caloriesIntake!).toList(),
-                    color: Colors.green,
+                if (_progressHistory.isNotEmpty) ...[
+                  // BMI Chart
+                  _buildChartCard(
+                    title: 'BMI Over Time',
+                    chart: _buildLineChart(
+                      data: _progressHistory
+                          .where((p) => p.bmi != null)
+                          .map((p) => p.bmi!)
+                          .toList(),
+                      color: Colors.blue,
+                    ),
                   ),
-                ),
 
-                // Calorie Deficit Chart
-                _buildChartCard(
-                  title: 'Calorie Deficit Over Time',
-                  chart: _buildLineChart(
-                    data: _progressHistory.where((p) => p.calorieDeficit != null).map((p) => p.calorieDeficit!).toList(),
-                    color: Colors.red,
+                  // Calories Intake Chart
+                  _buildChartCard(
+                    title: 'Calories Intake Over Time',
+                    chart: _buildLineChart(
+                      data: _progressHistory
+                          .where((p) => p.caloriesIntake != null)
+                          .map((p) => p.caloriesIntake!)
+                          .toList(),
+                      color: Colors.green,
+                    ),
                   ),
-                ),
-              ],
 
-              // Progress History
-              const SizedBox(height: 30),
-              const Text(
-                'Progress History',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _progressHistory.isEmpty
-                      ? const Center(child: Text('No progress records yet'))
-                      : ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _progressHistory.length,
-                          itemBuilder: (context, index) {
-                            final progress = _progressHistory[index];
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              child: ListTile(
-                                title: Text('BMI: ${progress.bmi?.toStringAsFixed(1) ?? 'N/A'}'),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('Calories Intake: ${progress.caloriesIntake?.toInt() ?? 'N/A'}'),
-                                    Text('Calorie Deficit: ${progress.calorieDeficit?.toInt() ?? 'N/A'}'),
-                                  ],
-                                ),
-                                trailing: Text(
-                                  '${progress.date.day}/${progress.date.month}/${progress.date.year}',
-                                ),
+                  // Calorie Deficit Chart
+                  _buildChartCard(
+                    title: 'Calorie Deficit Over Time',
+                    chart: _buildLineChart(
+                      data: _progressHistory
+                          .where((p) => p.calorieDeficit != null)
+                          .map((p) => p.calorieDeficit!)
+                          .toList(),
+                      color: Colors.red,
+                    ),
+                  ),
+                ],
+
+                // Progress History
+                const SizedBox(height: 30),
+                const Text(
+                  'Progress History',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _progressHistory.isEmpty
+                    ? const Center(child: Text('No progress records yet'))
+                    : ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _progressHistory.length,
+                        itemBuilder: (context, index) {
+                          final progress = _progressHistory[index];
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: ListTile(
+                              title: Text(
+                                'BMI: ${progress.bmi?.toStringAsFixed(1) ?? 'N/A'}',
                               ),
-                            );
-                          },
-                        ),
-            ],
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Calories Intake: ${progress.caloriesIntake?.toInt() ?? 'N/A'}',
+                                  ),
+                                  Text(
+                                    'Calorie Deficit: ${progress.calorieDeficit?.toInt() ?? 'N/A'}',
+                                  ),
+                                ],
+                              ),
+                              trailing: Text(
+                                '${progress.date.day}/${progress.date.month}/${progress.date.year}',
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ],
+            ),
           ),
         ),
       ),
@@ -348,11 +370,16 @@ class _ProgressScreenState extends State<ProgressScreen> {
                             'Update Locked',
                             style: TextStyle(fontWeight: FontWeight.bold),
                           ),
-                          Text('Next update in $_daysUntilNextBmiUpdate day(s)'),
+                          Text(
+                            'Next update in $_daysUntilNextBmiUpdate day(s)',
+                          ),
                           if (_bmiNextAllowedDate != null)
                             Text(
                               'Available: ${_bmiNextAllowedDate!.day}/${_bmiNextAllowedDate!.month}/${_bmiNextAllowedDate!.year}',
-                              style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontStyle: FontStyle.italic,
+                              ),
                             ),
                         ],
                       ),
@@ -410,7 +437,10 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     icon: const Icon(Icons.save),
                     label: const Text('Update BMI'),
                     style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 32,
+                        vertical: 16,
+                      ),
                       textStyle: const TextStyle(fontSize: 16),
                       backgroundColor: Colors.blue,
                     ),
@@ -470,11 +500,16 @@ class _ProgressScreenState extends State<ProgressScreen> {
                             'Update Locked',
                             style: TextStyle(fontWeight: FontWeight.bold),
                           ),
-                          Text('Next update in $_hoursUntilNextCaloriesUpdate hour(s)'),
+                          Text(
+                            'Next update in $_hoursUntilNextCaloriesUpdate hour(s)',
+                          ),
                           if (_caloriesNextAllowedDate != null)
                             Text(
                               'Available: ${_caloriesNextAllowedDate!.day}/${_caloriesNextAllowedDate!.month} ${_caloriesNextAllowedDate!.hour}:${_caloriesNextAllowedDate!.minute.toString().padLeft(2, '0')}',
-                              style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontStyle: FontStyle.italic,
+                              ),
                             ),
                         ],
                       ),
@@ -551,7 +586,10 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     icon: const Icon(Icons.save),
                     label: const Text('Update Calories'),
                     style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 32,
+                        vertical: 16,
+                      ),
                       textStyle: const TextStyle(fontSize: 16),
                       backgroundColor: Colors.green,
                     ),
@@ -578,10 +616,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            SizedBox(
-              height: 200,
-              child: chart,
-            ),
+            SizedBox(height: 200, child: chart),
           ],
         ),
       ),
@@ -601,10 +636,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
         gridData: FlGridData(show: true),
         titlesData: FlTitlesData(
           leftTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 40,
-            ),
+            sideTitles: SideTitles(showTitles: true, reservedSize: 40),
           ),
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
@@ -616,7 +648,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   if (index == 0 ||
                       index == (reversedData.length - 1) ~/ 2 ||
                       index == reversedData.length - 1) {
-                    final progress = _progressHistory[_progressHistory.length - 1 - index];
+                    final progress =
+                        _progressHistory[_progressHistory.length - 1 - index];
                     return Text(
                       '${progress.date.day}/${progress.date.month}',
                       style: const TextStyle(fontSize: 10),
