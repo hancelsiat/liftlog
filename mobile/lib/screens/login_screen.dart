@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -13,7 +12,8 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -41,9 +41,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppTheme.backgroundGradient,
-        ),
+        decoration: const BoxDecoration(gradient: AppTheme.backgroundGradient),
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
@@ -77,12 +75,10 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
                             // Login Button
                             _buildLoginButton(authProvider),
-                            
-
                           ],
                         ),
                       ),
-                      
+
                       const SizedBox(height: 24),
 
                       // Register Link
@@ -117,10 +113,11 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           ),
         ),
         const SizedBox(height: 24),
-        
+
         // App Title
         ShaderMask(
-          shaderCallback: (bounds) => AppTheme.primaryGradient.createShader(bounds),
+          shaderCallback: (bounds) =>
+              AppTheme.primaryGradient.createShader(bounds),
           child: const Text(
             'LiftLog',
             style: TextStyle(
@@ -132,7 +129,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           ),
         ),
         const SizedBox(height: 8),
-        
+
         Text(
           'Your Premium Fitness Companion',
           style: TextStyle(
@@ -158,15 +155,19 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             gradient: AppTheme.primaryGradient,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: const Icon(Icons.email_outlined, color: Colors.white, size: 20),
+          child: const Icon(
+            Icons.email_outlined,
+            color: Colors.white,
+            size: 20,
+          ),
         ),
       ),
       validator: (value) {
         if (value == null || value.isEmpty) {
-          return 'Please enter your email';
+          return 'Please enter your email address.';
         }
         if (!value.contains('@')) {
-          return 'Please enter a valid email';
+          return 'This doesn\'t look like a valid email address.';
         }
         return null;
       },
@@ -190,7 +191,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         ),
         suffixIcon: IconButton(
           icon: Icon(
-            _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+            _obscurePassword
+                ? Icons.visibility_outlined
+                : Icons.visibility_off_outlined,
             color: AppTheme.textSecondary,
           ),
           onPressed: () {
@@ -202,10 +205,10 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       ),
       validator: (value) {
         if (value == null || value.isEmpty) {
-          return 'Please enter your password';
+          return 'Please enter your password.';
         }
         if (value.length < 6) {
-          return 'Password must be at least 6 characters';
+          return 'Your password must be at least 6 characters long.';
         }
         return null;
       },
@@ -281,10 +284,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           Expanded(
             child: Text(
               error,
-              style: const TextStyle(
-                color: AppTheme.errorColor,
-                fontSize: 14,
-              ),
+              style: const TextStyle(color: AppTheme.errorColor, fontSize: 14),
             ),
           ),
         ],
@@ -314,7 +314,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             padding: const EdgeInsets.symmetric(horizontal: 8),
           ),
           child: ShaderMask(
-            shaderCallback: (bounds) => AppTheme.primaryGradient.createShader(bounds),
+            shaderCallback: (bounds) =>
+                AppTheme.primaryGradient.createShader(bounds),
             child: const Text(
               'Sign Up',
               style: TextStyle(
@@ -336,7 +337,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       final success = await authProvider.login(
         context,
         _emailController.text.trim(),
-        _passwordController.text
+        _passwordController.text,
       );
 
       if (success && mounted) {
@@ -344,20 +345,25 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         Navigator.pushReplacement(
           context,
           PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => const DashboardScreen(),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
-              return FadeTransition(opacity: animation, child: child);
-            },
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                const DashboardScreen(),
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+                  return FadeTransition(opacity: animation, child: child);
+                },
             transitionDuration: const Duration(milliseconds: 500),
           ),
         );
       } else if (authProvider.pendingApproval) {
         showDialog(
           context: context,
-          barrierDismissible: false, // User must tap button to dismiss, so they read the message
+          barrierDismissible:
+              false, // User must tap button to dismiss, so they read the message
           builder: (context) => AlertDialog(
             backgroundColor: Theme.of(context).colorScheme.surface,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
             icon: Icon(
               Icons.hourglass_top_rounded,
               color: Colors.amber[600],
@@ -400,7 +406,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('Email Not Verified'),
-            content: const Text('Please verify your email address before logging in. Would you like to resend the verification email?'),
+            content: const Text(
+              'Please verify your email address before logging in. Would you like to resend the verification email?',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
@@ -408,7 +416,10 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
               ),
               TextButton(
                 onPressed: () {
-                  authProvider.resendVerificationEmail(context, _emailController.text.trim());
+                  authProvider.resendVerificationEmail(
+                    context,
+                    _emailController.text.trim(),
+                  );
                   Navigator.of(context).pop();
                 },
                 child: const Text('Resend'),

@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
@@ -16,7 +15,8 @@ class RegisterScreen extends StatefulWidget {
   State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProviderStateMixin {
+class _RegisterScreenState extends State<RegisterScreen>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -55,9 +55,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
 
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppTheme.backgroundGradient,
-        ),
+        decoration: const BoxDecoration(gradient: AppTheme.backgroundGradient),
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
@@ -140,9 +138,16 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                 : const Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.cloud_upload_outlined, color: AppTheme.textSecondary, size: 40),
+                      Icon(
+                        Icons.cloud_upload_outlined,
+                        color: AppTheme.textSecondary,
+                        size: 40,
+                      ),
                       SizedBox(height: 8),
-                      Text('Tap to select an image', style: TextStyle(color: AppTheme.textSecondary)),
+                      Text(
+                        'Tap to select an image',
+                        style: TextStyle(color: AppTheme.textSecondary),
+                      ),
                     ],
                   ),
           ),
@@ -158,26 +163,29 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
     if (_formKey.currentState!.validate()) {
       if (_selectedRole == UserRole.trainer && _credentialFile == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please upload your trainer credential.')),
+          const SnackBar(
+            content: Text('Please upload your trainer credential.'),
+          ),
         );
         return;
       }
 
       final success = await Provider.of<AuthProvider>(context, listen: false)
           .register(
-        context,
-        _emailController.text.trim(), 
-        _passwordController.text, 
-        _usernameController.text.trim(),
-        role: _selectedRole,
-        credentialFile: _credentialFile,
-      );
+            context,
+            _emailController.text.trim(),
+            _passwordController.text,
+            _usernameController.text.trim(),
+            role: _selectedRole,
+            credentialFile: _credentialFile,
+          );
 
       if (success && mounted) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => CheckEmailScreen(email: _emailController.text.trim()),
+            builder: (context) =>
+                CheckEmailScreen(email: _emailController.text.trim()),
           ),
         );
       }
@@ -201,16 +209,13 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
               ),
             ],
           ),
-          child: const Icon(
-            Icons.person_add,
-            size: 40,
-            color: Colors.white,
-          ),
+          child: const Icon(Icons.person_add, size: 40, color: Colors.white),
         ),
         const SizedBox(height: 20),
-        
+
         ShaderMask(
-          shaderCallback: (bounds) => AppTheme.secondaryGradient.createShader(bounds),
+          shaderCallback: (bounds) =>
+              AppTheme.secondaryGradient.createShader(bounds),
           child: const Text(
             'Create Account',
             style: TextStyle(
@@ -222,7 +227,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
           ),
         ),
         const SizedBox(height: 8),
-        
+
         Text(
           'Join the LiftLog community',
           style: TextStyle(
@@ -251,9 +256,13 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(child: _buildRoleChip(UserRole.member, Icons.person, 'Member')),
+            Expanded(
+              child: _buildRoleChip(UserRole.member, Icons.person, 'Member'),
+            ),
             const SizedBox(width: 16),
-            Expanded(child: _buildRoleChip(UserRole.trainer, Icons.sports, 'Trainer')),
+            Expanded(
+              child: _buildRoleChip(UserRole.trainer, Icons.sports, 'Trainer'),
+            ),
           ],
         ),
         if (_selectedRole == UserRole.trainer) ...[
@@ -270,7 +279,11 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
             ),
             child: Row(
               children: [
-                const Icon(Icons.info_outline, color: AppTheme.infoColor, size: 20),
+                const Icon(
+                  Icons.info_outline,
+                  color: AppTheme.infoColor,
+                  size: 20,
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -301,7 +314,9 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
           color: isSelected ? null : AppTheme.surfaceColor.withOpacity(0.3),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? Colors.transparent : AppTheme.surfaceColor.withOpacity(0.5),
+            color: isSelected
+                ? Colors.transparent
+                : AppTheme.surfaceColor.withOpacity(0.5),
             width: 1,
           ),
         ),
@@ -339,15 +354,19 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
             gradient: AppTheme.accentGradient,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: const Icon(Icons.person_outline, color: Colors.white, size: 20),
+          child: const Icon(
+            Icons.person_outline,
+            color: Colors.white,
+            size: 20,
+          ),
         ),
       ),
       validator: (value) {
         if (value == null || value.isEmpty) {
-          return 'Please enter a username';
+          return 'Please enter a username.';
         }
         if (value.length < 3) {
-          return 'Username must be at least 3 characters';
+          return 'Your username must be at least 3 characters long.';
         }
         return null;
       },
@@ -367,15 +386,19 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
             gradient: AppTheme.primaryGradient,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: const Icon(Icons.email_outlined, color: Colors.white, size: 20),
+          child: const Icon(
+            Icons.email_outlined,
+            color: Colors.white,
+            size: 20,
+          ),
         ),
       ),
       validator: (value) {
         if (value == null || value.isEmpty) {
-          return 'Please enter an email';
+          return 'Please enter your email address.';
         }
         if (!value.contains('@')) {
-          return 'Please enter a valid email';
+          return 'This doesn\'t look like a valid email address.';
         }
         return null;
       },
@@ -399,7 +422,9 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
         ),
         suffixIcon: IconButton(
           icon: Icon(
-            _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+            _obscurePassword
+                ? Icons.visibility_outlined
+                : Icons.visibility_off_outlined,
             color: AppTheme.textSecondary,
           ),
           onPressed: () {
@@ -411,10 +436,10 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
       ),
       validator: (value) {
         if (value == null || value.isEmpty) {
-          return 'Please enter a password';
+          return 'Please enter a password.';
         }
         if (value.length < 6) {
-          return 'Password must be at least 6 characters';
+          return 'Your password must be at least 6 characters long.';
         }
         return null;
       },
@@ -430,10 +455,12 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
     return Container(
       height: 56,
       decoration: BoxDecoration(
-        gradient: canRegister ? AppTheme.secondaryGradient : AppTheme.disabledGradient,
+        gradient: canRegister
+            ? AppTheme.secondaryGradient
+            : AppTheme.disabledGradient,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          if(canRegister)
+          if (canRegister)
             BoxShadow(
               color: AppTheme.secondaryColor.withOpacity(0.4),
               blurRadius: 20,
@@ -496,10 +523,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
           Expanded(
             child: Text(
               error,
-              style: const TextStyle(
-                color: AppTheme.errorColor,
-                fontSize: 14,
-              ),
+              style: const TextStyle(color: AppTheme.errorColor, fontSize: 14),
             ),
           ),
         ],
@@ -529,7 +553,8 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
             padding: const EdgeInsets.symmetric(horizontal: 8),
           ),
           child: ShaderMask(
-            shaderCallback: (bounds) => AppTheme.secondaryGradient.createShader(bounds),
+            shaderCallback: (bounds) =>
+                AppTheme.secondaryGradient.createShader(bounds),
             child: const Text(
               'Sign In',
               style: TextStyle(

@@ -43,7 +43,7 @@ router.post('/register', upload.single('credential'), async (req, res) => {
         await User.findByIdAndDelete(existingUser._id);
       } else {
         return res.status(400).json({ 
-          error: 'User already exists with this email or username' 
+          error: 'An account with this email or username already exists. Please try logging in or use a different one.' 
         });
       }
     }
@@ -51,7 +51,7 @@ router.post('/register', upload.single('credential'), async (req, res) => {
     let credentialImageUrl = '';
     if (role === 'trainer') {
       if (!req.file) {
-        return res.status(400).json({ error: 'Trainer credential is required.' });
+        return res.status(400).json({ error: 'Please upload your trainer credentials to continue.' });
       }
 
       const file = req.file;
@@ -153,17 +153,17 @@ router.post('/login', async (req, res) => {
     const user = await User.findOne({ email });
 
     if (!user) {
-      return res.status(401).json({ error: 'Invalid login credentials' });
+      return res.status(401).json({ error: 'The email or password you entered is incorrect. Please check for typos and try again.' });
     }
 
     const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) {
-      return res.status(401).json({ error: 'Invalid login credentials' });
+      return res.status(401).json({ error: 'The email or password you entered is incorrect. Please check for typos and try again.' });
     }
 
     if (role && role !== 'all' && user.role !== role) {
       return res.status(403).json({
-        error: `Access denied. You are registered as a ${user.role}, not as a ${role}.`
+        error: `You are trying to log in as a ${role}, but your account is registered as a ${user.role}.`
       });
     }
 
@@ -183,7 +183,7 @@ router.post('/login', async (req, res) => {
     }
 
     if (!user.isMembershipActive()) {
-      return res.status(403).json({ error: 'Membership has expired' });
+      return res.status(403).json({ error: 'Your membership has expired. Please renew to access your account.' });
     }
 
     const token = generateToken(user);
