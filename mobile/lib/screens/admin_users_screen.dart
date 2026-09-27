@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -47,9 +46,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Manage Users'),
-      ),
+      appBar: AppBar(title: const Text('Manage Users')),
       body: FutureBuilder<Map<UserRole, List<User>>>(
         future: _usersFuture,
         builder: (context, snapshot) {
@@ -93,7 +90,10 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
       children: [
         Padding(
           padding: const EdgeInsets.all(16.0),
-          child: Text(title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          child: Text(
+            title,
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
         ),
         ListView.builder(
           shrinkWrap: true,
@@ -108,9 +108,18 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(user.username, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    Text(
+                      user.username,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 4),
-                    Text(user.email, style: const TextStyle(fontSize: 14, color: Colors.grey)),
+                    Text(
+                      user.email,
+                      style: const TextStyle(fontSize: 14, color: Colors.grey),
+                    ),
                     const SizedBox(height: 16),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
@@ -136,7 +145,8 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
             IconButton(
               icon: const Icon(Icons.badge_outlined, color: Colors.blue),
               tooltip: 'View Credential',
-              onPressed: () => _viewCredential(context, user.credentialImageUrl),
+              onPressed: () =>
+                  _viewCredential(context, user.credentialImageUrl),
             ),
           );
         }
@@ -200,15 +210,30 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     );
   }
 
-  void _approveTrainer(String userId, bool approve, BuildContext context, {String? rejectionReason}) async {
+  void _approveTrainer(
+    String userId,
+    bool approve,
+    BuildContext context, {
+    String? rejectionReason,
+  }) async {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      await authProvider.approveTrainer(context, userId, approve, rejectionReason: rejectionReason);
+      await authProvider.approveTrainer(
+        context,
+        userId,
+        approve,
+        rejectionReason: rejectionReason,
+      );
       setState(() {
         _usersFuture = _fetchAndGroupUsers();
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Trainer ${approve ? 'approved' : 'rejected'} successfully!'), backgroundColor: Colors.green),
+        SnackBar(
+          content: Text(
+            'Trainer ${approve ? 'approved' : 'rejected'} successfully!',
+          ),
+          backgroundColor: Colors.green,
+        ),
       );
     } catch (e) {
       showErrorSnackBar(context, e.toString());
@@ -217,31 +242,78 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
   void _showRejectionDialog(BuildContext context, String userId) {
     final rejectionReasonController = TextEditingController();
+    String selectedReason = 'Invalid credentials provided.';
+    final predefinedReasons = [
+      'Invalid credentials provided.',
+      'Credentials are not clear or unreadable.',
+      'Does not meet minimum qualifications.',
+      'Custom',
+    ];
+
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Reject Trainer'),
-          content: TextField(
-            controller: rejectionReasonController,
-            decoration: const InputDecoration(hintText: "Reason for rejection"),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                final reason = rejectionReasonController.text;
-                if (reason.isNotEmpty) {
-                  _approveTrainer(userId, false, context, rejectionReason: reason);
-                  Navigator.of(context).pop();
-                }
-              },
-              child: const Text('Reject'),
-            ),
-          ],
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Reject Trainer'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Select a reason for rejection:'),
+                  const SizedBox(height: 8),
+                  ...predefinedReasons.map((reason) {
+                    return RadioListTile<String>(
+                      title: Text(reason),
+                      value: reason,
+                      groupValue: selectedReason,
+                      onChanged: (value) {
+                        setDialogState(() {
+                          selectedReason = value!;
+                        });
+                      },
+                      contentPadding: EdgeInsets.zero,
+                    );
+                  }),
+                  if (selectedReason == 'Custom')
+                    TextField(
+                      controller: rejectionReasonController,
+                      decoration: const InputDecoration(
+                        hintText: "Enter custom reason",
+                      ),
+                      autofocus: true,
+                    ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    final reason = selectedReason == 'Custom'
+                        ? rejectionReasonController.text.trim()
+                        : selectedReason;
+
+                    if (reason.isNotEmpty) {
+                      _approveTrainer(
+                        userId,
+                        false,
+                        context,
+                        rejectionReason: reason,
+                      );
+                      Navigator.of(context).pop();
+                    }
+                  },
+                  child: const Text(
+                    'Reject',
+                    style: TextStyle(color: Colors.red),
+                  ),
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -250,12 +322,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   void _editUser(BuildContext context, User user) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => EditUserScreen(user: user),
-      ),
-    ).then((_) => setState(() {
-      _usersFuture = _fetchAndGroupUsers();
-    }));
+      MaterialPageRoute(builder: (context) => EditUserScreen(user: user)),
+    ).then(
+      (_) => setState(() {
+        _usersFuture = _fetchAndGroupUsers();
+      }),
+    );
   }
 
   void _deleteUser(BuildContext context, String userId) {
@@ -282,7 +354,10 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                   });
                   Navigator.of(context).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('User deleted successfully!'), backgroundColor: Colors.green),
+                    const SnackBar(
+                      content: Text('User deleted successfully!'),
+                      backgroundColor: Colors.green,
+                    ),
                   );
                 } catch (e) {
                   Navigator.of(context).pop();
