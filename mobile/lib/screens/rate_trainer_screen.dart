@@ -30,14 +30,18 @@ class _RateTrainerScreenState extends State<RateTrainerScreen> {
         _rating.toInt(),
         _feedbackController.text,
       );
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Thank you for your feedback!'), backgroundColor: Colors.green),
-      );
-      Navigator.of(context).pop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Thank you! Your feedback has been submitted successfully.'), backgroundColor: Colors.green),
+        );
+        Navigator.of(context).pop();
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error submitting rating: $e'), backgroundColor: Colors.red),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('We could not submit your rating at this time. Please try again.'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 

@@ -108,9 +108,11 @@ class _DriveUploadScreenState extends State<DriveUploadScreen> {
       setState(() {
         _status = 'Upload request error: $e';
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Upload failed: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to upload video from Google Drive. Please check your connection or link.')),
+        );
+      }
     } finally {
       setState(() => _loading = false);
     }

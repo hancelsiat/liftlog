@@ -223,9 +223,13 @@ class _ManageWorkoutsScreenState extends State<ManageWorkoutsScreen> {
         const SnackBar(content: Text('Workouts deleted successfully')),
       );
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to delete workouts: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to delete workouts. Please try again.'),
+          ),
+        );
+      }
     }
   }
 }

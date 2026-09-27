@@ -12,10 +12,12 @@ class CreateWorkoutTemplateScreen extends StatefulWidget {
   const CreateWorkoutTemplateScreen({super.key, this.workout});
 
   @override
-  State<CreateWorkoutTemplateScreen> createState() => _CreateWorkoutTemplateScreenState();
+  State<CreateWorkoutTemplateScreen> createState() =>
+      _CreateWorkoutTemplateScreenState();
 }
 
-class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScreen> {
+class _CreateWorkoutTemplateScreenState
+    extends State<CreateWorkoutTemplateScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
@@ -27,45 +29,212 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
   final List<Map<String, dynamic>> _exercises = [];
   bool _isLoading = false;
 
-  final List<String> _categories = ['strength', 'cardio', 'flexibility', 'mixed'];
+  final List<String> _categories = [
+    'strength',
+    'cardio',
+    'flexibility',
+    'mixed',
+  ];
   final List<String> _intensities = ['low', 'moderate', 'high'];
 
   // Predefined exercises by category
   final Map<String, List<Map<String, dynamic>>> _predefinedExercises = {
     'strength': [
-      {'name': 'Bench Press', 'icon': Icons.fitness_center, 'intensity': 'moderate', 'defaultSets': 3, 'defaultReps': 10},
-      {'name': 'Squats', 'icon': Icons.accessibility_new, 'intensity': 'moderate', 'defaultSets': 4, 'defaultReps': 12},
-      {'name': 'Deadlift', 'icon': Icons.fitness_center, 'intensity': 'high', 'defaultSets': 3, 'defaultReps': 8},
-      {'name': 'Shoulder Press', 'icon': Icons.fitness_center, 'intensity': 'moderate', 'defaultSets': 3, 'defaultReps': 10},
-      {'name': 'Bicep Curls', 'icon': Icons.fitness_center, 'intensity': 'low', 'defaultSets': 3, 'defaultReps': 12},
-      {'name': 'Tricep Dips', 'icon': Icons.fitness_center, 'intensity': 'low', 'defaultSets': 3, 'defaultReps': 12},
-      {'name': 'Lat Pulldown', 'icon': Icons.fitness_center, 'intensity': 'moderate', 'defaultSets': 3, 'defaultReps': 10},
-      {'name': 'Leg Press', 'icon': Icons.accessibility_new, 'intensity': 'moderate', 'defaultSets': 3, 'defaultReps': 12},
-      {'name': 'Lunges', 'icon': Icons.accessibility_new, 'intensity': 'low', 'defaultSets': 3, 'defaultReps': 10},
-      {'name': 'Pull-ups', 'icon': Icons.fitness_center, 'intensity': 'high', 'defaultSets': 3, 'defaultReps': 8},
-      {'name': 'Push-ups', 'icon': Icons.fitness_center, 'intensity': 'moderate', 'defaultSets': 3, 'defaultReps': 15},
-      {'name': 'Plank', 'icon': Icons.self_improvement, 'intensity': 'low', 'defaultSets': 3, 'defaultReps': 1},
+      {
+        'name': 'Bench Press',
+        'icon': Icons.fitness_center,
+        'intensity': 'moderate',
+        'defaultSets': 3,
+        'defaultReps': 10,
+      },
+      {
+        'name': 'Squats',
+        'icon': Icons.accessibility_new,
+        'intensity': 'moderate',
+        'defaultSets': 4,
+        'defaultReps': 12,
+      },
+      {
+        'name': 'Deadlift',
+        'icon': Icons.fitness_center,
+        'intensity': 'high',
+        'defaultSets': 3,
+        'defaultReps': 8,
+      },
+      {
+        'name': 'Shoulder Press',
+        'icon': Icons.fitness_center,
+        'intensity': 'moderate',
+        'defaultSets': 3,
+        'defaultReps': 10,
+      },
+      {
+        'name': 'Bicep Curls',
+        'icon': Icons.fitness_center,
+        'intensity': 'low',
+        'defaultSets': 3,
+        'defaultReps': 12,
+      },
+      {
+        'name': 'Tricep Dips',
+        'icon': Icons.fitness_center,
+        'intensity': 'low',
+        'defaultSets': 3,
+        'defaultReps': 12,
+      },
+      {
+        'name': 'Lat Pulldown',
+        'icon': Icons.fitness_center,
+        'intensity': 'moderate',
+        'defaultSets': 3,
+        'defaultReps': 10,
+      },
+      {
+        'name': 'Leg Press',
+        'icon': Icons.accessibility_new,
+        'intensity': 'moderate',
+        'defaultSets': 3,
+        'defaultReps': 12,
+      },
+      {
+        'name': 'Lunges',
+        'icon': Icons.accessibility_new,
+        'intensity': 'low',
+        'defaultSets': 3,
+        'defaultReps': 10,
+      },
+      {
+        'name': 'Pull-ups',
+        'icon': Icons.fitness_center,
+        'intensity': 'high',
+        'defaultSets': 3,
+        'defaultReps': 8,
+      },
+      {
+        'name': 'Push-ups',
+        'icon': Icons.fitness_center,
+        'intensity': 'moderate',
+        'defaultSets': 3,
+        'defaultReps': 15,
+      },
+      {
+        'name': 'Plank',
+        'icon': Icons.self_improvement,
+        'intensity': 'low',
+        'defaultSets': 3,
+        'defaultReps': 1,
+      },
     ],
     'cardio': [
-      {'name': 'Running', 'icon': Icons.directions_run, 'intensity': 'moderate', 'defaultSets': 1, 'defaultReps': 30},
-      {'name': 'Cycling', 'icon': Icons.directions_bike, 'intensity': 'moderate', 'defaultSets': 1, 'defaultReps': 30},
-      {'name': 'Jump Rope', 'icon': Icons.sports, 'intensity': 'high', 'defaultSets': 3, 'defaultReps': 100},
-      {'name': 'Burpees', 'icon': Icons.fitness_center, 'intensity': 'high', 'defaultSets': 3, 'defaultReps': 15},
-      {'name': 'Mountain Climbers', 'icon': Icons.fitness_center, 'intensity': 'high', 'defaultSets': 3, 'defaultReps': 20},
-      {'name': 'High Knees', 'icon': Icons.directions_run, 'intensity': 'moderate', 'defaultSets': 3, 'defaultReps': 30},
-      {'name': 'Jumping Jacks', 'icon': Icons.sports, 'intensity': 'low', 'defaultSets': 3, 'defaultReps': 30},
+      {
+        'name': 'Running',
+        'icon': Icons.directions_run,
+        'intensity': 'moderate',
+        'defaultSets': 1,
+        'defaultReps': 30,
+      },
+      {
+        'name': 'Cycling',
+        'icon': Icons.directions_bike,
+        'intensity': 'moderate',
+        'defaultSets': 1,
+        'defaultReps': 30,
+      },
+      {
+        'name': 'Jump Rope',
+        'icon': Icons.sports,
+        'intensity': 'high',
+        'defaultSets': 3,
+        'defaultReps': 100,
+      },
+      {
+        'name': 'Burpees',
+        'icon': Icons.fitness_center,
+        'intensity': 'high',
+        'defaultSets': 3,
+        'defaultReps': 15,
+      },
+      {
+        'name': 'Mountain Climbers',
+        'icon': Icons.fitness_center,
+        'intensity': 'high',
+        'defaultSets': 3,
+        'defaultReps': 20,
+      },
+      {
+        'name': 'High Knees',
+        'icon': Icons.directions_run,
+        'intensity': 'moderate',
+        'defaultSets': 3,
+        'defaultReps': 30,
+      },
+      {
+        'name': 'Jumping Jacks',
+        'icon': Icons.sports,
+        'intensity': 'low',
+        'defaultSets': 3,
+        'defaultReps': 30,
+      },
     ],
     'flexibility': [
-      {'name': 'Yoga Flow', 'icon': Icons.self_improvement, 'intensity': 'low', 'defaultSets': 1, 'defaultReps': 20},
-      {'name': 'Stretching', 'icon': Icons.self_improvement, 'intensity': 'low', 'defaultSets': 1, 'defaultReps': 15},
-      {'name': 'Hamstring Stretch', 'icon': Icons.self_improvement, 'intensity': 'low', 'defaultSets': 2, 'defaultReps': 1},
-      {'name': 'Quad Stretch', 'icon': Icons.self_improvement, 'intensity': 'low', 'defaultSets': 2, 'defaultReps': 1},
-      {'name': 'Shoulder Stretch', 'icon': Icons.self_improvement, 'intensity': 'low', 'defaultSets': 2, 'defaultReps': 1},
+      {
+        'name': 'Yoga Flow',
+        'icon': Icons.self_improvement,
+        'intensity': 'low',
+        'defaultSets': 1,
+        'defaultReps': 20,
+      },
+      {
+        'name': 'Stretching',
+        'icon': Icons.self_improvement,
+        'intensity': 'low',
+        'defaultSets': 1,
+        'defaultReps': 15,
+      },
+      {
+        'name': 'Hamstring Stretch',
+        'icon': Icons.self_improvement,
+        'intensity': 'low',
+        'defaultSets': 2,
+        'defaultReps': 1,
+      },
+      {
+        'name': 'Quad Stretch',
+        'icon': Icons.self_improvement,
+        'intensity': 'low',
+        'defaultSets': 2,
+        'defaultReps': 1,
+      },
+      {
+        'name': 'Shoulder Stretch',
+        'icon': Icons.self_improvement,
+        'intensity': 'low',
+        'defaultSets': 2,
+        'defaultReps': 1,
+      },
     ],
     'mixed': [
-      {'name': 'Circuit Training', 'icon': Icons.fitness_center, 'intensity': 'moderate', 'defaultSets': 3, 'defaultReps': 12},
-      {'name': 'HIIT', 'icon': Icons.sports, 'intensity': 'high', 'defaultSets': 4, 'defaultReps': 30},
-      {'name': 'CrossFit WOD', 'icon': Icons.fitness_center, 'intensity': 'high', 'defaultSets': 1, 'defaultReps': 1},
+      {
+        'name': 'Circuit Training',
+        'icon': Icons.fitness_center,
+        'intensity': 'moderate',
+        'defaultSets': 3,
+        'defaultReps': 12,
+      },
+      {
+        'name': 'HIIT',
+        'icon': Icons.sports,
+        'intensity': 'high',
+        'defaultSets': 4,
+        'defaultReps': 30,
+      },
+      {
+        'name': 'CrossFit WOD',
+        'icon': Icons.fitness_center,
+        'intensity': 'high',
+        'defaultSets': 1,
+        'defaultReps': 1,
+      },
     ],
   };
 
@@ -111,7 +280,9 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Theme.of(context).primaryColor,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(20),
+                ),
               ),
               child: Row(
                 children: [
@@ -149,34 +320,45 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
                       ),
                     )
                   else
-                    ...filteredExercises.map((exercise) => Card(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          child: ListTile(
-                            leading: Icon(
-                              exercise['icon'] as IconData,
-                              color: Theme.of(context).primaryColor,
-                            ),
-                            title: Text(exercise['name'] as String),
-                            subtitle: Text(
-                              '${exercise['defaultSets']} sets × ${exercise['defaultReps']} reps',
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                            trailing: const Icon(Icons.add_circle_outline),
-                            onTap: () {
-                              _addPredefinedExercise(exercise);
-                              Navigator.pop(context, true);
-                            },
+                    ...filteredExercises.map(
+                      (exercise) => Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          leading: Icon(
+                            exercise['icon'] as IconData,
+                            color: Theme.of(context).primaryColor,
                           ),
-                        )),
+                          title: Text(exercise['name'] as String),
+                          subtitle: Text(
+                            '${exercise['defaultSets']} sets × ${exercise['defaultReps']} reps',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          trailing: const Icon(Icons.add_circle_outline),
+                          onTap: () {
+                            _addPredefinedExercise(exercise);
+                            Navigator.pop(context, true);
+                          },
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 16),
                   // Custom exercise option
                   Card(
                     color: Colors.blue.shade100,
                     child: ListTile(
                       leading: const Icon(Icons.edit, color: Colors.blue),
-                      title: const Text('Custom Exercise', style: TextStyle(color: Colors.black)),
-                      subtitle: const Text('Create your own exercise', style: TextStyle(color: Colors.black54)),
-                      trailing: const Icon(Icons.arrow_forward, color: Colors.black),
+                      title: const Text(
+                        'Custom Exercise',
+                        style: TextStyle(color: Colors.black),
+                      ),
+                      subtitle: const Text(
+                        'Create your own exercise',
+                        style: TextStyle(color: Colors.black54),
+                      ),
+                      trailing: const Icon(
+                        Icons.arrow_forward,
+                        color: Colors.black,
+                      ),
                       onTap: () {
                         Navigator.pop(context);
                         _addCustomExercise();
@@ -264,7 +446,10 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
     });
 
     try {
-      final workoutProvider = Provider.of<WorkoutProvider>(context, listen: false);
+      final workoutProvider = Provider.of<WorkoutProvider>(
+        context,
+        listen: false,
+      );
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       if (widget.workout == null) {
         await workoutProvider.createWorkout(
@@ -277,7 +462,9 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
         );
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Workout template created successfully!')),
+          const SnackBar(
+            content: Text('Workout template created successfully!'),
+          ),
         );
       } else {
         await workoutProvider.updateWorkout(
@@ -287,15 +474,21 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
           _exercises,
         );
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Workout template updated successfully!')),
+          const SnackBar(
+            content: Text('Workout template updated successfully!'),
+          ),
         );
       }
 
       Navigator.pop(context);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving workout template: $e')),
-      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to save workout template. Please try again.'),
+          ),
+        );
+      }
     } finally {
       setState(() {
         _isLoading = false;
@@ -315,9 +508,7 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Create Workout Template'),
-      ),
+      appBar: AppBar(title: const Text('Create Workout Template')),
       body: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -411,7 +602,6 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
               ),
               const SizedBox(height: 16),
 
-
               const SizedBox(height: 32),
 
               // Exercises Section
@@ -460,7 +650,9 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
                                 Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: Theme.of(context).primaryColor.withOpacity(0.1),
+                                    color: Theme.of(
+                                      context,
+                                    ).primaryColor.withOpacity(0.1),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Text(
@@ -475,8 +667,8 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Text(
-                                    _exercises[index]['name'].isEmpty 
-                                        ? 'Exercise ${index + 1}' 
+                                    _exercises[index]['name'].isEmpty
+                                        ? 'Exercise ${index + 1}'
                                         : _exercises[index]['name'],
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
@@ -485,7 +677,10 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
                                   ),
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.delete, color: Colors.red),
+                                  icon: const Icon(
+                                    Icons.delete,
+                                    color: Colors.red,
+                                  ),
                                   onPressed: () => _removeExercise(index),
                                 ),
                               ],
@@ -497,7 +692,8 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
                                 labelText: 'Exercise Name',
                                 border: OutlineInputBorder(),
                               ),
-                              onChanged: (value) => _updateExercise(index, 'name', value),
+                              onChanged: (value) =>
+                                  _updateExercise(index, 'name', value),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
                                   return 'Please enter exercise name';
@@ -510,37 +706,52 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
                               children: [
                                 Expanded(
                                   child: TextFormField(
-                                    initialValue: _exercises[index]['sets'].toString(),
+                                    initialValue: _exercises[index]['sets']
+                                        .toString(),
                                     decoration: const InputDecoration(
                                       labelText: 'Sets',
                                       border: OutlineInputBorder(),
                                     ),
                                     keyboardType: TextInputType.number,
-                                    onChanged: (value) => _updateExercise(index, 'sets', int.tryParse(value) ?? 3),
+                                    onChanged: (value) => _updateExercise(
+                                      index,
+                                      'sets',
+                                      int.tryParse(value) ?? 3,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 16),
                                 Expanded(
                                   child: TextFormField(
-                                    initialValue: _exercises[index]['reps'].toString(),
+                                    initialValue: _exercises[index]['reps']
+                                        .toString(),
                                     decoration: const InputDecoration(
                                       labelText: 'Reps',
                                       border: OutlineInputBorder(),
                                     ),
                                     keyboardType: TextInputType.number,
-                                    onChanged: (value) => _updateExercise(index, 'reps', int.tryParse(value) ?? 10),
+                                    onChanged: (value) => _updateExercise(
+                                      index,
+                                      'reps',
+                                      int.tryParse(value) ?? 10,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 16),
                                 Expanded(
                                   child: TextFormField(
-                                    initialValue: _exercises[index]['weight'].toString(),
+                                    initialValue: _exercises[index]['weight']
+                                        .toString(),
                                     decoration: const InputDecoration(
                                       labelText: 'Weight (lbs)',
                                       border: OutlineInputBorder(),
                                     ),
                                     keyboardType: TextInputType.number,
-                                    onChanged: (value) => _updateExercise(index, 'weight', int.tryParse(value) ?? 0),
+                                    onChanged: (value) => _updateExercise(
+                                      index,
+                                      'weight',
+                                      int.tryParse(value) ?? 0,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -553,7 +764,8 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
                                 border: OutlineInputBorder(),
                               ),
                               maxLines: 2,
-                              onChanged: (value) => _updateExercise(index, 'notes', value),
+                              onChanged: (value) =>
+                                  _updateExercise(index, 'notes', value),
                             ),
                           ],
                         ),
@@ -604,7 +816,10 @@ class _CreateWorkoutTemplateScreenState extends State<CreateWorkoutTemplateScree
                         : const Icon(Icons.check_circle, size: 28),
                     label: Text(
                       _isLoading ? 'Saving...' : 'Save Workout Template',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,

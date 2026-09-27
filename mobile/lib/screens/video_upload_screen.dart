@@ -1,11 +1,8 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../services/api_service.dart';
-import '../models/exercise_video.dart';
 
 class VideoUploadScreen extends StatefulWidget {
   const VideoUploadScreen({super.key});
@@ -18,7 +15,11 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
   final _formKey = GlobalKey<FormState>();
   final _apiService = ApiService();
   final GoogleSignIn _googleSignIn = GoogleSignIn(
-    scopes: ['https://www.googleapis.com/auth/drive.readonly', 'profile', 'email'],
+    scopes: [
+      'https://www.googleapis.com/auth/drive.readonly',
+      'profile',
+      'email',
+    ],
   );
 
   final _titleController = TextEditingController();
@@ -45,8 +46,6 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
   String _driveStatus = '';
   final bool _showDriveUpload = false;
 
-
-
   Future<void> _uploadVideo() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -58,7 +57,9 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
       final jwt = await _apiService.getToken();
       if (jwt == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Session expired. Please log in again.')),
+          const SnackBar(
+            content: Text('Session expired. Please log in again.'),
+          ),
         );
         Navigator.of(context).pushReplacementNamed('/login');
         return;
@@ -85,19 +86,27 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
         });
       } else {
         final message = result['message'];
-        final displayMessage = (message is Map) ? message.toString() : (message ?? 'Upload failed');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(displayMessage)),
-        );
+        final displayMessage = (message is Map)
+            ? message.toString()
+            : (message ?? 'Upload failed');
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(displayMessage)));
       }
 
       setState(() {
         _isUploading = false;
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Upload failed: ${e.toString()}')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Failed to upload video. Please check your connection.',
+            ),
+          ),
+        );
+      }
       setState(() {
         _isUploading = false;
       });
@@ -135,15 +144,23 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
     });
     try {
       // Query Drive for video/mp4 files owned by or shared with the user
-      final q = Uri.encodeQueryComponent("mimeType='video/mp4' and trashed=false");
-      final url = 'https://www.googleapis.com/drive/v3/files?q=$q&fields=files(id,name,size,mimeType)';
+      final q = Uri.encodeQueryComponent(
+        "mimeType='video/mp4' and trashed=false",
+      );
+      final url =
+          'https://www.googleapis.com/drive/v3/files?q=$q&fields=files(id,name,size,mimeType)';
 
-      final resp = await http.get(Uri.parse(url),
-        headers: {'Authorization': 'Bearer $_accessToken'});
-      if (resp.statusCode != 200) throw Exception('Drive list failed: ${resp.statusCode} ${resp.body}');
+      final resp = await http.get(
+        Uri.parse(url),
+        headers: {'Authorization': 'Bearer $_accessToken'},
+      );
+      if (resp.statusCode != 200)
+        throw Exception('Drive list failed: ${resp.statusCode} ${resp.body}');
 
       final data = json.decode(resp.body) as Map<String, dynamic>;
-      final files = (data['files'] as List<dynamic>).map((f) => Map<String, dynamic>.from(f)).toList();
+      final files = (data['files'] as List<dynamic>)
+          .map((f) => Map<String, dynamic>.from(f))
+          .toList();
       setState(() {
         _driveFiles = files;
         _driveStatus = 'Found ${files.length} mp4 files';
@@ -191,7 +208,11 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
       );
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Video "${uploadedVideo.title}" uploaded successfully from Drive')),
+        SnackBar(
+          content: Text(
+            'Video "${uploadedVideo.title}" uploaded successfully from Drive',
+          ),
+        ),
       );
 
       // Clear form after successful upload
@@ -205,14 +226,19 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
 
       // Navigate to training videos to see the uploaded video
       Navigator.of(context).pushReplacementNamed('/training-videos');
-
     } catch (e) {
       setState(() {
         _driveStatus = 'Upload failed: $e';
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Upload failed: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Failed to upload video from Google Drive. Please check the link and try again.',
+            ),
+          ),
+        );
+      }
     } finally {
       setState(() => _isUploading = false);
     }
@@ -221,9 +247,7 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Upload Training Video'),
-      ),
+      appBar: AppBar(title: const Text('Upload Training Video')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Form(
@@ -231,9 +255,6 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-
-
-
               // Video Title
               TextFormField(
                 controller: _titleController,
@@ -304,22 +325,20 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
               ),
               const SizedBox(height: 16),
 
-
-
               // Upload Button
               _isUploading
-                ? const Center(child: CircularProgressIndicator())
-                : ElevatedButton(
-                    onPressed: _uploadVideo,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                  ? const Center(child: CircularProgressIndicator())
+                  : ElevatedButton(
+                      onPressed: _uploadVideo,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: const Text(
+                        'Select and Upload Video',
+                        style: TextStyle(fontSize: 18),
+                      ),
                     ),
-                    child: const Text(
-                      'Select and Upload Video',
-                      style: TextStyle(fontSize: 18),
-                    ),
-                  ),
             ],
           ),
         ),

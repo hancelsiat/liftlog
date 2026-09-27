@@ -112,7 +112,11 @@ class _ProgressScreenState extends State<ProgressScreen> {
         Navigator.of(context).pushReplacementNamed('/login');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load progress history: $e')),
+          const SnackBar(
+            content: Text(
+              'We could not load your progress history at this time.',
+            ),
+          ),
         );
       }
     }
@@ -151,8 +155,10 @@ class _ProgressScreenState extends State<ProgressScreen> {
         );
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to update BMI: $e'),
+          const SnackBar(
+            content: Text(
+              'Failed to update BMI. Please check your connection and try again.',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -195,8 +201,10 @@ class _ProgressScreenState extends State<ProgressScreen> {
         );
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to update calories: $e'),
+          const SnackBar(
+            content: Text(
+              'Failed to update calories. Please check your connection and try again.',
+            ),
             backgroundColor: Colors.red,
           ),
         );

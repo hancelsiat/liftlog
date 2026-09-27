@@ -24,9 +24,11 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
       );
       Navigator.of(context).pop();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error completing workout: $e'), backgroundColor: Colors.red),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to complete workout. Please check your connection.'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 

@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:liftlog_mobile/models/workout.dart';
 import 'package:liftlog_mobile/services/api_service.dart';
@@ -25,7 +24,10 @@ class _AssignWorkoutScreenState extends State<AssignWorkoutScreen> {
   }
 
   Future<List<Workout>> _fetchWorkoutTemplates() async {
-    final trainerId = Provider.of<AuthProvider>(context, listen: false).user?.id;
+    final trainerId = Provider.of<AuthProvider>(
+      context,
+      listen: false,
+    ).user?.id;
     final response = await _apiService.getTrainerWorkouts();
     return response.where((workout) => workout.trainerId == trainerId).toList();
   }
@@ -33,14 +35,24 @@ class _AssignWorkoutScreenState extends State<AssignWorkoutScreen> {
   void _assignWorkout(String workoutId) async {
     try {
       await _apiService.assignWorkoutToClient(widget.memberId, workoutId);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Workout assigned successfully!'), backgroundColor: Colors.green),
-      );
-      Navigator.of(context).pop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Workout successfully assigned to the client!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.of(context).pop(); // Return true to indicate success
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error assigning workout: $e'), backgroundColor: Colors.red),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('We could not assign the workout. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -59,10 +71,20 @@ class _AssignWorkoutScreenState extends State<AssignWorkoutScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.white)));
+            return Center(
+              child: Text(
+                'Error: ${snapshot.error}',
+                style: const TextStyle(color: Colors.white),
+              ),
+            );
           }
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('You have no workout templates.', style: TextStyle(color: Colors.white)));
+            return const Center(
+              child: Text(
+                'You have no workout templates.',
+                style: TextStyle(color: Colors.white),
+              ),
+            );
           }
 
           final workouts = snapshot.data!;
@@ -74,7 +96,10 @@ class _AssignWorkoutScreenState extends State<AssignWorkoutScreen> {
                 color: AppTheme.cardBackground,
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: ListTile(
-                  title: Text(workout.title, style: const TextStyle(color: Colors.white)),
+                  title: Text(
+                    workout.title,
+                    style: const TextStyle(color: Colors.white),
+                  ),
                   onTap: () => _assignWorkout(workout.id),
                 ),
               );

@@ -38,9 +38,11 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
           await ApiService.configureBaseUrl(manualIp: url);
         }
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Server URL updated successfully')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Server URL updated successfully')),
+          );
+        }
 
         setState(() {
           _currentBaseUrl = ApiService.getCurrentBaseUrl();

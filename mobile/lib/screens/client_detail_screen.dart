@@ -49,14 +49,13 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with SingleTick
         const SnackBar(content: Text('Client removed successfully!'), backgroundColor: Colors.green),
       );
       Navigator.of(context).pop();
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error removing client: $e'), backgroundColor: Colors.red),
-      );
-    }
-  }
-
-  void _deleteWorkout(String workoutId) async {
+} catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to remove client. Please try again.'), backgroundColor: Colors.red),
+        );
+      }
+    }void _deleteWorkout(String workoutId) async {
     try {
       await _apiService.deleteWorkout(workoutId);
       setState(() {
@@ -64,13 +63,13 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with SingleTick
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Workout deleted successfully!'), backgroundColor: Colors.green),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error deleting workout: $e'), backgroundColor: Colors.red),
-      );
+} catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to delete workout. Please try again.'), backgroundColor: Colors.red),
+        );
+      }
     }
-  }
 
   @override
   Widget build(BuildContext context) {
