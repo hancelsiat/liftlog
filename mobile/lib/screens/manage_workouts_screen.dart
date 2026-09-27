@@ -54,7 +54,9 @@ class _ManageWorkoutsScreenState extends State<ManageWorkoutsScreen> {
               onPressed: _deleteSelectedWorkouts,
             ),
           IconButton(
-            icon: Icon(_isSelecting ? Icons.close : Icons.check_box_outline_blank),
+            icon: Icon(
+              _isSelecting ? Icons.close : Icons.check_box_outline_blank,
+            ),
             onPressed: () {
               setState(() {
                 _isSelecting = !_isSelecting;
@@ -65,105 +67,150 @@ class _ManageWorkoutsScreenState extends State<ManageWorkoutsScreen> {
         ],
       ),
       backgroundColor: AppTheme.darkBackground,
-      body: Builder(builder: (context) {
-        if (workoutProvider.isLoading) {
-          return const Center(child: CircularProgressIndicator());
-        } else if (workoutProvider.error != null) {
-          return Center(child: Text('Error: ${workoutProvider.error}'));
-        } else if (workouts.isEmpty) {
-          return const Center(
-            child: Text(
-              'You have not created any workouts yet.',
-              style: TextStyle(color: Colors.white, fontSize: 16),
-            ),
-          );
-        } else {
-          return ListView.builder(
-            padding: const EdgeInsets.all(8.0),
-            itemCount: workouts.length,
-            itemBuilder: (context, index) {
-              final workout = workouts[index];
-              final isSelected = _selectedWorkouts.contains(workout.id);
-              final formattedDate = DateFormat.yMMMd().format(workout.date.toLocal());
-
-              return Card(
-                color: isSelected ? AppTheme.primaryColor.withOpacity(0.5) : AppTheme.cardBackground,
-                margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 8.0),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.all(16.0),
-                  leading: _isSelecting
-                      ? Checkbox(
-                          value: isSelected,
-                          onChanged: (bool? value) {
-                            setState(() {
-                              if (value == true) {
-                                _selectedWorkouts.add(workout.id);
-                              } else {
-                                _selectedWorkouts.remove(workout.id);
-                              }
-                            });
-                          },
-                        )
-                      : const Icon(Icons.fitness_center, color: AppTheme.primaryColor, size: 40),
-                  title: Text(
-                    workout.name,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+      body: RefreshIndicator(
+        onRefresh: () =>
+            Provider.of<WorkoutProvider>(context, listen: false).loadWorkouts(),
+        child: Builder(
+          builder: (context) {
+            if (workoutProvider.isLoading) {
+              return const Center(child: CircularProgressIndicator());
+            } else if (workoutProvider.error != null) {
+              return ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(height: MediaQuery.of(context).size.height * 0.4),
+                  Center(
+                    child: Text(
+                      'Error: ${workoutProvider.error}',
+                      style: const TextStyle(color: Colors.white),
+                    ),
                   ),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        workout.description,
-                        style: const TextStyle(color: Colors.white70),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Created on: $formattedDate',
-                        style: const TextStyle(color: Colors.white54, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.edit, color: Colors.blue),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => CreateWorkoutTemplateScreen(workout: workout),
-                        ),
-                      );
-                    },
-                  ),
-                  onTap: () {
-                    if (_isSelecting) {
-                      setState(() {
-                        if (isSelected) {
-                          _selectedWorkouts.remove(workout.id);
-                        } else {
-                          _selectedWorkouts.add(workout.id);
-                        }
-                      });
-                    }
-                  },
-                  onLongPress: () {
-                    setState(() {
-                      _isSelecting = true;
-                      _selectedWorkouts.add(workout.id);
-                    });
-                  },
-                ),
+                ],
               );
-            },
-          );
-        }
-      }),
+            } else if (workouts.isEmpty) {
+              return ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(height: MediaQuery.of(context).size.height * 0.4),
+                  const Center(
+                    child: Text(
+                      'You have not created any workouts yet.',
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                  ),
+                ],
+              );
+            } else {
+              return ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(8.0),
+                itemCount: workouts.length,
+                itemBuilder: (context, index) {
+                  final workout = workouts[index];
+                  final isSelected = _selectedWorkouts.contains(workout.id);
+                  final formattedDate = DateFormat.yMMMd().format(
+                    workout.date.toLocal(),
+                  );
+
+                  return Card(
+                    color: isSelected
+                        ? AppTheme.primaryColor.withOpacity(0.5)
+                        : AppTheme.cardBackground,
+                    margin: const EdgeInsets.symmetric(
+                      vertical: 8.0,
+                      horizontal: 8.0,
+                    ),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.all(16.0),
+                      leading: _isSelecting
+                          ? Checkbox(
+                              value: isSelected,
+                              onChanged: (bool? value) {
+                                setState(() {
+                                  if (value == true) {
+                                    _selectedWorkouts.add(workout.id);
+                                  } else {
+                                    _selectedWorkouts.remove(workout.id);
+                                  }
+                                });
+                              },
+                            )
+                          : const Icon(
+                              Icons.fitness_center,
+                              color: AppTheme.primaryColor,
+                              size: 40,
+                            ),
+                      title: Text(
+                        workout.name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            workout.description,
+                            style: const TextStyle(color: Colors.white70),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Created on: $formattedDate',
+                            style: const TextStyle(
+                              color: Colors.white54,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.edit, color: Colors.blue),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  CreateWorkoutTemplateScreen(workout: workout),
+                            ),
+                          );
+                        },
+                      ),
+                      onTap: () {
+                        if (_isSelecting) {
+                          setState(() {
+                            if (isSelected) {
+                              _selectedWorkouts.remove(workout.id);
+                            } else {
+                              _selectedWorkouts.add(workout.id);
+                            }
+                          });
+                        }
+                      },
+                      onLongPress: () {
+                        setState(() {
+                          _isSelecting = true;
+                          _selectedWorkouts.add(workout.id);
+                        });
+                      },
+                    ),
+                  );
+                },
+              );
+            }
+          },
+        ),
+      ),
     );
   }
 
   void _deleteSelectedWorkouts() async {
     if (_selectedWorkouts.isEmpty) return;
 
-    final workoutProvider = Provider.of<WorkoutProvider>(context, listen: false);
+    final workoutProvider = Provider.of<WorkoutProvider>(
+      context,
+      listen: false,
+    );
     final List<String> workoutsToDelete = _selectedWorkouts.toList();
 
     try {
@@ -176,9 +223,9 @@ class _ManageWorkoutsScreenState extends State<ManageWorkoutsScreen> {
         const SnackBar(content: Text('Workouts deleted successfully')),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to delete workouts: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to delete workouts: $e')));
     }
   }
 }

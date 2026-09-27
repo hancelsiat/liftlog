@@ -12,7 +12,8 @@ class TrainerVideosScreen extends StatefulWidget {
   _TrainerVideosScreenState createState() => _TrainerVideosScreenState();
 }
 
-class _TrainerVideosScreenState extends State<TrainerVideosScreen> with SingleTickerProviderStateMixin {
+class _TrainerVideosScreenState extends State<TrainerVideosScreen>
+    with SingleTickerProviderStateMixin {
   final ApiService _apiService = ApiService();
   List<ExerciseVideo> _videos = [];
   bool _isLoading = true;
@@ -55,7 +56,9 @@ class _TrainerVideosScreenState extends State<TrainerVideosScreen> with SingleTi
               content: const Text('Session expired. Please log in again.'),
               backgroundColor: AppTheme.errorColor,
               behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           );
           Navigator.of(context).pushReplacementNamed('/login');
@@ -68,10 +71,8 @@ class _TrainerVideosScreenState extends State<TrainerVideosScreen> with SingleTi
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => VideoPlayerScreen(
-          videoUrl: videoUrl,
-          title: title,
-        ),
+        builder: (context) =>
+            VideoPlayerScreen(videoUrl: videoUrl, title: title),
       ),
     );
   }
@@ -92,7 +93,9 @@ class _TrainerVideosScreenState extends State<TrainerVideosScreen> with SingleTi
             ),
             backgroundColor: AppTheme.successColor,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         );
       }
@@ -103,7 +106,9 @@ class _TrainerVideosScreenState extends State<TrainerVideosScreen> with SingleTi
             content: Text('Failed to delete video: ${e.toString()}'),
             backgroundColor: AppTheme.errorColor,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         );
       }
@@ -114,21 +119,19 @@ class _TrainerVideosScreenState extends State<TrainerVideosScreen> with SingleTi
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppTheme.backgroundGradient,
-        ),
+        decoration: const BoxDecoration(gradient: AppTheme.backgroundGradient),
         child: SafeArea(
           child: Column(
             children: [
               _buildAppBar(),
               Expanded(
-                child: _isLoading 
-                  ? _buildLoadingState()
-                  : _errorMessage != null
+                child: _isLoading
+                    ? _buildLoadingState()
+                    : _errorMessage != null
                     ? _buildErrorState()
                     : _videos.isEmpty
-                      ? _buildEmptyState()
-                      : _buildVideoList(),
+                    ? _buildEmptyState()
+                    : _buildVideoList(),
               ),
             ],
           ),
@@ -199,90 +202,111 @@ class _TrainerVideosScreenState extends State<TrainerVideosScreen> with SingleTi
   }
 
   Widget _buildErrorState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppTheme.errorColor.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.error_outline,
-                size: 64,
-                color: AppTheme.errorColor,
+    return RefreshIndicator(
+      onRefresh: _fetchTrainerVideos,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(height: MediaQuery.of(context).size.height * 0.2),
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: AppTheme.errorColor.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.error_outline,
+                      size: 64,
+                      color: AppTheme.errorColor,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    _errorMessage!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: AppTheme.textPrimary,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: _fetchTrainerVideos,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryColor,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 32,
+                        vertical: 16,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 24),
-            Text(
-              _errorMessage!,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: AppTheme.textPrimary,
-                fontSize: 16,
-              ),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: _fetchTrainerVideos,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                gradient: AppTheme.primaryGradient,
-                shape: BoxShape.circle,
-                boxShadow: AppTheme.glowShadow,
-              ),
-              child: const Icon(
-                Icons.video_library_outlined,
-                size: 80,
-                color: Colors.white,
+    return RefreshIndicator(
+      onRefresh: _fetchTrainerVideos,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(height: MediaQuery.of(context).size.height * 0.2),
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(32),
+                    decoration: BoxDecoration(
+                      gradient: AppTheme.primaryGradient,
+                      shape: BoxShape.circle,
+                      boxShadow: AppTheme.glowShadow,
+                    ),
+                    child: const Icon(
+                      Icons.video_library_outlined,
+                      size: 80,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  const Text(
+                    'No Videos Yet',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Start sharing your expertise by\nuploading your first training video',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: AppTheme.textSecondary.withOpacity(0.8),
+                      height: 1.5,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 32),
-            const Text(
-              'No Videos Yet',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: AppTheme.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Start sharing your expertise by\nuploading your first training video',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                color: AppTheme.textSecondary.withOpacity(0.8),
-                height: 1.5,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -293,6 +317,7 @@ class _TrainerVideosScreenState extends State<TrainerVideosScreen> with SingleTi
       color: AppTheme.primaryColor,
       backgroundColor: AppTheme.cardBackground,
       child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(20),
         itemCount: _videos.length,
         itemBuilder: (context, index) {
@@ -336,22 +361,25 @@ class _TrainerVideosScreenState extends State<TrainerVideosScreen> with SingleTi
                     ),
                     child: AspectRatio(
                       aspectRatio: 16 / 9,
-                      child: video.thumbnailUrl != null && video.thumbnailUrl!.isNotEmpty
+                      child:
+                          video.thumbnailUrl != null &&
+                              video.thumbnailUrl!.isNotEmpty
                           ? Image.network(
                               video.thumbnailUrl!,
                               fit: BoxFit.cover,
                               errorBuilder: (context, error, stackTrace) {
                                 return _buildThumbnailPlaceholder(video);
                               },
-                              loadingBuilder: (context, child, loadingProgress) {
-                                if (loadingProgress == null) return child;
-                                return _buildThumbnailPlaceholder(video);
-                              },
+                              loadingBuilder:
+                                  (context, child, loadingProgress) {
+                                    if (loadingProgress == null) return child;
+                                    return _buildThumbnailPlaceholder(video);
+                                  },
                             )
                           : _buildThumbnailPlaceholder(video),
                     ),
                   ),
-                  
+
                   // Play Button Overlay
                   Positioned.fill(
                     child: Container(
@@ -388,14 +416,17 @@ class _TrainerVideosScreenState extends State<TrainerVideosScreen> with SingleTi
                       ),
                     ),
                   ),
-                  
+
                   // Duration Badge (if available)
                   if (video.duration != null && video.duration! > 0)
                     Positioned(
                       bottom: 8,
                       right: 8,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.black.withOpacity(0.8),
                           borderRadius: BorderRadius.circular(6),
@@ -410,7 +441,7 @@ class _TrainerVideosScreenState extends State<TrainerVideosScreen> with SingleTi
                         ),
                       ),
                     ),
-                  
+
                   // Menu Button
                   Positioned(
                     top: 8,
@@ -422,10 +453,16 @@ class _TrainerVideosScreenState extends State<TrainerVideosScreen> with SingleTi
                           color: Colors.black.withOpacity(0.6),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(Icons.more_vert, size: 20, color: Colors.white),
+                        child: const Icon(
+                          Icons.more_vert,
+                          size: 20,
+                          color: Colors.white,
+                        ),
                       ),
                       color: AppTheme.cardBackground,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                       onSelected: (value) {
                         if (value == 'play') {
                           _playVideo(video.videoUrl, video.title);
@@ -438,9 +475,15 @@ class _TrainerVideosScreenState extends State<TrainerVideosScreen> with SingleTi
                           value: 'play',
                           child: Row(
                             children: [
-                              Icon(Icons.play_arrow, color: AppTheme.primaryColor),
+                              Icon(
+                                Icons.play_arrow,
+                                color: AppTheme.primaryColor,
+                              ),
                               SizedBox(width: 12),
-                              Text('Play Video', style: TextStyle(color: AppTheme.textPrimary)),
+                              Text(
+                                'Play Video',
+                                style: TextStyle(color: AppTheme.textPrimary),
+                              ),
                             ],
                           ),
                         ),
@@ -448,9 +491,15 @@ class _TrainerVideosScreenState extends State<TrainerVideosScreen> with SingleTi
                           value: 'delete',
                           child: Row(
                             children: [
-                              Icon(Icons.delete_outline, color: AppTheme.errorColor),
+                              Icon(
+                                Icons.delete_outline,
+                                color: AppTheme.errorColor,
+                              ),
                               SizedBox(width: 12),
-                              Text('Delete', style: TextStyle(color: AppTheme.errorColor)),
+                              Text(
+                                'Delete',
+                                style: TextStyle(color: AppTheme.errorColor),
+                              ),
                             ],
                           ),
                         ),
@@ -459,7 +508,7 @@ class _TrainerVideosScreenState extends State<TrainerVideosScreen> with SingleTi
                   ),
                 ],
               ),
-              
+
               // Video Info Section (YouTube-style)
               Padding(
                 padding: const EdgeInsets.all(16),
@@ -478,9 +527,9 @@ class _TrainerVideosScreenState extends State<TrainerVideosScreen> with SingleTi
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    
+
                     const SizedBox(height: 8),
-                    
+
                     // Trainer Info Row
                     Row(
                       children: [
@@ -494,7 +543,7 @@ class _TrainerVideosScreenState extends State<TrainerVideosScreen> with SingleTi
                           ),
                           child: Center(
                             child: Text(
-                              video.trainerName.isNotEmpty 
+                              video.trainerName.isNotEmpty
                                   ? video.trainerName[0].toUpperCase()
                                   : 'T',
                               style: const TextStyle(
@@ -506,11 +555,11 @@ class _TrainerVideosScreenState extends State<TrainerVideosScreen> with SingleTi
                           ),
                         ),
                         const SizedBox(width: 12),
-                        
+
                         // Trainer Name
                         Expanded(
                           child: Text(
-                            video.trainerName.isNotEmpty 
+                            video.trainerName.isNotEmpty
                                 ? video.trainerName
                                 : 'Unknown Trainer',
                             style: TextStyle(
@@ -524,12 +573,12 @@ class _TrainerVideosScreenState extends State<TrainerVideosScreen> with SingleTi
                         ),
                       ],
                     ),
-                    
+
                     // Description
-                    if (video.description != null && video.description!.isNotEmpty) ...[
+                    if (video.description.isNotEmpty) ...[
                       const SizedBox(height: 12),
                       Text(
-                        video.description!,
+                        video.description,
                         style: TextStyle(
                           fontSize: 14,
                           color: AppTheme.textSecondary.withOpacity(0.8),
@@ -539,9 +588,9 @@ class _TrainerVideosScreenState extends State<TrainerVideosScreen> with SingleTi
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
-                    
+
                     const SizedBox(height: 12),
-                    
+
                     // Tags Row
                     Wrap(
                       spacing: 8,
@@ -549,7 +598,10 @@ class _TrainerVideosScreenState extends State<TrainerVideosScreen> with SingleTi
                       children: [
                         // Exercise Type Badge
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
                             color: AppTheme.accentColor.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(8),
@@ -579,15 +631,22 @@ class _TrainerVideosScreenState extends State<TrainerVideosScreen> with SingleTi
                             ],
                           ),
                         ),
-                        
+
                         // Difficulty Badge
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
-                            color: _getDifficultyColor(video.difficulty).withOpacity(0.2),
+                            color: _getDifficultyColor(
+                              video.difficulty,
+                            ).withOpacity(0.2),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: _getDifficultyColor(video.difficulty).withOpacity(0.3),
+                              color: _getDifficultyColor(
+                                video.difficulty,
+                              ).withOpacity(0.3),
                               width: 1,
                             ),
                           ),
@@ -612,7 +671,7 @@ class _TrainerVideosScreenState extends State<TrainerVideosScreen> with SingleTi
       ),
     );
   }
-  
+
   Widget _buildThumbnailPlaceholder(ExerciseVideo video) {
     return Container(
       decoration: BoxDecoration(
@@ -649,7 +708,7 @@ class _TrainerVideosScreenState extends State<TrainerVideosScreen> with SingleTi
       ),
     );
   }
-  
+
   IconData _getExerciseIcon(String type) {
     switch (type.toLowerCase()) {
       case 'cardio':
@@ -666,7 +725,7 @@ class _TrainerVideosScreenState extends State<TrainerVideosScreen> with SingleTi
         return Icons.fitness_center;
     }
   }
-  
+
   Color _getDifficultyColor(String difficulty) {
     switch (difficulty.toLowerCase()) {
       case 'beginner':
@@ -686,7 +745,10 @@ class _TrainerVideosScreenState extends State<TrainerVideosScreen> with SingleTi
       builder: (context) => AlertDialog(
         backgroundColor: AppTheme.cardBackground,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Delete Video', style: TextStyle(color: AppTheme.textPrimary)),
+        title: const Text(
+          'Delete Video',
+          style: TextStyle(color: AppTheme.textPrimary),
+        ),
         content: Text(
           'Are you sure you want to delete "${video.title}"? This action cannot be undone.',
           style: const TextStyle(color: AppTheme.textSecondary),

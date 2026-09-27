@@ -218,18 +218,42 @@ class _WorkoutsScreenState extends State<WorkoutsScreen>
             return TabBarView(
               controller: _tabController,
               children: [
-                _buildWorkoutsList(
-                  assigned,
-                  'Your trainer has not assigned you a plan yet.',
+                RefreshIndicator(
+                  onRefresh: () async {
+                    setState(() {
+                      _loadFuture = _fetchAssignedWorkouts();
+                    });
+                    await _loadFuture;
+                  },
+                  child: _buildWorkoutsList(
+                    assigned,
+                    'Your trainer has not assigned you a plan yet.',
+                  ),
                 ),
-                _buildWorkoutsList(
-                  completed,
-                  'You have no completed workouts yet.',
+                RefreshIndicator(
+                  onRefresh: () async {
+                    setState(() {
+                      _loadFuture = _fetchAssignedWorkouts();
+                    });
+                    await _loadFuture;
+                  },
+                  child: _buildWorkoutsList(
+                    completed,
+                    'You have no completed workouts yet.',
+                  ),
                 ),
               ],
             );
           } else {
-            return _buildTrainersList();
+            return RefreshIndicator(
+              onRefresh: () async {
+                setState(() {
+                  _loadFuture = _loadTrainers();
+                });
+                await _loadFuture;
+              },
+              child: _buildTrainersList(),
+            );
           }
         },
       ),
@@ -238,15 +262,22 @@ class _WorkoutsScreenState extends State<WorkoutsScreen>
 
   Widget _buildTrainersList() {
     if (_trainers.isEmpty) {
-      return const Center(
-        child: Text(
-          'No trainers available',
-          style: TextStyle(color: Colors.white),
-        ),
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: const [
+          SizedBox(height: 100),
+          Center(
+            child: Text(
+              'No trainers available',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
       );
     }
 
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(vertical: 16),
       itemCount: _trainers.length,
       itemBuilder: (context, index) {
@@ -423,12 +454,22 @@ class _WorkoutsScreenState extends State<WorkoutsScreen>
 
   Widget _buildWorkoutsList(List<Workout> workouts, String emptyMessage) {
     if (workouts.isEmpty) {
-      return Center(
-        child: Text(emptyMessage, style: const TextStyle(color: Colors.white)),
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          const SizedBox(height: 100),
+          Center(
+            child: Text(
+              emptyMessage,
+              style: const TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
       );
     }
 
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       itemCount: workouts.length,
       itemBuilder: (context, index) {
         final workout = workouts[index];

@@ -87,36 +87,53 @@ class _TrainingVideosScreenState extends State<TrainingVideosScreen> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+      body: RefreshIndicator(
+        onRefresh: _fetchVideos,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _errorMessage != null
+                ? ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
                     children: [
-                      Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
-                      ElevatedButton(
-                        onPressed: _fetchVideos,
-                        child: const Text('Retry'),
+                      SizedBox(height: MediaQuery.of(context).size.height * 0.3),
+                      Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: _fetchVideos,
+                              child: const Text('Retry'),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
-                  ),
-                )
-              : _videos.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'No videos available',
-                        style: TextStyle(fontSize: 18),
+                  )
+                : _videos.isEmpty
+                    ? ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: [
+                          SizedBox(height: MediaQuery.of(context).size.height * 0.3),
+                          const Center(
+                            child: Text(
+                              'No videos available',
+                              style: TextStyle(fontSize: 18),
+                            ),
+                          ),
+                        ],
+                      )
+                    : ListView.builder(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.all(8.0),
+                        itemCount: _videos.length,
+                        itemBuilder: (context, index) {
+                          final video = _videos[index];
+                          return _buildVideoCard(video);
+                        },
                       ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(8.0),
-                      itemCount: _videos.length,
-                      itemBuilder: (context, index) {
-                        final video = _videos[index];
-                        return _buildVideoCard(video);
-                      },
-                    ),
+      ),
     );
   }
 

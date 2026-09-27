@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'dart:async';
-import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../models/progress.dart';
 
@@ -198,16 +196,24 @@ class _ProgressScreenState extends State<ProgressScreen> {
     }
   }
 
+  Future<void> _refreshAll() async {
+    await _checkUpdateStatus();
+    _fetchProgressHistory();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Progress'),
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
+      body: RefreshIndicator(
+        onRefresh: _refreshAll,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // BMI Section
