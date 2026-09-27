@@ -215,6 +215,10 @@ router.get('/profile', verifyToken, async (req, res) => {
 router.patch('/profile', verifyToken, async (req, res) => {
   try {
     const updates = req.body;
+    if (updates.password) {
+      const bcrypt = require('bcryptjs');
+      updates.password = await bcrypt.hash(updates.password, 10);
+    }
     const user = await User.findByIdAndUpdate(
       req.user._id, 
       updates, 
@@ -272,6 +276,10 @@ router.get('/users',
 // Admin: Update user
 router.patch('/users/:id', verifyToken, checkRole(['admin']), async (req, res) => {
   try {
+    if (req.body.password) {
+      const bcrypt = require('bcryptjs');
+      req.body.password = await bcrypt.hash(req.body.password, 10);
+    }
     const user = await User.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json(user);
