@@ -35,6 +35,15 @@ router.post('/register', upload.single('credential'), async (req, res) => {
       });
     }
 
+    if (password) {
+      const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/;
+      if (!passwordRegex.test(password)) {
+        return res.status(400).json({ 
+          error: 'Your password must be at least 6 characters long and contain at least one uppercase letter, one lowercase letter, and one number.' 
+        });
+      }
+    }
+
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
     if (existingUser) {
       if (!existingUser.isEmailVerified) {
@@ -216,6 +225,12 @@ router.patch('/profile', verifyToken, async (req, res) => {
   try {
     const updates = req.body;
     if (updates.password) {
+      const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/;
+      if (!passwordRegex.test(updates.password)) {
+        return res.status(400).json({ 
+          error: 'Your new password must be at least 6 characters long and contain at least one uppercase letter, one lowercase letter, and one number.' 
+        });
+      }
       const bcrypt = require('bcryptjs');
       updates.password = await bcrypt.hash(updates.password, 10);
     }
@@ -277,6 +292,12 @@ router.get('/users',
 router.patch('/users/:id', verifyToken, checkRole(['admin']), async (req, res) => {
   try {
     if (req.body.password) {
+      const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/;
+      if (!passwordRegex.test(req.body.password)) {
+        return res.status(400).json({ 
+          error: 'The new password must be at least 6 characters long and contain at least one uppercase letter, one lowercase letter, and one number.' 
+        });
+      }
       const bcrypt = require('bcryptjs');
       req.body.password = await bcrypt.hash(req.body.password, 10);
     }

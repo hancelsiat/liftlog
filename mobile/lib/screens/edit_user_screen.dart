@@ -74,6 +74,14 @@ class _EditUserScreenState extends State<EditUserScreen> {
         if (label != 'New Password (optional)' && (value == null || value.isEmpty)) {
           return 'Please enter a $label';
         }
+        if (label == 'New Password (optional)' && value != null && value.isNotEmpty) {
+          if (value.length < 6) {
+            return 'Your password must be at least 6 characters long.';
+          }
+          if (!RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)').hasMatch(value)) {
+            return 'Password must contain at least 1 uppercase, 1 lowercase, and 1 number.';
+          }
+        }
         return null;
       },
     );
