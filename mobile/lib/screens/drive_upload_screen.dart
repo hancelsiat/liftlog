@@ -6,7 +6,11 @@ import 'package:http/http.dart' as http;
 import '../services/api_service.dart';
 
 final GoogleSignIn _googleSignIn = GoogleSignIn(
-  scopes: ['https://www.googleapis.com/auth/drive.readonly', 'profile', 'email'],
+  scopes: [
+    'https://www.googleapis.com/auth/drive.readonly',
+    'profile',
+    'email',
+  ],
 );
 
 class DriveUploadScreen extends StatefulWidget {
@@ -55,15 +59,23 @@ class _DriveUploadScreenState extends State<DriveUploadScreen> {
     });
     try {
       // Query Drive for video/mp4 files owned by or shared with the user
-      final q = Uri.encodeQueryComponent("mimeType='video/mp4' and trashed=false");
-      final url = 'https://www.googleapis.com/drive/v3/files?q=$q&fields=files(id,name,size,mimeType)';
+      final q = Uri.encodeQueryComponent(
+        "mimeType='video/mp4' and trashed=false",
+      );
+      final url =
+          'https://www.googleapis.com/drive/v3/files?q=$q&fields=files(id,name,size,mimeType)';
 
-      final resp = await http.get(Uri.parse(url),
-        headers: {'Authorization': 'Bearer $_accessToken'});
-      if (resp.statusCode != 200) throw Exception('Drive list failed: ${resp.statusCode} ${resp.body}');
+      final resp = await http.get(
+        Uri.parse(url),
+        headers: {'Authorization': 'Bearer $_accessToken'},
+      );
+      if (resp.statusCode != 200)
+        throw Exception('Failed to connect to Google Drive. Please try again.');
 
       final data = json.decode(resp.body) as Map<String, dynamic>;
-      final files = (data['files'] as List<dynamic>).map((f) => Map<String, dynamic>.from(f)).toList();
+      final files = (data['files'] as List<dynamic>)
+          .map((f) => Map<String, dynamic>.from(f))
+          .toList();
       setState(() {
         _files = files;
         _status = 'Found ${files.length} mp4 files';
@@ -102,7 +114,11 @@ class _DriveUploadScreenState extends State<DriveUploadScreen> {
 
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Video "${result['filename']}" uploaded successfully from Drive')),
+        SnackBar(
+          content: Text(
+            'Video "${result['filename']}" uploaded successfully from Drive',
+          ),
+        ),
       );
     } catch (e) {
       setState(() {
@@ -110,7 +126,11 @@ class _DriveUploadScreenState extends State<DriveUploadScreen> {
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to upload video from Google Drive. Please check your connection or link.')),
+          const SnackBar(
+            content: Text(
+              'Failed to upload video from Google Drive. Please check your connection or link.',
+            ),
+          ),
         );
       }
     } finally {
@@ -124,28 +144,38 @@ class _DriveUploadScreenState extends State<DriveUploadScreen> {
       appBar: AppBar(title: const Text('Drive → GridFS Upload')),
       body: Padding(
         padding: const EdgeInsets.all(12),
-        child: Column(children: [
-          ElevatedButton(onPressed: _signIn, child: const Text('Sign in with Google')),
-          const SizedBox(height: 8),
-          ElevatedButton(onPressed: _listMp4Files, child: const Text('List mp4 files in Drive')),
-          const SizedBox(height: 12),
-          _loading ? const CircularProgressIndicator() : Container(),
-          Text(_status),
-          Expanded(child: ListView.builder(
-            itemCount: _files.length,
-            itemBuilder: (_, i) {
-              final f = _files[i];
-              return ListTile(
-                title: Text(f['name'] ?? 'unknown'),
-                subtitle: Text('${f['size'] ?? '?'} bytes'),
-                trailing: ElevatedButton(
-                  child: const Text('Upload'),
-                  onPressed: () => _uploadToBackend(f['id']),
-                ),
-              );
-            },
-          )),
-        ]),
+        child: Column(
+          children: [
+            ElevatedButton(
+              onPressed: _signIn,
+              child: const Text('Sign in with Google'),
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton(
+              onPressed: _listMp4Files,
+              child: const Text('List mp4 files in Drive'),
+            ),
+            const SizedBox(height: 12),
+            _loading ? const CircularProgressIndicator() : Container(),
+            Text(_status),
+            Expanded(
+              child: ListView.builder(
+                itemCount: _files.length,
+                itemBuilder: (_, i) {
+                  final f = _files[i];
+                  return ListTile(
+                    title: Text(f['name'] ?? 'unknown'),
+                    subtitle: Text('${f['size'] ?? '?'} bytes'),
+                    trailing: ElevatedButton(
+                      child: const Text('Upload'),
+                      onPressed: () => _uploadToBackend(f['id']),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

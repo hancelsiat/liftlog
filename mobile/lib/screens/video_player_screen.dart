@@ -40,23 +40,25 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
       // Clean the video URL to ensure it's properly formatted
       final cleanedUrl = cleanSupabaseUrl(widget.videoUrl);
-      
+
       print('Initializing video player with URL: $cleanedUrl');
 
       if (cleanedUrl.isEmpty) {
-        throw Exception('Invalid video URL');
+        throw Exception(
+          'The video URL is invalid or empty. Please check the video source.',
+        );
       }
 
       if (cleanedUrl.contains('drive.google.com')) {
-        throw Exception('This video cannot be played because it is a Google Drive link. Please use a direct video link.');
+        throw Exception(
+          'This video cannot be played because it is a Google Drive link. Please use a direct video link.',
+        );
       }
 
       // Initialize the video player controller with the network URL
       _controller = VideoPlayerController.networkUrl(
         Uri.parse(cleanedUrl),
-        httpHeaders: {
-          'Accept': 'video/mp4,video/*',
-        },
+        httpHeaders: {'Accept': 'video/mp4,video/*'},
       );
 
       // Add listener for player state changes
@@ -71,7 +73,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           // Check for errors
           if (_controller!.value.hasError) {
             setState(() {
-              _errorMessage = 'Video playback error: ${_controller!.value.errorDescription}';
+              _errorMessage =
+                  'Video playback error: ${_controller!.value.errorDescription}';
               _isInitialized = false;
             });
           }
@@ -146,7 +149,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60);
     final seconds = duration.inSeconds.remainder(60);
-    
+
     if (hours > 0) {
       return '$hours:${twoDigits(minutes)}:${twoDigits(seconds)}';
     }
@@ -183,7 +186,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                     Text(
                       'URL: ${widget.videoUrl}',
                       textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.white54, fontSize: 12),
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 12,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton(
@@ -201,111 +207,122 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 ),
               )
             : !_isInitialized
-                ? Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const CircularProgressIndicator(
-                        color: Colors.white,
+            ? Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const CircularProgressIndicator(color: Colors.white),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Loading video...',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ],
+              )
+            : GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _showControls = !_showControls;
+                  });
+                },
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Video player
+                    Center(
+                      child: AspectRatio(
+                        aspectRatio: _controller!.value.aspectRatio,
+                        child: VideoPlayer(_controller!),
                       ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Loading video...',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                    ],
-                  )
-                : GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _showControls = !_showControls;
-                      });
-                    },
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        // Video player
-                        Center(
-                          child: AspectRatio(
-                            aspectRatio: _controller!.value.aspectRatio,
-                            child: VideoPlayer(_controller!),
-                          ),
-                        ),
-                        
-                        // Controls overlay
-                        if (_showControls)
-                          Container(
-                            color: Colors.black45,
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.end,
+                    ),
+
+                    // Controls overlay
+                    if (_showControls)
+                      Container(
+                        color: Colors.black45,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            // Play/Pause and skip controls
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                // Play/Pause and skip controls
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.replay_10,
-                                        size: 36,
-                                        color: Colors.white,
-                                      ),
-                                      onPressed: _skipBackward,
-                                    ),
-                                    const SizedBox(width: 20),
-                                    IconButton(
-                                      icon: Icon(
-                                        _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
-                                        size: 64,
-                                        color: Colors.white,
-                                      ),
-                                      onPressed: _togglePlayPause,
-                                    ),
-                                    const SizedBox(width: 20),
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.forward_10,
-                                        size: 36,
-                                        color: Colors.white,
-                                      ),
-                                      onPressed: _skipForward,
-                                    ),
-                                  ],
-                                ),
-                                
-                                // Progress bar
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                                  child: Row(
-                                    children: [
-                                      Text(
-                                        _formatDuration(_currentPosition),
-                                        style: const TextStyle(color: Colors.white, fontSize: 12),
-                                      ),
-                                      Expanded(
-                                        child: Slider(
-                                          value: _currentPosition.inSeconds.toDouble(),
-                                          min: 0.0,
-                                          max: _totalDuration.inSeconds.toDouble(),
-                                          onChanged: (value) {
-                                            _seekTo(Duration(seconds: value.toInt()));
-                                          },
-                                          activeColor: Colors.red,
-                                          inactiveColor: Colors.white30,
-                                        ),
-                                      ),
-                                      Text(
-                                        _formatDuration(_totalDuration),
-                                        style: const TextStyle(color: Colors.white, fontSize: 12),
-                                      ),
-                                    ],
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.replay_10,
+                                    size: 36,
+                                    color: Colors.white,
                                   ),
+                                  onPressed: _skipBackward,
                                 ),
-                                const SizedBox(height: 16),
+                                const SizedBox(width: 20),
+                                IconButton(
+                                  icon: Icon(
+                                    _isPlaying
+                                        ? Icons.pause_circle_filled
+                                        : Icons.play_circle_filled,
+                                    size: 64,
+                                    color: Colors.white,
+                                  ),
+                                  onPressed: _togglePlayPause,
+                                ),
+                                const SizedBox(width: 20),
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.forward_10,
+                                    size: 36,
+                                    color: Colors.white,
+                                  ),
+                                  onPressed: _skipForward,
+                                ),
                               ],
                             ),
-                          ),
-                      ],
-                    ),
-                  ),
+
+                            // Progress bar
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16.0,
+                              ),
+                              child: Row(
+                                children: [
+                                  Text(
+                                    _formatDuration(_currentPosition),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Slider(
+                                      value: _currentPosition.inSeconds
+                                          .toDouble(),
+                                      min: 0.0,
+                                      max: _totalDuration.inSeconds.toDouble(),
+                                      onChanged: (value) {
+                                        _seekTo(
+                                          Duration(seconds: value.toInt()),
+                                        );
+                                      },
+                                      activeColor: Colors.red,
+                                      inactiveColor: Colors.white30,
+                                    ),
+                                  ),
+                                  Text(
+                                    _formatDuration(_totalDuration),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
       ),
     );
   }

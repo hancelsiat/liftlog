@@ -154,8 +154,9 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
         Uri.parse(url),
         headers: {'Authorization': 'Bearer $_accessToken'},
       );
-      if (resp.statusCode != 200)
-        throw Exception('Drive list failed: ${resp.statusCode} ${resp.body}');
+      if (resp.statusCode != 200) {
+        throw Exception('Failed to connect to Google Drive. Please try again.');
+      }
 
       final data = json.decode(resp.body) as Map<String, dynamic>;
       final files = (data['files'] as List<dynamic>)
