@@ -94,8 +94,8 @@ router.get('/trainers/available', verifyToken, checkRole(['all']), async (req, r
 
     const trainers = await User.find({
       role: 'trainer',
-      membershipExpiration: { $gt: new Date() }
-    }).select('username email profile.firstName profile.lastName');
+      isApproved: true // Ensure the trainer is actually approved by admin!
+    }).select('username email profile.firstName profile.lastName isApproved');
 
     res.json({ trainers });
   } catch (error) {
@@ -122,14 +122,14 @@ router.get('/trainer/:trainerId', verifyToken, checkRole(['all']), async (req, r
 
     const workouts = await Workout.find({
       trainer: trainerId,
-      isPublic: true
+      isTemplate: true // Templates are the public workouts for a trainer!
     })
       .populate('trainer', 'username')
       .sort({ createdAt: -1 });
 
     const total = await Workout.countDocuments({
       trainer: trainerId,
-      isPublic: true
+      isTemplate: true
     });
 
     res.json({
