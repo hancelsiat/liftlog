@@ -25,7 +25,6 @@ router.post('/register', upload.single('credential'), async (req, res) => {
       email, 
       password, 
       role = 'member', 
-      membershipExpiration,
       profile 
     } = req.body;
 
@@ -87,7 +86,6 @@ router.post('/register', upload.single('credential'), async (req, res) => {
       email,
       password,
       role,
-      membershipExpiration: membershipExpiration || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       profile,
       isEmailVerified: false,
       isApproved: role === 'member',
@@ -189,10 +187,6 @@ router.post('/login', async (req, res) => {
         error: 'Your trainer account is pending admin approval. Please wait for an administrator to review and approve your application.',
         pendingApproval: true
       });
-    }
-
-    if (!user.isMembershipActive()) {
-      return res.status(403).json({ error: 'Your membership has expired. Please renew to access your account.' });
     }
 
     const token = generateToken(user);

@@ -57,14 +57,6 @@ const UserSchema = new mongoose.Schema({
     type: Boolean,
     default: true // Members are auto-approved, trainers need admin approval
   },
-  membershipStart: {
-    type: Date,
-    default: Date.now
-  },
-  membershipExpiration: {
-    type: Date,
-    required: true
-  },
   profile: {
     firstName: String,
     lastName: String,
@@ -91,11 +83,6 @@ UserSchema.pre('save', async function(next) {
 // Method to check password
 UserSchema.methods.comparePassword = async function(candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
-};
-
-// Check if membership is active
-UserSchema.methods.isMembershipActive = function() {
-  return new Date() <= this.membershipExpiration;
 };
 
 // Generate email verification token
