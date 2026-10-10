@@ -184,3 +184,82 @@ graph TD
     Services <-->|HTTPS / SDK| Supabase
     Services -->|HTTPS / API Key| Brevo
 ```
+
+---
+
+## 5. Database Integration Workflow (MongoDB & Supabase)
+
+This sequence diagram illustrates how the backend orchestrates data between MongoDB (structured data) and Supabase (binary file storage) during a media upload process (e.g., uploading a training video or trainer credentials).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client as 📱 Mobile App (Flutter)
+    participant API as ⚙️ Backend Server (Render)
+    participant Supa as 🪣 Supabase Storage
+    participant Mongo as 🍃 MongoDB Atlas
+
+    Client->>API: POST /api/videos (Video File + Metadata)
+    
+    activate API
+    API->>API: Verify JWT Token & Parse File (Multer)
+    
+    %% Supabase Uploads
+    API->>Supa: Upload Original Video File (.mp4)
+    activate Supa
+    Supa-->>API: Success (Return File Path / Signed URL)
+    deactivate Supa
+
+    API->>API: Generate Video Thumbnail (FFmpeg)
+    
+    API->>Supa: Upload Thumbnail Image (.jpg)
+    activate Supa
+    Supa-->>API: Success (Return Thumbnail Path)
+    deactivate Supa
+
+    %% MongoDB Document Creation
+    API->>Mongo: Create ExerciseVideo Document\n(Save Titles, Tags, Supabase URLs)
+    activate Mongo
+    Mongo-->>API: Success (Document Saved)
+    deactivate Mongo
+
+    API-->>Client: 201 Created (Success Response JSON)
+    deactivate API
+```
+
+---
+
+## 6. Backend Server Request Lifecycle
+
+This flowchart breaks down the internal architecture and request processing pipeline inside the Express.js Node Server hosted on Render.
+
+```mermaid
+graph TD
+    Client([Incoming Client Request]) --> API_Gateway[Express Entry Point\n(server.js)]
+    
+    subgraph Express Pipeline ["⚙️ Express.js Request Lifecycle"]
+        API_Gateway --> CORS[CORS & Body Parser Middleware]
+        CORS --> Auth{Auth Middleware\n(verifyToken)}
+        
+        Auth -->|Invalid/No Token| Reject[401/403 Error Response]
+        Auth -->|Valid Token| Routes[Route Handlers]
+        
+        Routes -->|/api/auth| AuthLogic[Auth Routes\n(Login, Register, Admin)]
+        Routes -->|/api/workouts| WorkoutLogic[Workout Routes\n(CRUD, Assign)]
+        Routes -->|/api/videos| VideoLogic[Video Routes\n(Upload, Stream, Delete)]
+        Routes -->|/api/progress| ProgressLogic[Progress Routes\n(BMI, Calories, Charts)]
+        
+        AuthLogic --> Controller[Controllers / Mongoose Models]
+        WorkoutLogic --> Controller
+        VideoLogic --> Controller
+        ProgressLogic --> Controller
+        
+        Controller --> Format[Format JSON Response]
+    end
+
+    Controller <--> DB[(MongoDB Atlas)]
+    Controller <--> Storage[(Supabase Buckets)]
+    Controller --> Emailer[[Brevo Email API]]
+    
+    Format --> Return([Send Response to Client])
+```
