@@ -88,61 +88,70 @@ graph TD
 ## 3. Entity Relationship Diagram (ERD)
 
 ```mermaid
-erDiagram
-    USER ||--o{ WORKOUT : "creates / assigned to"
-    USER ||--o{ EXERCISE_VIDEO : "uploads (if trainer)"
-    USER ||--o{ PROGRESS : "logs"
-    USER ||--o{ USER : "has clients / has trainer"
+graph TD
+    %% Models
+    User["User Model"]
+    Workout["Workout Model"]
+    Video["ExerciseVideo Model"]
+    Progress["Progress Model"]
 
-    USER {
-        ObjectId _id PK
-        string username
-        string email
-        string password "Hashed"
-        string role "member, trainer, admin"
-        boolean isApproved
-        boolean isEmailVerified
-        string credentialImageUrl
-        ObjectId trainer FK
-    }
+    %% Relationships
+    User -->|Has Many| Workout
+    User -->|Uploads| Video
+    User -->|Logs| Progress
+    User -->|Assigns / Has| User
 
-    WORKOUT {
-        ObjectId _id PK
-        string title
-        string description
-        boolean isTemplate
-        boolean isPublic
-        ObjectId user FK "Member ID"
-        ObjectId trainer FK "Trainer ID"
-        ObjectId assignedTo FK "Member ID"
-        date date
-        date completedAt
-    }
+    %% User Fields
+    subgraph User Fields
+        U1(_id: ObjectId PK)
+        U2(username: String)
+        U3(email: String)
+        U4(password: String Hashed)
+        U5(role: member, trainer, admin)
+        U6(isApproved: Boolean)
+        U7(isEmailVerified: Boolean)
+        U8(credentialImageUrl: String)
+        U9(trainer: ObjectId FK)
+    end
+    User --- U1 & U2 & U3 & U4 & U5 & U6 & U7 & U8 & U9
 
-    EXERCISE_VIDEO {
-        ObjectId _id PK
-        string title
-        string description
-        ObjectId trainer FK
-        string videoUrl "Supabase Signed URL"
-        string videoPath
-        string thumbnailUrl
-        string exerciseType
-        string difficulty
-        number duration
-        boolean isPublic
-    }
+    %% Workout Fields
+    subgraph Workout Fields
+        W1(_id: ObjectId PK)
+        W2(title: String)
+        W3(description: String)
+        W4(isTemplate: Boolean)
+        W5(isPublic: Boolean)
+        W6(user: ObjectId FK)
+        W7(trainer: ObjectId FK)
+        W8(assignedTo: ObjectId FK)
+        W9(completedAt: Date)
+    end
+    Workout --- W1 & W2 & W3 & W4 & W5 & W6 & W7 & W8 & W9
 
-    PROGRESS {
-        ObjectId _id PK
-        ObjectId user FK
-        number bmi
-        number caloriesIntake
-        number calorieDeficit
-        date date
-        date lastBmiUpdate
-        date lastCaloriesUpdate
-    }
+    %% Video Fields
+    subgraph Video Fields
+        V1(_id: ObjectId PK)
+        V2(title: String)
+        V3(trainer: ObjectId FK)
+        V4(videoUrl: String URL)
+        V5(thumbnailUrl: String URL)
+        V6(exerciseType: String)
+        V7(difficulty: String)
+        V8(duration: Number)
+    end
+    Video --- V1 & V2 & V3 & V4 & V5 & V6 & V7 & V8
+
+    %% Progress Fields
+    subgraph Progress Fields
+        P1(_id: ObjectId PK)
+        P2(user: ObjectId FK)
+        P3(bmi: Number)
+        P4(caloriesIntake: Number)
+        P5(calorieDeficit: Number)
+        P6(date: Date)
+    end
+    Progress --- P1 & P2 & P3 & P4 & P5 & P6
 ```
 
 ---
@@ -192,39 +201,36 @@ graph TD
 This sequence diagram illustrates how the backend orchestrates data between MongoDB (structured data) and Supabase (binary file storage) during a media upload process (e.g., uploading a training video or trainer credentials).
 
 ```mermaid
-sequenceDiagram
-    autonumber
-    participant Client as 📱 Mobile App (Flutter)
-    participant API as ⚙️ Backend Server (Render)
-    participant Supa as 🪣 Supabase Storage
-    participant Mongo as 🍃 MongoDB Atlas
+graph TD
+    %% Entities
+    Client[📱 Mobile App]
+    API[⚙️ Backend Server]
+    Supa[(🪣 Supabase Storage)]
+    Mongo[(🍃 MongoDB Atlas)]
 
-    Client->>API: POST /api/videos (Video File + Metadata)
-    
-    activate API
-    API->>API: Verify JWT Token & Parse File (Multer)
-    
-    %% Supabase Uploads
-    API->>Supa: Upload Original Video File (.mp4)
-    activate Supa
-    Supa-->>API: Success (Return File Path / Signed URL)
-    deactivate Supa
+    %% Step 1: Request
+    Client -->|1. POST /api/videos\n(File + Metadata)| API
 
-    API->>API: Generate Video Thumbnail (FFmpeg)
-    
-    API->>Supa: Upload Thumbnail Image (.jpg)
-    activate Supa
-    Supa-->>API: Success (Return Thumbnail Path)
-    deactivate Supa
+    %% Step 2: Auth & Parse
+    API -->|2. Verify Token & Parse File| API
 
-    %% MongoDB Document Creation
-    API->>Mongo: Create ExerciseVideo Document\n(Save Titles, Tags, Supabase URLs)
-    activate Mongo
-    Mongo-->>API: Success (Document Saved)
-    deactivate Mongo
+    %% Step 3: Video Upload
+    API -->|3. Upload .mp4 File| Supa
+    Supa -->|4. Return Signed URL & Path| API
 
-    API-->>Client: 201 Created (Success Response JSON)
-    deactivate API
+    %% Step 4: Thumbnail Generation
+    API -->|5. Generate Thumbnail Image| API
+
+    %% Step 5: Thumbnail Upload
+    API -->|6. Upload .jpg File| Supa
+    Supa -->|7. Return Thumbnail Path| API
+
+    %% Step 6: Database Save
+    API -->|8. Save Document\n(Titles, Tags, Supabase URLs)| Mongo
+    Mongo -->|9. Success Confirmation| API
+
+    %% Step 7: Response
+    API -->|10. Return 201 Created JSON| Client
 ```
 
 ---
