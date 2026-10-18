@@ -196,9 +196,22 @@ class ApiService {
         );
       } catch (e) {
         if (e is ApiException) rethrow;
-        throw Exception(
-          'We encountered an unexpected error. Please check your connection and try again.',
-        );
+        // Non-JSON body (e.g. Express "Cannot GET" HTML page or a proxy error).
+        final String message;
+        if (response.statusCode == 404) {
+          message =
+              'This feature is not available on the server yet (404). '
+              'Please redeploy/update the backend.';
+        } else if (response.statusCode >= 500) {
+          message =
+              'The server is having trouble (${response.statusCode}). '
+              'It may be starting up — please try again in a minute.';
+        } else {
+          message =
+              'We encountered an unexpected error (${response.statusCode}). '
+              'Please check your connection and try again.';
+        }
+        throw ApiException(message: message, statusCode: response.statusCode);
       }
     }
   }
@@ -455,6 +468,60 @@ class ApiService {
     await _delete('/videos/$videoId');
   }
 
+  // ============ ADMIN CONTENT MODERATION ============
+
+  /// Admin: all trainer-uploaded videos (public and private).
+  /// [status] is 'active', 'deleted' or 'all'.
+  Future<Map<String, dynamic>> getAdminVideos({
+    String status = 'active',
+    String? search,
+  }) async {
+    final uri = Uri.parse('$baseUrl/videos/admin/all').replace(
+      queryParameters: {
+        'status': status,
+        if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
+      },
+    );
+    return await _getUri(uri.toString()) as Map<String, dynamic>;
+  }
+
+  /// Admin: all trainer-created workouts.
+  /// [status] is 'active', 'deleted' or 'all'.
+  Future<Map<String, dynamic>> getAdminWorkouts({
+    String status = 'active',
+    String? search,
+  }) async {
+    final uri = Uri.parse('$baseUrl/workouts/admin/all').replace(
+      queryParameters: {
+        'status': status,
+        if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
+      },
+    );
+    return await _getUri(uri.toString()) as Map<String, dynamic>;
+  }
+
+  /// Admin: remove an inappropriate video. [reason] (min 10 chars) is
+  /// emailed to the trainer.
+  Future<Map<String, dynamic>> adminDeleteVideo(
+    String videoId, {
+    required String reason,
+  }) async {
+    return await _deleteWithBody('/videos/admin/$videoId', {'reason': reason});
+  }
+
+  /// Admin: remove an inappropriate workout. [reason] (min 10 chars) is
+  /// emailed to the trainer. Copies assigned to members are hidden too.
+  Future<Map<String, dynamic>> adminDeleteWorkout(
+    String workoutId, {
+    required String reason,
+    bool removeAssignedCopies = true,
+  }) async {
+    return await _deleteWithBody('/workouts/admin/$workoutId', {
+      'reason': reason,
+      'removeAssignedCopies': removeAssignedCopies,
+    });
+  }
+
   Future<Map<String, dynamic>> getUsers({
     String? role,
     String? search,
@@ -479,6 +546,70 @@ class ApiService {
 
   Future<void> deleteUser(String userId) async {
     await _delete('/auth/users/$userId');
+  }
+
+  /// Admin: current BMI / calorie cooldown status for a user.
+  Future<Map<String, dynamic>> getUserCooldownStatus(String userId) async {
+    return await _get('/progress/admin/$userId/cooldown-status')
+        as Map<String, dynamic>;
+  }
+
+  /// Member: ask an admin to reset the BMI / calorie cooldown (e.g. misclick).
+  /// [type] must be 'bmi', 'calories' or 'both'.
+  Future<Map<String, dynamic>> requestCooldownReset({
+    required String type,
+    required String reason,
+  }) async {
+    return await _post('/progress/reset-requests', {
+      'type': type,
+      'reason': reason,
+    });
+  }
+
+  /// Member: latest reset request (or null if none).
+  Future<Map<String, dynamic>?> getMyCooldownResetRequest() async {
+    final response =
+        await _get('/progress/reset-requests/mine') as Map<String, dynamic>;
+    return response['request'] as Map<String, dynamic>?;
+  }
+
+  /// Member: cancel the pending reset request.
+  Future<void> cancelMyCooldownResetRequest() async {
+    await _delete('/progress/reset-requests/mine');
+  }
+
+  /// Admin: list member reset requests.
+  /// [status] is 'pending', 'approved', 'rejected' or 'all'.
+  Future<Map<String, dynamic>> getCooldownResetRequests({
+    String status = 'pending',
+  }) async {
+    return await _get('/progress/admin/reset-requests?status=$status')
+        as Map<String, dynamic>;
+  }
+
+  /// Admin: approve or reject a member reset request.
+  Future<Map<String, dynamic>> handleCooldownResetRequest(
+    String requestId, {
+    required bool approve,
+    String? note,
+  }) async {
+    return await _patch('/progress/admin/reset-requests/$requestId', {
+      'action': approve ? 'approve' : 'reject',
+      if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+    });
+  }
+
+  /// Admin: reset a user's tracking cooldown.
+  /// [type] must be 'bmi', 'calories' or 'both'.
+  Future<Map<String, dynamic>> resetUserCooldown(
+    String userId, {
+    required String type,
+    required String reason,
+  }) async {
+    return await _post('/progress/admin/$userId/reset-cooldown', {
+      'type': type,
+      'reason': reason,
+    });
   }
 
   Future<Workout> createWorkoutTemplate({
@@ -539,6 +670,20 @@ class ApiService {
   Future<List<dynamic>> getClients() async {
     final response = await _get('/clients');
     return response as List<dynamic>;
+  }
+
+  /// Fetches list of approved trainers with bio/feedback for member selection.
+  /// New endpoint from admin moderation features. Returns User objects
+  /// (bio field populated for visibility before choosing trainer).
+  Future<List<User>> getTrainers() async {
+    final response = await _get('/clients/trainers');
+    final dynamic list = response is Map ? response['trainers'] : response;
+    if (list is List) {
+      return list
+          .map((data) => User.fromJson(data as Map<String, dynamic>))
+          .toList();
+    }
+    return [];
   }
 
   Future<List<dynamic>> getClientProgress(String clientId) async {

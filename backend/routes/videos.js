@@ -8,8 +8,10 @@ const path = require('path');
 const os = require('os');
 const child_process = require('child_process');
 const ffmpeg = require('fluent-ffmpeg');
-const ExerciseVideo = require('../models/ExerciseVideo'); // adjust if model path differs
-const { verifyToken } = require('../middleware/auth'); // adjust to your auth middleware
+const ExerciseVideo = require('../models/ExerciseVideo');
+const User = require('../models/User');
+const { verifyToken, checkRole } = require('../middleware/auth');
+const emailService = require('../services/emailService');
 
 // init supabase
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -228,7 +230,10 @@ router.get('/trainer', verifyToken, async (req, res) => {
       return res.status(401).json({ error: 'Please log in to view your videos.' });
     }
 
-    const videos = await ExerciseVideo.find({ trainer: req.user._id }).sort({ createdAt: -1 });
+    const videos = await ExerciseVideo.find({ 
+      trainer: req.user._id, 
+      isDeleted: { $ne: true } 
+    }).sort({ createdAt: -1 });
     console.log(`Found ${videos.length} videos for trainer ${req.user._id}`);
 
     // Generate signed URLs for videos and thumbnails
@@ -275,7 +280,10 @@ router.get('/trainer', verifyToken, async (req, res) => {
 // GET /api/videos - Get public videos for members
 router.get('/', verifyToken, async (req, res) => {
   try {
-    const videos = await ExerciseVideo.find({ isPublic: true })
+    const videos = await ExerciseVideo.find({ 
+      isPublic: true, 
+      isDeleted: { $ne: true } 
+    })
       .populate('trainer', 'username email')
       .sort({ createdAt: -1 });
     console.log(`Found ${videos.length} public videos`);
@@ -369,6 +377,161 @@ router.delete('/:id', verifyToken, async (req, res) => {
   } catch (err) {
     console.error('videos delete error:', err && err.stack ? err.stack : err);
     return res.status(500).json({ error: 'Failed to delete video', message: err.message || String(err) });
+  }
+});
+
+const escapeHtml = (value) => String(value == null ? '' : value)
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// GET /api/videos/admin/all - Admin: list ALL trainer uploads (public and private) for moderation
+// Query: ?status=active|deleted|all (default active), ?search=<title/trainer>, ?trainerId=<id>
+router.get('/admin/all', verifyToken, checkRole(['admin']), async (req, res) => {
+  try {
+    const status = (req.query.status || 'active').toString().toLowerCase();
+    if (!['active', 'deleted', 'all'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status filter. Use active, deleted or all.' });
+    }
+
+    const query = {};
+    if (status === 'active') query.isDeleted = { $ne: true };
+    if (status === 'deleted') query.isDeleted = true;
+    if (req.query.trainerId) query.trainer = req.query.trainerId;
+
+    const search = (req.query.search || '').toString().trim();
+    if (search) {
+      const rx = new RegExp(escapeRegex(search), 'i');
+      const matchingTrainers = await User.find({ username: rx, role: 'trainer' }).select('_id');
+      query.$or = [
+        { title: rx },
+        { description: rx },
+        { trainer: { $in: matchingTrainers.map((t) => t._id) } }
+      ];
+    }
+
+    const videos = await ExerciseVideo.find(query)
+      .populate('trainer', 'username email')
+      .populate('deletedBy', 'username')
+      .sort({ createdAt: -1 })
+      .limit(200);
+
+    // Signed URLs only for videos whose files still exist (removed videos are purged from storage)
+    const result = await Promise.all(videos.map(async (video) => {
+      const videoObj = video.toObject();
+      if (video.isDeleted) {
+        videoObj.videoUrl = null;
+        videoObj.thumbnailUrl = null;
+        return videoObj;
+      }
+      try {
+        const { data: videoData, error: videoError } = await supabase
+          .storage.from(BUCKET).createSignedUrl(video.videoPath, 3600);
+        if (!videoError && videoData) videoObj.videoUrl = videoData.signedUrl;
+
+        if (video.thumbnailPath) {
+          const { data: thumbData, error: thumbError } = await supabase
+            .storage.from(BUCKET).createSignedUrl(video.thumbnailPath, 3600);
+          if (!thumbError && thumbData) videoObj.thumbnailUrl = thumbData.signedUrl;
+        }
+      } catch (err) {
+        console.error('Admin list: signed URL error:', err.message);
+      }
+      return videoObj;
+    }));
+
+    const [activeCount, deletedCount] = await Promise.all([
+      ExerciseVideo.countDocuments({ isDeleted: { $ne: true } }),
+      ExerciseVideo.countDocuments({ isDeleted: true })
+    ]);
+
+    return res.json({ videos: result, activeCount, deletedCount });
+  } catch (err) {
+    console.error('Admin videos list error:', err);
+    return res.status(500).json({ error: 'Failed to load videos for moderation', message: err.message });
+  }
+});
+
+// Admin only: Soft delete inappropriate video with detailed reason
+// This is part of Admin Settings for content moderation. Records reason for audit and user notification.
+// Updates DB with deletion metadata, optionally cleans storage, and logs action.
+router.delete('/admin/:id', verifyToken, checkRole(['admin']), async (req, res) => {
+  try {
+    const { reason } = req.body;
+    if (!reason || reason.trim().length < 10) {
+      return res.status(400).json({ 
+        error: 'A detailed deletion reason is required (minimum 10 characters).' 
+      });
+    }
+
+    const video = await ExerciseVideo.findById(req.params.id);
+    if (!video) {
+      return res.status(404).json({ error: 'We could not find this video.' });
+    }
+
+    if (video.isDeleted) {
+      return res.status(400).json({ error: 'This video has already been deleted.' });
+    }
+
+    const trimmedReason = reason.trim().slice(0, 500);
+
+    // Soft delete with reason for audit and transparency
+    video.isDeleted = true;
+    video.deletionReason = trimmedReason;
+    video.deletedBy = req.user._id;
+    video.deletedAt = new Date();
+    await video.save();
+
+    // Clean up storage (Supabase) for inappropriate content (similar to trainer delete)
+    const filesToDelete = [video.videoPath];
+    if (video.thumbnailPath) {
+      filesToDelete.push(video.thumbnailPath);
+    }
+    const { error: deleteError } = await supabase
+      .storage
+      .from(BUCKET)
+      .remove(filesToDelete);
+
+    if (deleteError) {
+      console.warn('Supabase storage cleanup warning for admin delete:', deleteError);
+      // Continue anyway - DB is the source of truth
+    }
+
+    // Send notification to trainer (using existing service)
+    try {
+      const trainerUser = await User.findById(video.trainer).select('email username');
+      const trainerEmail = trainerUser ? trainerUser.email : null;
+      if (trainerEmail) {
+        await emailService.sendEmail(trainerEmail, 'Your video has been removed - Moderation Notice', `
+            <h2>Video Moderation Notice</h2>
+            <p>Dear ${escapeHtml(trainerUser.username || 'Trainer')},</p>
+            <p>Your video titled "<strong>${escapeHtml(video.title)}</strong>" has been removed by an administrator.</p>
+            <p><strong>Reason for deletion:</strong> ${escapeHtml(trimmedReason)}</p>
+            <p>This action was taken to maintain appropriate content standards in the community.</p>
+            <p>If you believe this was an error, please contact admin support.</p>
+            <p>Video ID: ${video._id}</p>
+            <p>Best regards,<br>LiftLog Admin Team</p>
+          `);
+        console.log(`Deletion notification email sent to trainer ${trainerUser.username || trainerEmail}`);
+      }
+    } catch (emailErr) {
+      console.warn('Email notification for video deletion failed (non-blocking):', emailErr.message);
+    }
+
+    console.log(`[ADMIN] Video ${req.params.id} marked deleted by ${req.user._id}. Reason: ${trimmedReason}`);
+
+    res.json({ 
+      message: 'Video successfully removed for inappropriate content. Trainer notified with reason.',
+      deletionReason: trimmedReason,
+      videoId: video._id
+    });
+  } catch (error) {
+    console.error('Admin video delete error:', error);
+    res.status(500).json({ error: error.message || 'Failed to delete video' });
   }
 });
 

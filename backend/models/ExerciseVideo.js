@@ -69,8 +69,25 @@ const exerciseVideoSchema = new mongoose.Schema({
   updatedAt: {
     type: Date,
     default: Date.now
+  },
+  isDeleted: {
+    type: Boolean,
+    default: false
+  },
+  deletionReason: {
+    type: String,
+    trim: true,
+    maxlength: 500
+  },
+  deletedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  deletedAt: {
+    type: Date
   }
 });
+
 
 // Update the updatedAt field and normalize exerciseType before saving
 exerciseVideoSchema.pre('save', function(next) {

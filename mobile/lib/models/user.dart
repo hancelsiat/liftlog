@@ -16,6 +16,7 @@ class User {
   final bool isApproved;
   final String credentialImageUrl;
   final String? privateNotes;
+  final String? bio;
   final String? trainer;
 
   User({
@@ -29,6 +30,7 @@ class User {
     this.isApproved = false,
     this.credentialImageUrl = '',
     this.privateNotes,
+    this.bio,
     this.trainer,
   });
 
@@ -56,6 +58,7 @@ class User {
       isApproved: json['isApproved'] ?? false,
       credentialImageUrl: json['credentialImageUrl'] ?? '',
       privateNotes: json['privateNotes'],
+      bio: json['bio'],
       trainer: json['trainer'],
     );
   }
@@ -72,6 +75,7 @@ class User {
       'isApproved': isApproved,
       'credentialImageUrl': credentialImageUrl,
       'privateNotes': privateNotes,
+      'bio': bio,
       'trainer': trainer,
     };
   }

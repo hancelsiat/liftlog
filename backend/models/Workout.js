@@ -82,6 +82,11 @@ const WorkoutSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   },
+  // For assigned copies: the trainer template this workout was copied from
+  sourceTemplate: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Workout'
+  },
   completedAt: {
     type: Date
   },
@@ -89,6 +94,22 @@ const WorkoutSchema = new mongoose.Schema({
     type: String,
     trim: true,
     maxlength: 1000
+  },
+  isDeleted: {
+    type: Boolean,
+    default: false
+  },
+  deletionReason: {
+    type: String,
+    trim: true,
+    maxlength: 500
+  },
+  deletedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  deletedAt: {
+    type: Date
   }
 }, {
   timestamps: true

@@ -19,7 +19,8 @@ class ClientDetailScreen extends StatefulWidget {
   State<ClientDetailScreen> createState() => _ClientDetailScreenState();
 }
 
-class _ClientDetailScreenState extends State<ClientDetailScreen> with SingleTickerProviderStateMixin {
+class _ClientDetailScreenState extends State<ClientDetailScreen>
+    with SingleTickerProviderStateMixin {
   late Future<List<Workout>> _progressFuture;
   final ApiService _apiService = ApiService();
   TabController? _tabController;
@@ -46,30 +47,47 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with SingleTick
     try {
       await _apiService.removeClient(widget.client.id);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Client removed successfully!'), backgroundColor: Colors.green),
+        const SnackBar(
+          content: Text('Client removed successfully!'),
+          backgroundColor: Colors.green,
+        ),
       );
       Navigator.of(context).pop();
-} catch (e) {
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to remove client. Please try again.'), backgroundColor: Colors.red),
+          const SnackBar(
+            content: Text('Failed to remove client. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
-    }void _deleteWorkout(String workoutId) async {
+    }
+  }
+
+  void _deleteWorkout(String workoutId) async {
     try {
       await _apiService.deleteWorkout(workoutId);
       setState(() {
         _progressFuture = _fetchProgress();
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Workout deleted successfully!'), backgroundColor: Colors.green),
-} catch (e) {
+        const SnackBar(
+          content: Text('Workout deleted successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to delete workout. Please try again.'), backgroundColor: Colors.red),
+          const SnackBar(
+            content: Text('Failed to delete workout. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -90,7 +108,9 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with SingleTick
                 builder: (BuildContext context) {
                   return AlertDialog(
                     title: const Text('Remove Client'),
-                    content: const Text('Are you sure you want to remove this client?'),
+                    content: const Text(
+                      'Are you sure you want to remove this client?',
+                    ),
                     actions: <Widget>[
                       TextButton(
                         child: const Text('Cancel'),
@@ -99,7 +119,10 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with SingleTick
                         },
                       ),
                       TextButton(
-                        child: const Text('Remove', style: TextStyle(color: Colors.red)),
+                        child: const Text(
+                          'Remove',
+                          style: TextStyle(color: Colors.red),
+                        ),
                         onPressed: () {
                           Navigator.of(context).pop();
                           _removeClient();
@@ -128,20 +151,44 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with SingleTick
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.white)));
+            return Center(
+              child: Text(
+                'Error: ${snapshot.error}',
+                style: const TextStyle(color: Colors.white),
+              ),
+            );
           }
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('No workouts assigned yet.', style: TextStyle(color: Colors.white)));
+            return const Center(
+              child: Text(
+                'No workouts assigned yet.',
+                style: TextStyle(color: Colors.white),
+              ),
+            );
           }
 
-          final assigned = snapshot.data!.where((w) => w.completedAt == null).toList();
-          final completed = snapshot.data!.where((w) => w.completedAt != null).toList();
+          final assigned = snapshot.data!
+              .where((w) => w.completedAt == null)
+              .toList();
+          final completed = snapshot.data!
+              .where((w) => w.completedAt != null)
+              .toList();
 
           return TabBarView(
             controller: _tabController,
             children: [
-              _buildWorkoutsList(assigned, 'No workouts assigned yet.', currentTrainerId, hasLeft),
-              _buildWorkoutsList(completed, 'No completed workouts yet.', currentTrainerId, hasLeft),
+              _buildWorkoutsList(
+                assigned,
+                'No workouts assigned yet.',
+                currentTrainerId,
+                hasLeft,
+              ),
+              _buildWorkoutsList(
+                completed,
+                'No completed workouts yet.',
+                currentTrainerId,
+                hasLeft,
+              ),
             ],
           );
         },
@@ -153,7 +200,8 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with SingleTick
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => AssignWorkoutScreen(memberId: widget.client.id),
+                    builder: (context) =>
+                        AssignWorkoutScreen(memberId: widget.client.id),
                   ),
                 ).then((_) {
                   // Refresh progress when coming back
@@ -162,13 +210,18 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with SingleTick
                   });
                 });
               },
-        child: const Icon(Icons.assignment),
-        backgroundColor: AppTheme.primaryColor,
-      ),
+              child: const Icon(Icons.assignment),
+              backgroundColor: AppTheme.primaryColor,
+            ),
     );
   }
 
-  Widget _buildWorkoutsList(List<Workout> workouts, String emptyMessage, String? currentTrainerId, bool hasLeft) {
+  Widget _buildWorkoutsList(
+    List<Workout> workouts,
+    String emptyMessage,
+    String? currentTrainerId,
+    bool hasLeft,
+  ) {
     if (workouts.isEmpty) {
       return Center(
         child: Text(emptyMessage, style: const TextStyle(color: Colors.white)),
@@ -186,43 +239,56 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with SingleTick
           color: AppTheme.cardBackground,
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: ListTile(
-            title: Text(workout.title, style: const TextStyle(color: Colors.white)),
+            title: Text(
+              workout.title,
+              style: const TextStyle(color: Colors.white),
+            ),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Assigned on: $formattedDate', style: const TextStyle(color: Colors.white70)),
+                Text(
+                  'Assigned on: $formattedDate',
+                  style: const TextStyle(color: Colors.white70),
+                ),
                 if (workout.trainerName != null)
-                  Text('by ${workout.trainerName}', style: const TextStyle(color: Colors.white70, fontStyle: FontStyle.italic)),
+                  Text(
+                    'by ${workout.trainerName}',
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
               ],
             ),
             trailing: workout.completedAt != null
                 ? const Icon(Icons.check_circle, color: Colors.green)
                 : isOwner && !hasLeft
-                    ? Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.edit, color: Colors.blue),
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => CreateWorkoutTemplateScreen(workout: workout),
-                                ),
-                              ).then((_) {
-                                setState(() {
-                                  _progressFuture = _fetchProgress();
-                                });
-                              });
-                            },
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete, color: Colors.red),
-                            onPressed: () => _deleteWorkout(workout.id),
-                          ),
-                        ],
-                      )
-                    : null,
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit, color: Colors.blue),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  CreateWorkoutTemplateScreen(workout: workout),
+                            ),
+                          ).then((_) {
+                            setState(() {
+                              _progressFuture = _fetchProgress();
+                            });
+                          });
+                        },
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () => _deleteWorkout(workout.id),
+                      ),
+                    ],
+                  )
+                : null,
             onTap: () {
               if (workout.completedAt != null) {
                 Navigator.push(

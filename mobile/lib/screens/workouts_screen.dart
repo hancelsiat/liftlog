@@ -9,6 +9,7 @@ import '../utils/app_theme.dart';
 import 'workout_session_screen.dart';
 import 'workout_detail_screen.dart';
 import 'rate_trainer_screen.dart';
+import 'trainer_feedback_screen.dart';
 
 class WorkoutsScreen extends StatefulWidget {
   const WorkoutsScreen({super.key});
@@ -67,8 +68,10 @@ class _WorkoutsScreenState extends State<WorkoutsScreen>
       try {
         final ratingStats = await _apiService.getTrainerRating(trainer['_id']);
         trainer['ratingPercentage'] = ratingStats.ratingPercentage;
+        trainer['totalRatings'] = ratingStats.totalRatings;
       } catch (e) {
         trainer['ratingPercentage'] = 0.0;
+        trainer['totalRatings'] = 0;
       }
       trainers.add(trainer);
     }
@@ -103,6 +106,50 @@ class _WorkoutsScreenState extends State<WorkoutsScreen>
           backgroundColor: Colors.red,
         ),
       );
+    }
+  }
+
+  /// Opens the anonymous feedback screen for a trainer. If the member taps
+  /// "Choose this Trainer" there, the trainer is selected.
+  Future<void> _openTrainerFeedback(Map<String, dynamic> trainer) async {
+    final bool? choose = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (context) => TrainerFeedbackScreen(
+          trainerId: trainer['_id'].toString(),
+          trainerName: trainer['username']?.toString() ?? 'Trainer',
+          trainerBio: trainer['bio']?.toString(),
+        ),
+      ),
+    );
+    if (choose == true && mounted) {
+      await _confirmSelectTrainer(trainer);
+    }
+  }
+
+  /// Asks for confirmation before choosing a trainer.
+  Future<void> _confirmSelectTrainer(Map<String, dynamic> trainer) async {
+    final String name = trainer['username']?.toString() ?? 'this trainer';
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Choose Trainer'),
+          content: Text('Do you want to choose $name as your trainer?'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+            ),
+            TextButton(
+              child: const Text('Choose'),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed == true && mounted) {
+      await _selectTrainer(trainer['_id'].toString());
     }
   }
 
@@ -308,7 +355,7 @@ class _WorkoutsScreenState extends State<WorkoutsScreen>
             color: Colors.transparent,
             child: InkWell(
               borderRadius: BorderRadius.circular(20),
-              onTap: () => _selectTrainer(trainer['_id']),
+              onTap: () => _openTrainerFeedback(trainer),
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Row(
@@ -436,6 +483,52 @@ class _WorkoutsScreenState extends State<WorkoutsScreen>
                                       ? FontWeight.w600
                                       : FontWeight.normal,
                                 ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 6,
+                            children: [
+                              OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppTheme.primaryColor,
+                                  side: const BorderSide(
+                                    color: AppTheme.primaryColor,
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                icon: const Icon(
+                                  Icons.reviews_outlined,
+                                  size: 16,
+                                ),
+                                label: Text(
+                                  'Feedbacks (${trainer['totalRatings'] ?? 0})',
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                                onPressed: () => _openTrainerFeedback(trainer),
+                              ),
+                              ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.primaryColor,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                icon: const Icon(Icons.check, size: 16),
+                                label: const Text(
+                                  'Choose',
+                                  style: TextStyle(fontSize: 13),
+                                ),
+                                onPressed: () => _confirmSelectTrainer(trainer),
                               ),
                             ],
                           ),

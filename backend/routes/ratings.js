@@ -27,7 +27,10 @@ router.post('/', verifyToken, async (req, res) => {
 router.get('/', verifyToken, async (req, res) => {
   try {
     const trainerId = req.user._id;
-    const ratings = await Rating.find({ trainer: trainerId }).populate('member', 'username');
+    // Anonymous: do not expose which member wrote the feedback
+    const ratings = await Rating.find({ trainer: trainerId })
+      .select('rating feedback createdAt')
+      .sort({ createdAt: -1 });
 
     if (ratings.length === 0) {
       return res.json({
@@ -55,11 +58,23 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
-// Get all ratings for a specific trainer
+// Get all ratings for a specific trainer (used by members when choosing a trainer).
+// Feedback is ANONYMOUS: the member reference/username is never sent to the client.
 router.get('/trainer/:trainerId', async (req, res) => {
   try {
     const { trainerId } = req.params;
-    const ratings = await Rating.find({ trainer: trainerId }).populate('member', 'username');
+    const rawRatings = await Rating.find({ trainer: trainerId })
+      .select('rating feedback createdAt')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Strip any identifying information before sending
+    const ratings = rawRatings.map((r) => ({
+      _id: r._id,
+      rating: r.rating,
+      feedback: r.feedback || '',
+      createdAt: r.createdAt,
+    }));
 
     if (ratings.length === 0) {
       return res.json({

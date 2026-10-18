@@ -1,6 +1,10 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const Progress = require('../models/Progress');
+const CooldownResetRequest = require('../models/CooldownResetRequest');
+const User = require('../models/User');
+const emailService = require('../services/emailService');
 const { verifyToken, checkRole } = require('../middleware/auth');
 
 // Create or update progress entry with separate time restrictions
@@ -411,93 +415,341 @@ router.get('/user/:userId',
     }
 });
 
-// TEMPORARY: Admin route to delete all progress (for testing)
-router.delete('/admin/delete-all', verifyToken, checkRole(['admin']), async (req, res) => {
+// Admin: Reset BMI and calorie tracking cooldown for a user (by client request e.g. misclick)
+// This overrides the 7-day/24h restrictions. Logs the reset with reason for audit in cooldownResets array.
+// Connected directly to MongoDB via Mongoose. Uses partial update pattern for compatibility.
+const BMI_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+const CALORIES_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+
+// Escape user-supplied text before putting it into an HTML email
+const escapeHtml = (value) => String(value)
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+// Build the cooldown status for one tracker from its last update timestamp
+const buildCooldownStatus = (lastUpdate, cooldownMs, now) => {
+  if (!lastUpdate) {
+    return { active: false, lastUpdate: null, nextAllowedDate: null, remainingMs: 0 };
+  }
+  const nextAllowed = new Date(new Date(lastUpdate).getTime() + cooldownMs);
+  const remainingMs = Math.max(0, nextAllowed.getTime() - now.getTime());
+  return {
+    active: remainingMs > 0,
+    lastUpdate,
+    nextAllowedDate: nextAllowed,
+    remainingMs
+  };
+};
+
+// Validate the target user for admin cooldown operations
+const findCooldownTarget = async (userId) => {
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    return { error: { status: 400, message: 'Invalid user ID.' } };
+  }
+  const user = await User.findById(userId).select('email username role');
+  if (!user) {
+    return { error: { status: 404, message: 'User not found.' } };
+  }
+  return { user };
+};
+
+const typeLabel = (type) => (type === 'both' ? 'BMI and calorie' : type === 'bmi' ? 'BMI' : 'calorie');
+const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+// Shared reset logic used by the direct admin reset and by approving a member request.
+// Returns { progress, label } or { error: { status, message } }.
+const performCooldownReset = async (client, type, reason, adminId) => {
+  // Cooldowns are always read from the latest progress entry
+  const progress = await Progress.findOne({ user: client._id }).sort({ createdAt: -1 });
+  if (!progress) {
+    return { error: { status: 400, message: 'This user has no progress entries yet, so there is no cooldown to reset.' } };
+  }
+
+  // Clearing the timestamp lifts the restriction immediately
+  if (type === 'bmi' || type === 'both') progress.lastBmiUpdate = null;
+  if (type === 'calories' || type === 'both') progress.lastCaloriesUpdate = null;
+
+  if (!progress.cooldownResets) progress.cooldownResets = [];
+  progress.cooldownResets.push({ resetAt: new Date(), reason, type, admin: adminId });
+  await progress.save({ validateBeforeSave: false });
+
+  const label = typeLabel(type);
+
+  // Notify the client (non-blocking)
   try {
-    const result = await Progress.deleteMany({});
-    
+    if (client.email) {
+      await emailService.sendEmail(client.email, 'Your Progress Tracking Cooldown Has Been Reset', `
+          <h2>Progress Cooldown Reset</h2>
+          <p>Dear ${escapeHtml(client.username || 'User')},</p>
+          <p>Your ${label} tracking cooldown has been reset by an administrator per your request.</p>
+          <p><strong>Reason:</strong> ${escapeHtml(reason)}</p>
+          <p>You can now update your ${label} data immediately.</p>
+          <p>Thank you for using LiftLog.</p>
+          <p>LiftLog Admin Team</p>
+        `);
+    }
+  } catch (emailErr) {
+    console.warn('Notification for cooldown reset failed (non-blocking):', emailErr.message);
+  }
+
+  console.log(`[ADMIN] ${label} cooldown reset for user ${client._id} by admin ${adminId}. Reason: ${reason}`);
+  return { progress, label };
+};
+
+// Admin: View a user's current BMI / calorie cooldown status before resetting
+router.get('/admin/:userId/cooldown-status', verifyToken, checkRole(['admin']), async (req, res) => {
+  try {
+    const { user, error } = await findCooldownTarget(req.params.userId);
+    if (error) return res.status(error.status).json({ error: error.message });
+
+    const progress = await Progress.findOne({ user: user._id })
+      .sort({ createdAt: -1 })
+      .populate('cooldownResets.admin', 'username');
+
+    const now = new Date();
+    const resets = progress && Array.isArray(progress.cooldownResets)
+      ? progress.cooldownResets
+          .slice(-5)
+          .reverse()
+          .map((r) => ({
+            resetAt: r.resetAt,
+            reason: r.reason,
+            type: r.type || 'both',
+            admin: r.admin && r.admin.username ? r.admin.username : null
+          }))
+      : [];
+
     res.json({
-      success: true,
-      message: `Deleted ${result.deletedCount} progress entries. You can now create fresh progress data.`
+      user: { _id: user._id, username: user.username, email: user.email },
+      hasProgress: !!progress,
+      bmi: buildCooldownStatus(progress && progress.lastBmiUpdate, BMI_COOLDOWN_MS, now),
+      calories: buildCooldownStatus(progress && progress.lastCaloriesUpdate, CALORIES_COOLDOWN_MS, now),
+      recentResets: resets
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    console.error('Admin cooldown status error:', error);
+    res.status(500).json({ error: error.message || 'Failed to load cooldown status' });
   }
 });
 
-// TEMPORARY: Admin route to fix database schema
-router.post('/admin/fix-schema', verifyToken, checkRole(['admin']), async (req, res) => {
+// Body: { reason: string (min 5 chars), type: 'bmi' | 'calories' | 'both' (default 'both') }
+router.post('/admin/:userId/reset-cooldown', verifyToken, checkRole(['admin']), async (req, res) => {
   try {
-    const mongoose = require('mongoose');
-    const db = mongoose.connection.db;
-    
-    console.log('Attempting to fix Progress collection schema...');
-    
-    // OPTION 1: Try to remove validator completely
-    try {
-      await db.command({
-        collMod: 'progresses',
-        validator: {},
-        validationLevel: 'off'
-      });
-      console.log('✅ Validator removed completely!');
-      
-      return res.json({
-        success: true,
-        message: 'Database validator removed. Mongoose will handle all validation now.'
-      });
-    } catch (error1) {
-      console.log('Could not remove validator, trying to update it...', error1.message);
-      
-      // OPTION 2: Update validator to make fields optional
-      try {
-        await db.command({
-          collMod: 'progresses',
-          validator: {
-            $jsonSchema: {
-              bsonType: 'object',
-              required: ['user'],
-              properties: {
-                user: {
-                  bsonType: 'objectId'
-                }
-              }
-            }
-          },
-          validationLevel: 'moderate',
-          validationAction: 'warn'
-        });
-        console.log('✅ Validator updated to minimal schema!');
-        
-        return res.json({
-          success: true,
-          message: 'Database validator updated. Only user field is required now.'
-        });
-      } catch (error2) {
-        console.log('Could not update validator:', error2.message);
-        
-        if (error2.code === 26) {
-          return res.json({
-            success: true,
-            message: 'Collection has no validator - Mongoose handles validation.'
-          });
-        }
-        
-        throw error2;
-      }
+    const { reason } = req.body;
+    const type = (req.body.type || 'both').toString().toLowerCase();
+
+    if (!['bmi', 'calories', 'both'].includes(type)) {
+      return res.status(400).json({ error: 'Invalid reset type. Use "bmi", "calories" or "both".' });
     }
-  } catch (error) {
-    console.error('Error fixing schema:', error);
-    
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      details: 'Try deleting all progress entries and recreating them.'
+    if (!reason || reason.trim().length < 5) {
+      return res.status(400).json({ 
+        error: 'A reason for the cooldown reset is required (e.g. "Client misclicked update button").' 
+      });
+    }
+
+    const trimmedReason = reason.trim().slice(0, 500);
+    const { user: client, error } = await findCooldownTarget(req.params.userId);
+    if (error) return res.status(error.status).json({ error: error.message });
+
+    const result = await performCooldownReset(client, type, trimmedReason, req.user._id);
+    if (result.error) return res.status(result.error.status).json({ error: result.error.message });
+
+    // A direct reset also resolves any pending request from this member
+    await CooldownResetRequest.updateMany(
+      { user: client._id, status: 'pending' },
+      { status: 'approved', handledBy: req.user._id, handledAt: new Date(), adminNote: 'Resolved by direct admin reset.' }
+    );
+
+    res.json({
+      message: `${capitalize(result.label)} cooldown successfully reset. Client notified.`,
+      type,
+      progressId: result.progress._id,
+      reason: trimmedReason,
+      cooldownResets: result.progress.cooldownResets.length
     });
+  } catch (error) {
+    console.error('Admin cooldown reset error:', error);
+    res.status(500).json({ error: error.message || 'Failed to reset cooldown' });
   }
 });
+
+// ============ MEMBER RESET REQUESTS ============
+// NOTE: GET routes here use 2+ path segments so they don't collide with GET '/:id'.
+
+// Member: submit a request for the admin to reset their cooldown (e.g. misclick)
+// Body: { type: 'bmi' | 'calories' | 'both', reason: string (min 5 chars) }
+router.post('/reset-requests', verifyToken, checkRole(['member']), async (req, res) => {
+  try {
+    const type = (req.body.type || '').toString().toLowerCase();
+    const reason = (req.body.reason || '').toString().trim();
+
+    if (!['bmi', 'calories', 'both'].includes(type)) {
+      return res.status(400).json({ error: 'Please choose what to reset: BMI, calories or both.' });
+    }
+    if (reason.length < 5) {
+      return res.status(400).json({ error: 'Please explain what happened (at least 5 characters).' });
+    }
+
+    const progress = await Progress.findOne({ user: req.user._id }).sort({ createdAt: -1 });
+    const now = new Date();
+    const bmiActive = buildCooldownStatus(progress && progress.lastBmiUpdate, BMI_COOLDOWN_MS, now).active;
+    const caloriesActive = buildCooldownStatus(progress && progress.lastCaloriesUpdate, CALORIES_COOLDOWN_MS, now).active;
+    const needed = (type === 'bmi' && bmiActive) ||
+      (type === 'calories' && caloriesActive) ||
+      (type === 'both' && (bmiActive || caloriesActive));
+
+    if (!needed) {
+      return res.status(400).json({ error: 'You can already update this. No reset is needed.' });
+    }
+
+    const existing = await CooldownResetRequest.findOne({ user: req.user._id, status: 'pending' });
+    if (existing) {
+      return res.status(409).json({
+        error: 'You already have a pending reset request. Please wait for an admin to review it.'
+      });
+    }
+
+    const request = await CooldownResetRequest.create({
+      user: req.user._id,
+      type,
+      reason: reason.slice(0, 500)
+    });
+
+    console.log(`[RESET REQUEST] Member ${req.user._id} requested ${type} cooldown reset.`);
+
+    res.status(201).json({
+      message: 'Your reset request was sent to the admin.',
+      request
+    });
+  } catch (error) {
+    console.error('Create reset request error:', error);
+    res.status(500).json({ error: error.message || 'Failed to send reset request' });
+  }
+});
+
+// Member: get my latest reset request (to show pending / approved / rejected status)
+router.get('/reset-requests/mine', verifyToken, async (req, res) => {
+  try {
+    const request = await CooldownResetRequest.findOne({ user: req.user._id })
+      .sort({ createdAt: -1 })
+      .select('type reason status adminNote createdAt handledAt');
+    res.json({ request: request || null });
+  } catch (error) {
+    res.status(500).json({ error: error.message || 'Failed to load reset request' });
+  }
+});
+
+// Member: cancel my pending request
+router.delete('/reset-requests/mine', verifyToken, async (req, res) => {
+  try {
+    const result = await CooldownResetRequest.deleteOne({ user: req.user._id, status: 'pending' });
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: 'You have no pending reset request.' });
+    }
+    res.json({ message: 'Reset request cancelled.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message || 'Failed to cancel reset request' });
+  }
+});
+
+// Admin: list reset requests. Query: ?status=pending|approved|rejected|all (default pending)
+router.get('/admin/reset-requests', verifyToken, checkRole(['admin']), async (req, res) => {
+  try {
+    const status = (req.query.status || 'pending').toString().toLowerCase();
+    if (status !== 'all' && !['pending', 'approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status filter.' });
+    }
+    const query = status === 'all' ? {} : { status };
+
+    const requests = await CooldownResetRequest.find(query)
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .populate('user', 'username email')
+      .populate('handledBy', 'username')
+      .lean();
+
+    const pendingCount = await CooldownResetRequest.countDocuments({ status: 'pending' });
+
+    res.json({ requests, pendingCount });
+  } catch (error) {
+    console.error('List reset requests error:', error);
+    res.status(500).json({ error: error.message || 'Failed to load reset requests' });
+  }
+});
+
+// Admin: approve or reject a member's reset request
+// Body: { action: 'approve' | 'reject', note?: string (required for reject) }
+router.patch('/admin/reset-requests/:requestId', verifyToken, checkRole(['admin']), async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(requestId)) {
+      return res.status(400).json({ error: 'Invalid request ID.' });
+    }
+
+    const action = (req.body.action || '').toString().toLowerCase();
+    const note = (req.body.note || '').toString().trim().slice(0, 500);
+    if (!['approve', 'reject'].includes(action)) {
+      return res.status(400).json({ error: 'Action must be "approve" or "reject".' });
+    }
+    if (action === 'reject' && note.length < 5) {
+      return res.status(400).json({
+        error: 'Please give the member a reason for rejecting (at least 5 characters).'
+      });
+    }
+
+    const request = await CooldownResetRequest.findById(requestId);
+    if (!request) return res.status(404).json({ error: 'Reset request not found.' });
+    if (request.status !== 'pending') {
+      return res.status(409).json({ error: `This request was already ${request.status}.` });
+    }
+
+    const { user: client, error } = await findCooldownTarget(request.user.toString());
+    if (error) return res.status(error.status).json({ error: error.message });
+
+    if (action === 'approve') {
+      const auditReason = `Member request: ${request.reason}${note ? ` | Admin note: ${note}` : ''}`.slice(0, 500);
+      const result = await performCooldownReset(client, request.type, auditReason, req.user._id);
+      if (result.error) return res.status(result.error.status).json({ error: result.error.message });
+    } else {
+      // Notify member of rejection (non-blocking)
+      try {
+        if (client.email) {
+          await emailService.sendEmail(client.email, 'Your Cooldown Reset Request', `
+              <h2>Cooldown Reset Request Declined</h2>
+              <p>Dear ${escapeHtml(client.username || 'User')},</p>
+              <p>Your request to reset your ${typeLabel(request.type)} tracking cooldown was not approved.</p>
+              <p><strong>Admin note:</strong> ${escapeHtml(note)}</p>
+              <p>LiftLog Admin Team</p>
+            `);
+        }
+      } catch (emailErr) {
+        console.warn('Rejection email failed (non-blocking):', emailErr.message);
+      }
+    }
+
+    request.status = action === 'approve' ? 'approved' : 'rejected';
+    if (note) request.adminNote = note;
+    request.handledBy = req.user._id;
+    request.handledAt = new Date();
+    await request.save();
+
+    res.json({
+      message: action === 'approve'
+        ? `Request approved. ${capitalize(typeLabel(request.type))} cooldown reset and member notified.`
+        : 'Request rejected and member notified.',
+      request
+    });
+  } catch (error) {
+    console.error('Handle reset request error:', error);
+    res.status(500).json({ error: error.message || 'Failed to handle reset request' });
+  }
+});
+
+ // Admin schema fix and delete routes have been removed after successful deployment of the Progress collection fixes.
+ // The database validator issues on Render have been resolved. Partial updates for BMI/calories now work reliably.
+ // See FIX_RENDER_DATABASE.md and PROGRESS_UPDATE_FIX.md for details. New admin cooldown reset and content moderation features added.
 
 module.exports = router;

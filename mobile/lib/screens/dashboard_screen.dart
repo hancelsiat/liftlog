@@ -11,10 +11,11 @@ import 'training_videos_screen.dart';
 import 'video_upload_screen.dart';
 import 'trainer_videos_screen.dart';
 import 'settings_screen.dart';
-import 'user_management_screen.dart';
 import 'create_workout_template_screen.dart';
 import 'manage_workouts_screen.dart';
 import 'admin_users_screen.dart';
+import 'admin_reset_requests_screen.dart';
+import 'admin_content_moderation_screen.dart';
 import 'trainer_clients_screen.dart';
 import 'trainer_ratings_screen.dart';
 
@@ -500,6 +501,47 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const AdminUsersScreen()),
+          ),
+        ),
+        const SizedBox(height: 16),
+        _buildPremiumCard(
+          title: 'Trainer Videos',
+          subtitle: 'Review and remove inappropriate uploads',
+          icon: Icons.video_library,
+          gradient: AppTheme.secondaryGradient,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) =>
+                  const AdminContentModerationScreen(initialTab: 0),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        _buildPremiumCard(
+          title: 'Trainer Workouts',
+          subtitle: 'Review and remove inappropriate workouts',
+          icon: Icons.fitness_center,
+          gradient: AppTheme.primaryGradient,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) =>
+                  const AdminContentModerationScreen(initialTab: 1),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        _buildPremiumCard(
+          title: 'Reset Requests',
+          subtitle: 'Approve BMI / calorie cooldown resets',
+          icon: Icons.restart_alt,
+          gradient: AppTheme.accentGradient,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const AdminResetRequestsScreen(),
+            ),
           ),
         ),
         const SizedBox(height: 16),

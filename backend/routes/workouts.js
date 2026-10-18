@@ -1,7 +1,10 @@
 
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const Workout = require('../models/Workout');
+const User = require('../models/User');
+const emailService = require('../services/emailService');
 const { verifyToken, checkRole } = require('../middleware/auth');
 
 // Create a new workout (Member Route)
@@ -80,7 +83,7 @@ router.get('/', verifyToken, async (req, res) => {
 
 router.get('/trainer', verifyToken, checkRole(['trainer']), async (req, res) => {
   try {
-    const workouts = await Workout.find({ trainer: req.user._id, isTemplate: true }).populate('trainer', 'username _id');
+    const workouts = await Workout.find({ trainer: req.user._id, isTemplate: true, isDeleted: { $ne: true } }).populate('trainer', 'username _id');
     res.json({ workouts });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -95,7 +98,7 @@ router.get('/trainers/available', verifyToken, checkRole(['all']), async (req, r
     const trainers = await User.find({
       role: 'trainer',
       isApproved: true // Ensure the trainer is actually approved by admin!
-    }).select('username email profile.firstName profile.lastName isApproved');
+    }).select('username email bio profile.firstName profile.lastName isApproved');
 
     res.json({ trainers });
   } catch (error) {
@@ -106,7 +109,7 @@ router.get('/trainers/available', verifyToken, checkRole(['all']), async (req, r
 // Member: Get assigned workouts
 router.get('/my-plan', verifyToken, checkRole(['member']), async (req, res) => {
   try {
-    const workouts = await Workout.find({ assignedTo: req.user._id, isTemplate: false })
+    const workouts = await Workout.find({ assignedTo: req.user._id, isTemplate: false, isDeleted: { $ne: true } })
       .populate('trainer', 'username')
       .sort({ date: -1 });
     res.json(workouts);
@@ -122,14 +125,16 @@ router.get('/trainer/:trainerId', verifyToken, checkRole(['all']), async (req, r
 
     const workouts = await Workout.find({
       trainer: trainerId,
-      isTemplate: true // Templates are the public workouts for a trainer!
+      isTemplate: true, // Templates are the public workouts for a trainer!
+      isDeleted: { $ne: true } // Hide workouts removed by admin moderation
     })
       .populate('trainer', 'username')
       .sort({ createdAt: -1 });
 
     const total = await Workout.countDocuments({
       trainer: trainerId,
-      isTemplate: true
+      isTemplate: true,
+      isDeleted: { $ne: true }
     });
 
     res.json({
@@ -258,7 +263,10 @@ router.get('/user/:userId',
         page = 1 
       } = req.query;
 
-      const query = { user: req.params.userId };
+      const query = { 
+        user: req.params.userId, 
+        isDeleted: { $ne: true } 
+      };
 
       if (startDate && endDate) {
         query.date = {
@@ -305,6 +313,168 @@ router.post('/:workoutId/complete', verifyToken, checkRole(['member']), async (r
     res.json({ message: 'Workout marked as complete', workout });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+const escapeHtml = (value) => String(value == null ? '' : value)
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// Admin: list trainer-created workouts for moderation
+// Query: ?status=active|deleted|all (default active), ?search=<title/trainer>, ?trainerId=<id>
+// Only trainer templates are listed (personal member logs are not public content).
+router.get('/admin/all', verifyToken, checkRole(['admin']), async (req, res) => {
+  try {
+    const status = (req.query.status || 'active').toString().toLowerCase();
+    if (!['active', 'deleted', 'all'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status filter. Use active, deleted or all.' });
+    }
+
+    const query = { isTemplate: true };
+    if (status === 'active') query.isDeleted = { $ne: true };
+    if (status === 'deleted') query.isDeleted = true;
+    if (req.query.trainerId) {
+      if (!mongoose.Types.ObjectId.isValid(req.query.trainerId)) {
+        return res.status(400).json({ error: 'Invalid trainer ID.' });
+      }
+      query.trainer = req.query.trainerId;
+    }
+
+    const search = (req.query.search || '').toString().trim();
+    if (search) {
+      const rx = new RegExp(escapeRegex(search), 'i');
+      const matchingTrainers = await User.find({ username: rx, role: 'trainer' }).select('_id');
+      query.$or = [
+        { title: rx },
+        { description: rx },
+        { 'exercises.name': rx },
+        { trainer: { $in: matchingTrainers.map((t) => t._id) } }
+      ];
+    }
+
+    const workouts = await Workout.find(query)
+      .populate('trainer', 'username email')
+      .populate('deletedBy', 'username')
+      .sort({ createdAt: -1 })
+      .limit(200)
+      .lean();
+
+    // How many members currently have a copy of each template
+    const ids = workouts.map((w) => w._id);
+    const assignedCounts = await Workout.aggregate([
+      { $match: { sourceTemplate: { $in: ids }, isDeleted: { $ne: true } } },
+      { $group: { _id: '$sourceTemplate', count: { $sum: 1 } } }
+    ]);
+    const countMap = new Map(assignedCounts.map((c) => [c._id.toString(), c.count]));
+    workouts.forEach((w) => { w.assignedCount = countMap.get(w._id.toString()) || 0; });
+
+    const [activeCount, deletedCount] = await Promise.all([
+      Workout.countDocuments({ isTemplate: true, isDeleted: { $ne: true } }),
+      Workout.countDocuments({ isTemplate: true, isDeleted: true })
+    ]);
+
+    res.json({ workouts, activeCount, deletedCount });
+  } catch (error) {
+    console.error('Admin workouts list error:', error);
+    res.status(500).json({ error: error.message || 'Failed to load workouts for moderation' });
+  }
+});
+
+// Admin only: Soft delete inappropriate workout with detailed reason
+// Part of Admin Settings. Records deletionReason, deletedBy, deletedAt for audit.
+// Notifies the owner/trainer with the reason. Uses soft delete so data is preserved for review.
+router.delete('/admin/:id', verifyToken, checkRole(['admin']), async (req, res) => {
+  try {
+    const { reason } = req.body;
+    if (!reason || reason.trim().length < 10) {
+      return res.status(400).json({ 
+        error: 'A detailed deletion reason is required (minimum 10 characters).' 
+      });
+    }
+
+    const workout = await Workout.findById(req.params.id);
+    if (!workout) {
+      return res.status(404).json({ error: 'We could not find this workout.' });
+    }
+
+    if (workout.isDeleted) {
+      return res.status(400).json({ error: 'This workout has already been deleted.' });
+    }
+
+    const trimmedReason = reason.trim().slice(0, 500);
+    const deletedAt = new Date();
+
+    // Soft delete with full audit trail
+    workout.isDeleted = true;
+    workout.deletionReason = trimmedReason;
+    workout.deletedBy = req.user._id;
+    workout.deletedAt = deletedAt;
+    await workout.save({ validateBeforeSave: false });
+
+    // Also hide copies of this template already assigned to members (default on).
+    // Legacy copies made before `sourceTemplate` existed are matched by trainer + title.
+    let removedCopies = 0;
+    const removeCopies = req.body.removeAssignedCopies !== false;
+    if (workout.isTemplate && removeCopies) {
+      const copyFilter = {
+        isTemplate: { $ne: true },
+        isDeleted: { $ne: true },
+        $or: [
+          { sourceTemplate: workout._id },
+          { sourceTemplate: { $exists: false }, trainer: workout.trainer, title: workout.title, assignedTo: { $exists: true } }
+        ]
+      };
+      const copyResult = await Workout.updateMany(copyFilter, {
+        $set: {
+          isDeleted: true,
+          deletionReason: trimmedReason,
+          deletedBy: req.user._id,
+          deletedAt
+        }
+      });
+      removedCopies = copyResult.modifiedCount || copyResult.nModified || 0;
+    }
+
+    // Notify the relevant user (owner or assigned trainer)
+    try {
+      const ownerId = workout.user || workout.assignedTo || workout.trainer;
+      const owner = await User.findById(ownerId).select('email username');
+      const ownerEmail = owner ? owner.email : null;
+      if (ownerEmail) {
+        await emailService.sendEmail(ownerEmail, 'Your workout has been removed - Moderation Notice', `
+            <h2>Workout Moderation Notice</h2>
+            <p>Dear ${escapeHtml(owner.username || 'User')},</p>
+            <p>Your workout titled "<strong>${escapeHtml(workout.title)}</strong>" has been removed by an administrator.</p>
+            <p><strong>Reason for deletion:</strong> ${escapeHtml(trimmedReason)}</p>
+            <p>This action was taken to maintain appropriate content standards in the community.</p>
+            <p>If you believe this was an error, please contact admin support.</p>
+            <p>Workout ID: ${workout._id}</p>
+            <p>Best regards,<br>LiftLog Admin Team</p>
+          `);
+        console.log(`Deletion notification email sent to ${owner.username || ownerEmail}`);
+      }
+    } catch (emailErr) {
+      console.warn('Email notification for workout deletion failed (non-blocking):', emailErr.message);
+    }
+
+    console.log(`[ADMIN] Workout ${req.params.id} marked deleted by ${req.user._id}. Reason: ${trimmedReason}`);
+
+    res.json({ 
+      message: removedCopies > 0
+        ? `Workout removed and hidden from ${removedCopies} member plan(s). Owner notified with reason.`
+        : 'Workout successfully removed for inappropriate content. Owner notified with reason.',
+      deletionReason: trimmedReason,
+      workoutId: workout._id,
+      removedCopies
+    });
+  } catch (error) {
+    console.error('Admin workout delete error:', error);
+    res.status(500).json({ error: error.message || 'Failed to delete workout' });
   }
 });
 

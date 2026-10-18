@@ -48,13 +48,16 @@ router.post('/:memberId/assign-workout', verifyToken, checkRole(['trainer']), as
     const member = await User.findById(req.params.memberId);
     const workoutTemplate = await Workout.findById(workoutId);
 
-    if (!member || !workoutTemplate) {
+    if (!member || !workoutTemplate || workoutTemplate.isDeleted) {
       return res.status(404).json({ error: 'The requested member or workout could not be found.' });
     }
 
     const workoutInstance = new Workout({
       ...workoutTemplate.toObject(),
       _id: undefined,
+      createdAt: undefined,
+      updatedAt: undefined,
+      sourceTemplate: workoutTemplate._id,
       isTemplate: false,
       assignedTo: member._id,
       date: new Date(),
@@ -87,6 +90,28 @@ router.delete('/:memberId/remove', verifyToken, checkRole(['trainer']), async (r
     await member.save();
 
     res.json({ message: 'Client removed successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Public trainer browser for members: See trainer bio/feedback notes BEFORE choosing a trainer
+// Returns approved trainers with their public bio (notes/feedback). Ratings and detailed feedback
+// can be fetched separately via the ratings route for full transparency before selection.
+router.get('/trainers', verifyToken, async (req, res) => {
+  try {
+    const trainers = await User.find({
+      role: 'trainer',
+      isApproved: true,
+      isEmailVerified: true
+    })
+    .select('username bio profile.firstName profile.lastName email') // public fields only (no privateNotes)
+    .sort({ createdAt: -1 });
+
+    res.json({ 
+      trainers,
+      message: 'Trainers loaded successfully. Review bios and feedback before selecting a trainer.'
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

@@ -5,6 +5,7 @@ import '../providers/auth_provider.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
 import '../utils/error_handler.dart';
+import '../widgets/reset_cooldown_dialog.dart';
 import 'edit_user_screen.dart';
 import 'credential_viewer_screen.dart';
 
@@ -184,6 +185,13 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     } else if (user.role != UserRole.admin) {
       buttons.add(
         IconButton(
+          icon: const Icon(Icons.restart_alt, color: Colors.orange),
+          tooltip: 'Reset BMI / Calorie Cooldown',
+          onPressed: () => _showResetCooldownDialog(context, user),
+        ),
+      );
+      buttons.add(
+        IconButton(
           icon: const Icon(Icons.edit, color: Colors.green),
           tooltip: 'Edit User',
           onPressed: () => _editUser(context, user),
@@ -199,6 +207,21 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     }
 
     return buttons;
+  }
+
+  Future<void> _showResetCooldownDialog(BuildContext context, User user) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final String? message = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) =>
+          ResetCooldownDialog(userId: user.id, username: user.username),
+    );
+    if (message != null && mounted) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: Colors.green),
+      );
+    }
   }
 
   void _viewCredential(BuildContext context, String imageUrl) {

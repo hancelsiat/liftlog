@@ -12,11 +12,16 @@ class Rating {
   });
 
   factory Rating.fromJson(Map<String, dynamic> json) {
+    // Feedback is anonymous: the backend no longer sends member info.
+    // Kept defensive in case an older backend still returns a populated member.
+    final member = json['member'];
     return Rating(
-      rating: json['rating'],
-      feedback: json['feedback'],
-      createdAt: DateTime.parse(json['createdAt']),
-      memberName: json['member'] != null ? json['member']['username'] : null,
+      rating: (json['rating'] as num?)?.toInt() ?? 0,
+      feedback: json['feedback'] as String?,
+      createdAt: json['createdAt'] != null
+          ? DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now()
+          : DateTime.now(),
+      memberName: member is Map ? member['username'] as String? : null,
     );
   }
 }

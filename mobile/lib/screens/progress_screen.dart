@@ -3,6 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'dart:async';
 import '../services/api_service.dart';
 import '../models/progress.dart';
+import '../widgets/cooldown_reset_request_card.dart';
 
 class ProgressScreen extends StatefulWidget {
   const ProgressScreen({super.key});
@@ -35,6 +36,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   Timer? _updateTimer;
 
+  final GlobalKey<CooldownResetRequestCardState> _resetRequestCardKey =
+      GlobalKey<CooldownResetRequestCardState>();
+
   @override
   void initState() {
     super.initState();
@@ -43,6 +47,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     // Update timer every minute to refresh countdown
     _updateTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
       _checkUpdateStatus();
+      _resetRequestCardKey.currentState?.reload();
     });
   }
 
@@ -214,6 +219,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   Future<void> _refreshAll() async {
     await _checkUpdateStatus();
+    await _resetRequestCardKey.currentState?.reload();
     _fetchProgressHistory();
   }
 
@@ -236,7 +242,16 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
                 // Calories Section
                 _buildCaloriesSection(),
-                const SizedBox(height: 30),
+                const SizedBox(height: 16),
+
+                // Ask admin to reset cooldown (misclick)
+                CooldownResetRequestCard(
+                  key: _resetRequestCardKey,
+                  bmiLocked: !_canUpdateBmi,
+                  caloriesLocked: !_canUpdateCalories,
+                  onStatusChanged: _checkUpdateStatus,
+                ),
+                const SizedBox(height: 14),
 
                 // Progress Charts
                 const Text(

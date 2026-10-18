@@ -37,6 +37,26 @@ const ProgressSchema = new mongoose.Schema({
   lastCaloriesUpdate: {
     type: Date
   },
+  cooldownResets: [{
+    resetAt: {
+      type: Date,
+      default: Date.now
+    },
+    reason: {
+      type: String,
+      trim: true,
+      maxlength: 500
+    },
+    type: {
+      type: String,
+      enum: ['bmi', 'calories', 'both'],
+      default: 'both'
+    },
+    admin: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }
+  }],
   date: {
     type: Date,
     default: Date.now
