@@ -54,17 +54,6 @@ class CooldownResetRequestCardState extends State<CooldownResetRequestCard> {
     }
   }
 
-  String _typeLabel(String? type) {
-    switch (type) {
-      case 'bmi':
-        return 'BMI';
-      case 'calories':
-        return 'Calories';
-      default:
-        return 'BMI & Calories';
-    }
-  }
-
   bool get _isPending => _request?['status'] == 'pending';
 
   /// Show the last decision only if it happened within the last 3 days.
@@ -78,10 +67,7 @@ class CooldownResetRequestCardState extends State<CooldownResetRequestCard> {
   Future<void> _openRequestDialog() async {
     final result = await showDialog<Map<String, String>>(
       context: context,
-      builder: (_) => _RequestResetDialog(
-        bmiLocked: widget.bmiLocked,
-        caloriesLocked: widget.caloriesLocked,
-      ),
+      builder: (_) => const _RequestResetDialog(),
     );
     if (result == null || !mounted) return;
 
@@ -89,7 +75,6 @@ class CooldownResetRequestCardState extends State<CooldownResetRequestCard> {
     final messenger = ScaffoldMessenger.of(context);
     try {
       final response = await _apiService.requestCooldownReset(
-        type: result['type']!,
         reason: result['reason']!,
       );
       messenger.showSnackBar(
@@ -148,9 +133,9 @@ class CooldownResetRequestCardState extends State<CooldownResetRequestCard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Reset request pending (${_typeLabel(_request?['type'])})',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                const Text(
+                  'Reset request pending (BMI & Calories)',
+                  style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const Text(
                   'An admin will review your request soon.',
@@ -201,7 +186,9 @@ class CooldownResetRequestCardState extends State<CooldownResetRequestCard> {
             ),
             const SizedBox(height: 4),
             const Text(
-              'Ask an admin to reset your cooldown so you can update again.',
+              'Ask an admin to reset your BMI and calories. Your latest '
+              'BMI and calorie entries will be removed and you can enter '
+              'them again right away.',
               style: TextStyle(fontSize: 12),
             ),
             const SizedBox(height: 10),
@@ -232,16 +219,11 @@ class CooldownResetRequestCardState extends State<CooldownResetRequestCard> {
   }
 }
 
-/// Dialog where the member picks what to reset and explains why.
-/// Pops with {'type': ..., 'reason': ...} or null.
+/// Dialog where the member explains why they need a reset.
+/// A reset always covers both BMI and calories.
+/// Pops with {'reason': ...} or null.
 class _RequestResetDialog extends StatefulWidget {
-  final bool bmiLocked;
-  final bool caloriesLocked;
-
-  const _RequestResetDialog({
-    required this.bmiLocked,
-    required this.caloriesLocked,
-  });
+  const _RequestResetDialog();
 
   @override
   State<_RequestResetDialog> createState() => _RequestResetDialogState();
@@ -255,21 +237,8 @@ class _RequestResetDialogState extends State<_RequestResetDialog> {
     _custom,
   ];
 
-  late String _type;
   String _reasonChoice = _presets.first;
   final TextEditingController _customController = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.bmiLocked && !widget.caloriesLocked) {
-      _type = 'bmi';
-    } else if (widget.caloriesLocked && !widget.bmiLocked) {
-      _type = 'calories';
-    } else {
-      _type = 'both';
-    }
-  }
 
   @override
   void dispose() {
@@ -281,18 +250,6 @@ class _RequestResetDialogState extends State<_RequestResetDialog> {
       ? _customController.text.trim()
       : _reasonChoice;
 
-  List<DropdownMenuItem<String>> get _typeItems => [
-        if (widget.bmiLocked)
-          const DropdownMenuItem(value: 'bmi', child: Text('BMI')),
-        if (widget.caloriesLocked)
-          const DropdownMenuItem(value: 'calories', child: Text('Calories')),
-        if (widget.bmiLocked && widget.caloriesLocked)
-          const DropdownMenuItem(
-            value: 'both',
-            child: Text('Both BMI & Calories'),
-          ),
-      ];
-
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -302,12 +259,11 @@ class _RequestResetDialogState extends State<_RequestResetDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('What do you need reset?'),
-            DropdownButton<String>(
-              value: _type,
-              isExpanded: true,
-              items: _typeItems,
-              onChanged: (v) => setState(() => _type = v!),
+            Text(
+              'Your BMI and calorie cooldowns will both be reset. Your '
+              'latest BMI and calorie entries will be removed from your '
+              'history so you can enter the correct values.',
+              style: TextStyle(fontSize: 13, color: Colors.orange[800]),
             ),
             const SizedBox(height: 12),
             const Text('What happened?'),
@@ -340,10 +296,7 @@ class _RequestResetDialogState extends State<_RequestResetDialog> {
         ),
         ElevatedButton(
           onPressed: _reason.length >= 5
-              ? () => Navigator.of(context).pop({
-                    'type': _type,
-                    'reason': _reason,
-                  })
+              ? () => Navigator.of(context).pop({'reason': _reason})
               : null,
           child: const Text('Send Request'),
         ),

@@ -39,7 +39,6 @@ class _ResetCooldownDialogState extends State<ResetCooldownDialog> {
   String? _submitError;
   bool _loading = true;
   bool _submitting = false;
-  String _type = 'both';
   String _selectedReason = _presetReasons.first;
 
   @override
@@ -58,16 +57,7 @@ class _ResetCooldownDialogState extends State<ResetCooldownDialog> {
   bool get _caloriesActive => _status?['calories']?['active'] == true;
   bool get _hasProgress => _status?['hasProgress'] == true;
 
-  bool _isTypeAvailable(String type) {
-    switch (type) {
-      case 'bmi':
-        return _bmiActive;
-      case 'calories':
-        return _caloriesActive;
-      default:
-        return _bmiActive && _caloriesActive;
-    }
-  }
+  bool get _anyActive => _bmiActive || _caloriesActive;
 
   Future<void> _loadStatus() async {
     setState(() {
@@ -80,14 +70,6 @@ class _ResetCooldownDialogState extends State<ResetCooldownDialog> {
       setState(() {
         _status = status;
         _loading = false;
-        // Pre-select the option that matches the active cooldown(s)
-        if (_bmiActive && !_caloriesActive) {
-          _type = 'bmi';
-        } else if (_caloriesActive && !_bmiActive) {
-          _type = 'calories';
-        } else {
-          _type = 'both';
-        }
       });
     } catch (e) {
       if (!mounted) return;
@@ -105,7 +87,7 @@ class _ResetCooldownDialogState extends State<ResetCooldownDialog> {
   bool get _canSubmit =>
       !_submitting &&
       _hasProgress &&
-      _isTypeAvailable(_type) &&
+      _anyActive &&
       _reason.length >= 5;
 
   Future<void> _submit() async {
@@ -117,7 +99,6 @@ class _ResetCooldownDialogState extends State<ResetCooldownDialog> {
     try {
       final result = await _apiService.resetUserCooldown(
         widget.userId,
-        type: _type,
         reason: _reason,
       );
       if (!mounted) return;
@@ -184,18 +165,6 @@ class _ResetCooldownDialogState extends State<ResetCooldownDialog> {
     );
   }
 
-  Widget _buildTypeOption(String value, String label) {
-    final bool enabled = _isTypeAvailable(value) && !_submitting;
-    return RadioListTile<String>(
-      title: Text(label),
-      value: value,
-      groupValue: _type,
-      dense: true,
-      contentPadding: EdgeInsets.zero,
-      onChanged: enabled ? (v) => setState(() => _type = v!) : null,
-    );
-  }
-
   Widget _buildContent() {
     if (_loading) {
       return const SizedBox(
@@ -225,7 +194,7 @@ class _ResetCooldownDialogState extends State<ResetCooldownDialog> {
     }
 
     final recentResets = (_status?['recentResets'] as List?) ?? const [];
-    final bool anyActive = _bmiActive || _caloriesActive;
+    final bool anyActive = _anyActive;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -244,19 +213,15 @@ class _ResetCooldownDialogState extends State<ResetCooldownDialog> {
             ),
           )
         else ...[
-          const SizedBox(height: 8),
-          const Text('Reset', style: TextStyle(fontWeight: FontWeight.bold)),
-          _buildTypeOption('bmi', 'BMI only'),
-          _buildTypeOption('calories', 'Calories only'),
-          _buildTypeOption('both', 'Both BMI and calories'),
-          if (_type != 'calories')
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Text(
-                'The client\'s latest BMI entry will be deleted from their history.',
-                style: TextStyle(fontSize: 12, color: Colors.orange[800]),
-              ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Text(
+              'Both BMI and calories will be reset. The client\'s latest BMI '
+              'and calorie entries still on cooldown will be deleted from '
+              'their history and their update timers will start over.',
+              style: TextStyle(fontSize: 12, color: Colors.orange[800]),
             ),
+          ),
           const SizedBox(height: 8),
           const Text('Reason', style: TextStyle(fontWeight: FontWeight.bold)),
           ..._presetReasons.map(

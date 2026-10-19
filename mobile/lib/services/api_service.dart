@@ -556,13 +556,12 @@ class ApiService {
   }
 
   /// Member: ask an admin to reset the BMI / calorie cooldown (e.g. misclick).
-  /// [type] must be 'bmi', 'calories' or 'both'.
+  /// A reset always covers both BMI and calories.
   Future<Map<String, dynamic>> requestCooldownReset({
-    required String type,
     required String reason,
   }) async {
     return await _post('/progress/reset-requests', {
-      'type': type,
+      'type': 'both',
       'reason': reason,
     });
   }
@@ -600,15 +599,14 @@ class ApiService {
     });
   }
 
-  /// Admin: reset a user's tracking cooldown.
-  /// [type] must be 'bmi', 'calories' or 'both'.
+  /// Admin: reset a user's BMI and calorie tracking cooldown. The mistaken
+  /// entries are removed from the user's history.
   Future<Map<String, dynamic>> resetUserCooldown(
     String userId, {
-    required String type,
     required String reason,
   }) async {
     return await _post('/progress/admin/$userId/reset-cooldown', {
-      'type': type,
+      'type': 'both',
       'reason': reason,
     });
   }

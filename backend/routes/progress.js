@@ -459,43 +459,77 @@ const findCooldownTarget = async (userId) => {
 const typeLabel = (type) => (type === 'both' ? 'BMI and calorie' : type === 'bmi' ? 'BMI' : 'calorie');
 const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
-// Remove the member's most recent BMI entry from their history (used when a BMI
-// reset is approved because the value was misclicked or mistyped).
+// The two trackers on a progress entry. Each has its own fields, its own
+// "last update" timestamp and its own cooldown.
+const TRACKERS = {
+  bmi: { fields: ['bmi'], stamp: 'lastBmiUpdate', other: 'lastCaloriesUpdate', cooldownMs: BMI_COOLDOWN_MS },
+  calories: {
+    fields: ['caloriesIntake', 'calorieDeficit'],
+    stamp: 'lastCaloriesUpdate',
+    other: 'lastBmiUpdate',
+    cooldownMs: CALORIES_COOLDOWN_MS
+  }
+};
+
+const hasValue = (v) => v !== undefined && v !== null;
+
+// Remove the member's mistaken entry for one tracker (BMI or calories) from
+// their history. Used when a cooldown reset is approved.
+//
+// The mistaken entry is the one that was locking the member out at
+// `referenceTime` (when the member asked for the reset, or now for a direct
+// admin reset): the update timestamp on the latest entry at that time, if it
+// was still inside its cooldown. If that tracker was not locked, nothing is
+// removed, so older correct values are never touched.
+//
 // Each save creates a new progress document that carries the previous values
-// forward, so later documents that copied the wrong BMI are reverted as well.
-// Returns { removed: false } or { removed: true, value, deletedEntry }.
-const removeLatestBmiEntry = async (userId) => {
-  const latest = await Progress.findOne({ user: userId }).sort({ createdAt: -1 });
-  if (!latest || !latest.lastBmiUpdate) return { removed: false };
+// forward, so later documents that copied the wrong values are reverted to the
+// values from before the mistake.
+// Returns { removed: false } or { removed: true, values, deletedEntry }.
+const removeLatestTrackerEntry = async (userId, trackerName, referenceTime) => {
+  const { fields, stamp, other, cooldownMs } = TRACKERS[trackerName];
+  const ref = new Date(referenceTime);
 
-  const wrongBmiTime = latest.lastBmiUpdate;
+  // Latest entry as it was when the reset was asked for
+  const anchor = await Progress.findOne({ user: userId, createdAt: { $lte: ref } }).sort({ createdAt: -1 });
+  if (!anchor || !anchor[stamp]) return { removed: false };
+  const wrongTime = new Date(anchor[stamp]);
+  const stillLocked = wrongTime.getTime() <= ref.getTime() &&
+    ref.getTime() - wrongTime.getTime() < cooldownMs;
+  if (!stillLocked) return { removed: false };
 
-  // The document where that BMI was actually entered is the earliest one
-  // carrying this lastBmiUpdate timestamp.
-  const entry = await Progress.findOne({ user: userId, lastBmiUpdate: wrongBmiTime }).sort({ createdAt: 1 });
-  if (!entry || entry.bmi === undefined || entry.bmi === null) return { removed: false };
+  // The document where that value was actually entered is the earliest one
+  // carrying this timestamp.
+  const entry = await Progress.findOne({ user: userId, [stamp]: wrongTime }).sort({ createdAt: 1 });
+  if (!entry || !fields.some((f) => hasValue(entry[f]))) return { removed: false };
 
-  // The last correct BMI (if any) comes from the document before that entry.
+  // The last correct values (if any) come from the document before that entry.
   const previous = await Progress.findOne({ user: userId, createdAt: { $lt: entry.createdAt } })
     .sort({ createdAt: -1 });
-  const previousBmi = previous && previous.bmi !== undefined && previous.bmi !== null ? previous.bmi : null;
-  const previousBmiUpdate = previous ? previous.lastBmiUpdate || null : null;
 
-  const revert = previousBmi !== null
-    ? { $set: { bmi: previousBmi, lastBmiUpdate: previousBmiUpdate } }
-    : { $unset: { bmi: 1 }, $set: { lastBmiUpdate: previousBmiUpdate } };
+  const $set = { [stamp]: previous && previous[stamp] ? previous[stamp] : null };
+  const $unset = {};
+  for (const f of fields) {
+    if (previous && hasValue(previous[f])) $set[f] = previous[f];
+    else $unset[f] = 1;
+  }
+  const revert = Object.keys($unset).length ? { $set, $unset } : { $set };
 
-  // Later entries (e.g. calorie updates) that carried the wrong BMI forward
+  // Later entries (e.g. updates of the other tracker) that carried the wrong values forward
   await Progress.updateMany(
-    { user: userId, createdAt: { $gt: entry.createdAt }, lastBmiUpdate: wrongBmiTime },
+    { user: userId, createdAt: { $gt: entry.createdAt }, [stamp]: wrongTime },
     revert
   );
 
-  // If calories were saved in the same entry, keep it and only drop the BMI.
-  const caloriesSavedTogether = entry.lastCaloriesUpdate &&
-    new Date(entry.lastCaloriesUpdate).getTime() === new Date(wrongBmiTime).getTime();
+  const values = {};
+  for (const f of fields) if (hasValue(entry[f])) values[f] = entry[f];
 
-  if (caloriesSavedTogether) {
+  // If the other tracker was saved in the same entry, keep the entry and only
+  // drop this tracker's values. Otherwise delete the whole entry.
+  const otherSavedTogether = entry[other] &&
+    new Date(entry[other]).getTime() === new Date(wrongTime).getTime();
+
+  if (otherSavedTogether) {
     await Progress.updateOne({ _id: entry._id }, revert);
   } else {
     // Keep the reset audit trail if it lived on the entry being deleted
@@ -508,35 +542,62 @@ const removeLatestBmiEntry = async (userId) => {
     await Progress.deleteOne({ _id: entry._id });
   }
 
-  console.log(`[BMI RESET] Removed BMI ${entry.bmi} (entered ${new Date(wrongBmiTime).toISOString()}) for user ${userId}` +
-    (caloriesSavedTogether ? ' - entry kept for its calorie data' : ' - entry deleted'));
+  console.log(`[RESET] Removed ${trackerName} ${JSON.stringify(values)} (entered ${new Date(wrongTime).toISOString()}) ` +
+    `for user ${userId}${otherSavedTogether ? ' - entry kept for its other data' : ' - entry deleted'}`);
 
-  return { removed: true, value: entry.bmi, deletedEntry: !caloriesSavedTogether };
+  return { removed: true, values, deletedEntry: !otherSavedTogether };
 };
 
+// Human readable summary of what a reset removed, e.g.
+// "BMI 33 and calories 1000 kcal (deficit 500)". Empty string if nothing.
+const describeRemoval = (removal) => {
+  const parts = [];
+  if (removal.bmi && removal.bmi.removed) {
+    parts.push(`BMI ${removal.bmi.values.bmi}`);
+  }
+  if (removal.calories && removal.calories.removed) {
+    const v = removal.calories.values;
+    let text = `calories ${hasValue(v.caloriesIntake) ? `${v.caloriesIntake} kcal` : ''}`.trim();
+    if (hasValue(v.calorieDeficit)) text += ` (deficit ${v.calorieDeficit})`;
+    parts.push(text);
+  }
+  return parts.join(' and ');
+};
+
+// Every reset covers BMI and calories together
+const RESET_TYPE = 'both';
+
+// " Wrong values (...) removed from history." for API messages, or ''
+const removedMessage = (result) => (result.removedText
+  ? ` Wrong values (${result.removedText}) removed from history.`
+  : '');
+
 // Shared reset logic used by the direct admin reset and by approving a member request.
-// For BMI resets the wrong BMI entry is also removed from the member's history.
-// Returns { progress, label, bmiRemoval } or { error: { status, message } }.
-const performCooldownReset = async (client, type, reason, adminId) => {
+// For every tracker covered by `type`, the mistaken entry still on cooldown is
+// removed from the member's history and its update timer is cleared, so the
+// member can enter the correct value right away.
+// `referenceTime` is when the member asked for the reset (or now).
+// Returns { progress, label, removal, removedText } or { error: { status, message } }.
+const performCooldownReset = async (client, type, reason, adminId, referenceTime = new Date()) => {
   // Cooldowns are always read from the latest progress entry
   let progress = await Progress.findOne({ user: client._id }).sort({ createdAt: -1 });
   if (!progress) {
     return { error: { status: 400, message: 'This user has no progress entries yet, so there is no cooldown to reset.' } };
   }
 
-  let bmiRemoval = { removed: false };
-  if (type === 'bmi' || type === 'both') {
-    bmiRemoval = await removeLatestBmiEntry(client._id);
-    // The latest entry may have been deleted or changed
-    progress = await Progress.findOne({ user: client._id }).sort({ createdAt: -1 });
+  const trackers = type === 'both' ? ['bmi', 'calories'] : [type];
+  const removal = { bmi: { removed: false }, calories: { removed: false } };
+  for (const tracker of trackers) {
+    removal[tracker] = await removeLatestTrackerEntry(client._id, tracker, referenceTime);
   }
+  // The latest entry may have been deleted or changed
+  progress = await Progress.findOne({ user: client._id }).sort({ createdAt: -1 });
 
-  // If the wrong BMI was the member's only entry, nothing is left and there is
-  // no cooldown anymore; otherwise clear the timestamps on the latest entry.
+  // If the wrong values were the member's only entry, nothing is left and there
+  // is no cooldown anymore; otherwise clear the timers on the latest entry
+  // (the entry every cooldown check reads from).
   if (progress) {
-    // Clearing the timestamp lifts the restriction immediately
-    if (type === 'bmi' || type === 'both') progress.lastBmiUpdate = null;
-    if (type === 'calories' || type === 'both') progress.lastCaloriesUpdate = null;
+    for (const tracker of trackers) progress[TRACKERS[tracker].stamp] = null;
 
     if (!progress.cooldownResets) progress.cooldownResets = [];
     progress.cooldownResets.push({ resetAt: new Date(), reason, type, admin: adminId });
@@ -544,8 +605,9 @@ const performCooldownReset = async (client, type, reason, adminId) => {
   }
 
   const label = typeLabel(type);
-  const removedNote = bmiRemoval.removed
-    ? `<p>The BMI value you entered by mistake (${escapeHtml(bmiRemoval.value)}) has been removed from your progress history.</p>`
+  const removedText = describeRemoval(removal);
+  const removedNote = removedText
+    ? `<p>The values you entered by mistake (${escapeHtml(removedText)}) have been removed from your progress history.</p>`
     : '';
 
   // Notify the client (non-blocking)
@@ -567,7 +629,7 @@ const performCooldownReset = async (client, type, reason, adminId) => {
   }
 
   console.log(`[ADMIN] ${label} cooldown reset for user ${client._id} by admin ${adminId}. Reason: ${reason}`);
-  return { progress, label, bmiRemoval };
+  return { progress, label, removal, removedText };
 };
 
 // Admin: View a user's current BMI / calorie cooldown status before resetting
@@ -606,15 +668,14 @@ router.get('/admin/:userId/cooldown-status', verifyToken, checkRole(['admin']), 
   }
 });
 
-// Body: { reason: string (min 5 chars), type: 'bmi' | 'calories' | 'both' (default 'both') }
+// Body: { reason: string (min 5 chars) }
+// A reset always covers both BMI and calories (any `type` sent by older app
+// versions is ignored) so the two trackers never get out of sync.
 router.post('/admin/:userId/reset-cooldown', verifyToken, checkRole(['admin']), async (req, res) => {
   try {
     const { reason } = req.body;
-    const type = (req.body.type || 'both').toString().toLowerCase();
+    const type = RESET_TYPE;
 
-    if (!['bmi', 'calories', 'both'].includes(type)) {
-      return res.status(400).json({ error: 'Invalid reset type. Use "bmi", "calories" or "both".' });
-    }
     if (!reason || reason.trim().length < 5) {
       return res.status(400).json({ 
         error: 'A reason for the cooldown reset is required (e.g. "Client misclicked update button").' 
@@ -634,18 +695,16 @@ router.post('/admin/:userId/reset-cooldown', verifyToken, checkRole(['admin']), 
       { status: 'approved', handledBy: req.user._id, handledAt: new Date(), adminNote: 'Resolved by direct admin reset.' }
     );
 
-    const removedMsg = result.bmiRemoval.removed
-      ? ` Wrong BMI (${result.bmiRemoval.value}) removed from history.`
-      : '';
-
     res.json({
-      message: `${capitalize(result.label)} cooldown successfully reset.${removedMsg} Client notified.`,
+      message: `${capitalize(result.label)} cooldown successfully reset.${removedMessage(result)} Client notified.`,
       type,
       progressId: result.progress ? result.progress._id : null,
       reason: trimmedReason,
       cooldownResets: result.progress ? result.progress.cooldownResets.length : 0,
-      bmiRemoved: result.bmiRemoval.removed,
-      removedBmi: result.bmiRemoval.removed ? result.bmiRemoval.value : null
+      bmiRemoved: result.removal.bmi.removed,
+      removedBmi: result.removal.bmi.removed ? result.removal.bmi.values.bmi : null,
+      caloriesRemoved: result.removal.calories.removed,
+      removedCalories: result.removal.calories.removed ? result.removal.calories.values : null
     });
   } catch (error) {
     console.error('Admin cooldown reset error:', error);
@@ -657,15 +716,14 @@ router.post('/admin/:userId/reset-cooldown', verifyToken, checkRole(['admin']), 
 // NOTE: GET routes here use 2+ path segments so they don't collide with GET '/:id'.
 
 // Member: submit a request for the admin to reset their cooldown (e.g. misclick)
-// Body: { type: 'bmi' | 'calories' | 'both', reason: string (min 5 chars) }
+// Body: { reason: string (min 5 chars) }
+// A request always covers both BMI and calories (any `type` sent by older app
+// versions is ignored).
 router.post('/reset-requests', verifyToken, checkRole(['member']), async (req, res) => {
   try {
-    const type = (req.body.type || '').toString().toLowerCase();
+    const type = RESET_TYPE;
     const reason = (req.body.reason || '').toString().trim();
 
-    if (!['bmi', 'calories', 'both'].includes(type)) {
-      return res.status(400).json({ error: 'Please choose what to reset: BMI, calories or both.' });
-    }
     if (reason.length < 5) {
       return res.status(400).json({ error: 'Please explain what happened (at least 5 characters).' });
     }
@@ -674,11 +732,8 @@ router.post('/reset-requests', verifyToken, checkRole(['member']), async (req, r
     const now = new Date();
     const bmiActive = buildCooldownStatus(progress && progress.lastBmiUpdate, BMI_COOLDOWN_MS, now).active;
     const caloriesActive = buildCooldownStatus(progress && progress.lastCaloriesUpdate, CALORIES_COOLDOWN_MS, now).active;
-    const needed = (type === 'bmi' && bmiActive) ||
-      (type === 'calories' && caloriesActive) ||
-      (type === 'both' && (bmiActive || caloriesActive));
 
-    if (!needed) {
+    if (!bmiActive && !caloriesActive) {
       return res.status(400).json({ error: 'You can already update this. No reset is needed.' });
     }
 
@@ -789,11 +844,12 @@ router.patch('/admin/reset-requests/:requestId', verifyToken, checkRole(['admin'
     let removedMsg = '';
     if (action === 'approve') {
       const auditReason = `Member request: ${request.reason}${note ? ` | Admin note: ${note}` : ''}`.slice(0, 500);
-      const result = await performCooldownReset(client, request.type, auditReason, req.user._id);
+      // Every request resets both trackers (older requests may still say 'bmi'
+      // or 'calories'). The mistaken values are the ones that were locking the
+      // member when they sent the request.
+      const result = await performCooldownReset(client, RESET_TYPE, auditReason, req.user._id, request.createdAt);
       if (result.error) return res.status(result.error.status).json({ error: result.error.message });
-      if (result.bmiRemoval.removed) {
-        removedMsg = ` Wrong BMI (${result.bmiRemoval.value}) removed from history.`;
-      }
+      removedMsg = removedMessage(result);
     } else {
       // Notify member of rejection (non-blocking)
       try {
@@ -801,7 +857,7 @@ router.patch('/admin/reset-requests/:requestId', verifyToken, checkRole(['admin'
           await emailService.sendEmail(client.email, 'Your Cooldown Reset Request', `
               <h2>Cooldown Reset Request Declined</h2>
               <p>Dear ${escapeHtml(client.username || 'User')},</p>
-              <p>Your request to reset your ${typeLabel(request.type)} tracking cooldown was not approved.</p>
+              <p>Your request to reset your ${typeLabel(RESET_TYPE)} tracking cooldown was not approved.</p>
               <p><strong>Admin note:</strong> ${escapeHtml(note)}</p>
               <p>LiftLog Admin Team</p>
             `);
@@ -819,7 +875,7 @@ router.patch('/admin/reset-requests/:requestId', verifyToken, checkRole(['admin'
 
     res.json({
       message: action === 'approve'
-        ? `Request approved. ${capitalize(typeLabel(request.type))} cooldown reset.${removedMsg} Member notified.`
+        ? `Request approved. ${capitalize(typeLabel(RESET_TYPE))} cooldown reset.${removedMsg} Member notified.`
         : 'Request rejected and member notified.',
       request
     });
