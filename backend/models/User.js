@@ -70,10 +70,18 @@ const UserSchema = new mongoose.Schema({
     weight: Number,
     height: Number
     },
-    credentialImageUrl: {
-      type: String,
-      default: ''
-    }
+  credentialImageUrl: {
+    type: String,
+    default: ''
+  },
+  lastSeen: {
+    type: Date,
+    default: Date.now
+  },
+  blockedUsers: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }]
 }, {
   timestamps: true
 });

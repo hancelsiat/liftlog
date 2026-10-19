@@ -5,6 +5,7 @@ import '../models/user.dart';
 import '../services/api_service.dart';
 import '../utils/app_theme.dart';
 import 'client_detail_screen.dart';
+import 'chat_screen.dart';
 
 class TrainerClientsScreen extends StatefulWidget {
   const TrainerClientsScreen({super.key});
@@ -154,7 +155,17 @@ class _TrainerClientsScreenState extends State<TrainerClientsScreen> {
                             icon: const Icon(Icons.delete, color: Colors.red),
                             onPressed: () => _removeClient(client.id),
                           )
-                        : null,
+                        : IconButton(
+                            icon: const Icon(Icons.message, color: AppTheme.primaryColor),
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ChatScreen(partner: client),
+                                ),
+                              );
+                            },
+                          ),
                     onTap: () {
                       Navigator.push(
                         context,

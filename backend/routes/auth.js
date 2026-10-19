@@ -386,7 +386,68 @@ router.post('/resend-verification', async (req, res) => {
   }
 });
 
+// Member: Select a trainer - FIXED: cleanup previous trainer, check approval/status
+router.post('/select-trainer', verifyToken, checkRole(['member']), async (req, res) => {
+  try {
+    const { trainerId } = req.body;
+    const member = await User.findById(req.user._id);
+    const trainer = await User.findById(trainerId);
+    
+    if (!trainer || trainer.role !== 'trainer' || !trainer.isApproved || !trainer.isEmailVerified) {
+      return res.status(404).json({ error: 'Trainer not found or not approved.' });
+    }
+
+    // Clean up previous trainer relationship if switching
+    if (member.trainer && member.trainer.toString() !== trainerId.toString()) {
+      const oldTrainer = await User.findById(member.trainer);
+      if (oldTrainer) {
+        oldTrainer.clients.pull(member._id);
+        await oldTrainer.save();
+      }
+    }
+
+    member.trainer = trainerId;
+    await member.save();
+
+    if (!trainer.clients.includes(member._id)) {
+      trainer.clients.push(member._id);
+    }
+    await trainer.save();
+
+    res.json({ message: 'Trainer selected successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
 // Member: Select a trainer
+    const member = await User.findById(req.user._id);
+    const trainer = await User.findById(trainerId);
+    
+    if (!trainer || trainer.role !== 'trainer' || !trainer.isApproved || !trainer.isEmailVerified) {
+      return res.status(404).json({ error: 'Trainer not found or not approved.' });
+    }
+
+    // FIXED: Clean up previous trainer relationship if exists
+    if (member.trainer && member.trainer.toString() !== trainerId) {
+      const oldTrainer = await User.findById(member.trainer);
+      if (oldTrainer) {
+        oldTrainer.clients.pull(member._id);
+        await oldTrainer.save();
+      }
+    }
+
+    member.trainer = trainerId;
+    await member.save();
+
+    if (!trainer.clients.includes(member._id)) {
+      trainer.clients.push(member._id);
+    }
+    await trainer.save();
+
+    res.json({ message: 'Trainer selected successfully' });
+
 router.post('/select-trainer', verifyToken, checkRole(['member']), async (req, res) => {
   try {
     const { trainerId } = req.body;

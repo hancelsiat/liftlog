@@ -18,6 +18,7 @@ class User {
   final String? privateNotes;
   final String? bio;
   final String? trainer;
+  final DateTime? lastSeen;
 
   User({
     required this.id,
@@ -32,6 +33,7 @@ class User {
     this.privateNotes,
     this.bio,
     this.trainer,
+    this.lastSeen,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -60,6 +62,7 @@ class User {
       privateNotes: json['privateNotes'],
       bio: json['bio'],
       trainer: json['trainer'],
+      lastSeen: json['lastSeen'] != null ? DateTime.tryParse(json['lastSeen'].toString()) : null,
     );
   }
 
@@ -77,6 +80,7 @@ class User {
       'privateNotes': privateNotes,
       'bio': bio,
       'trainer': trainer,
+      'lastSeen': lastSeen?.toIso8601String(),
     };
   }
 }

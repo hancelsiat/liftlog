@@ -10,6 +10,7 @@ import 'workout_session_screen.dart';
 import 'workout_detail_screen.dart';
 import 'rate_trainer_screen.dart';
 import 'trainer_feedback_screen.dart';
+import 'chat_screen.dart';
 
 class WorkoutsScreen extends StatefulWidget {
   const WorkoutsScreen({super.key});
@@ -153,6 +154,45 @@ class _WorkoutsScreenState extends State<WorkoutsScreen>
     }
   }
 
+  /// Opens the realtime chat with the member's current trainer.
+  /// The profile only stores the trainer's id, so the trainer's
+  /// username is looked up from the available trainers list.
+  Future<void> _openTrainerChat() async {
+    final String? trainerId = _user?.trainer;
+    if (trainerId == null) return;
+
+    String trainerName = 'Trainer';
+    String trainerEmail = '';
+    try {
+      final trainers = await _apiService.getAvailableTrainers();
+      final match = trainers.firstWhere(
+        (t) => t['_id']?.toString() == trainerId,
+        orElse: () => <String, dynamic>{},
+      );
+      if (match.isNotEmpty) {
+        trainerName = match['username']?.toString() ?? trainerName;
+        trainerEmail = match['email']?.toString() ?? '';
+      }
+    } catch (_) {
+      // Fall back to a generic name; chat still works with the id.
+    }
+
+    if (!mounted) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(
+          partner: User(
+            id: trainerId,
+            email: trainerEmail,
+            username: trainerName,
+            name: trainerName,
+            role: UserRole.trainer,
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showLeaveTrainerDialog() {
     showDialog(
       context: context,
@@ -221,6 +261,12 @@ class _WorkoutsScreenState extends State<WorkoutsScreen>
         title: Text(_user?.trainer != null ? 'My Plan' : 'Choose a Trainer'),
         backgroundColor: AppTheme.darkBackground,
         actions: [
+          if (_user?.trainer != null)
+            IconButton(
+              icon: const Icon(Icons.chat_bubble_outline),
+              onPressed: _openTrainerChat,
+              tooltip: 'Chat with Trainer',
+            ),
           if (_user?.trainer != null)
             IconButton(
               icon: const Icon(Icons.exit_to_app),

@@ -4,7 +4,7 @@ const router = express.Router();
 const User = require('../models/User');
 const { verifyToken, checkRole } = require('../middleware/auth');
 
-// Member leaves a trainer
+// Member leaves a trainer - FIXED: properly unlink from both sides and clean references
 router.post('/leave-trainer', verifyToken, checkRole(['member']), async (req, res) => {
   try {
     const member = await User.findById(req.user._id);
@@ -12,11 +12,13 @@ router.post('/leave-trainer', verifyToken, checkRole(['member']), async (req, re
       return res.status(400).json({ error: 'You are not currently assigned to a trainer.' });
     }
 
-    // const trainer = await User.findById(member.trainer);
-    // if (trainer) {
-    //   trainer.clients.pull(member._id);
-    //   await trainer.save();
-    // }
+    const trainerId = member.trainer;
+    const trainer = await User.findById(trainerId);
+    
+    if (trainer) {
+      trainer.clients.pull(member._id);
+      await trainer.save();
+    }
 
     member.trainer = null;
     await member.save();

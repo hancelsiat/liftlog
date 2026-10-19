@@ -26,6 +26,7 @@ dependencies:
   dart_jsonwebtoken: ^3.3.1
   intl: ^0.20.2
   flutter_rating_bar: ^4.0.1
+  socket_io_client: ^2.0.3
 
 dev_dependencies:
   flutter_test:
@@ -37,7 +38,7 @@ flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/fitness_logo.webp"
-  remove_alph-ios: true
+  remove_alpha_ios: true
 
 flutter:
   uses-material-design: true

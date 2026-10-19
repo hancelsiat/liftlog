@@ -9,6 +9,7 @@ import '../utils/app_theme.dart';
 import 'assign_workout_screen.dart';
 import 'create_workout_template_screen.dart';
 import 'workout_detail_screen.dart';
+import 'chat_screen.dart';
 
 class ClientDetailScreen extends StatefulWidget {
   final User client;
@@ -100,6 +101,17 @@ class _ClientDetailScreenState extends State<ClientDetailScreen>
         title: Text(widget.client.username),
         backgroundColor: AppTheme.darkBackground,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.message, color: AppTheme.primaryColor),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ChatScreen(partner: widget.client),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.delete, color: Colors.red),
             onPressed: () {

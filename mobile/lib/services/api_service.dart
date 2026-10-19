@@ -11,6 +11,7 @@ import '../models/workout.dart';
 import '../models/progress.dart';
 import '../models/exercise_video.dart';
 import '../models/rating_stats.dart';
+import '../models/message.dart';
 
 class ApiService {
   static String _baseUrl = '';
@@ -737,6 +738,27 @@ class ApiService {
     final response = await _get('/ratings/trainer/$trainerId');
     return RatingStats.fromJson(response);
   }
+
+  // Chat methods
+  Future<List<Message>> getChatHistory(String partnerId) async {
+    final response = await _get('/chat/history/$partnerId');
+    if (response is List) {
+      return response.map((m) => Message.fromJson(m as Map<String, dynamic>)).toList();
+    }
+    return [];
+  }
+
+  Future<void> markMessagesAsRead(String partnerId) async {
+    await _post('/chat/mark-read/$partnerId', {});
+  }
+
+  Future<void> reportMessage(String messageId, String reason) async {
+    await _post('/chat/$messageId/report', {'reason': reason});
+  }
+
+  Future<void> deleteMessage(String messageId) async {
+    await _delete('/chat/$messageId');
+  }
 }
 
 class ApiException implements Exception {
@@ -757,3 +779,4 @@ class ApiException implements Exception {
     return message;
   }
 }
+
