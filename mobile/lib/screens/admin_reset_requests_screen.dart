@@ -99,6 +99,7 @@ class _AdminResetRequestsScreenState extends State<AdminResetRequestsScreen> {
                 Text(
                   approve
                       ? 'This will reset the ${_typeLabel(request['type'])} cooldown for $username right away.'
+                          '${request['type'] == 'calories' ? '' : '\n\nTheir latest BMI entry will also be deleted from their progress history.'}'
                       : 'Tell $username why the request is rejected.',
                 ),
                 const SizedBox(height: 12),

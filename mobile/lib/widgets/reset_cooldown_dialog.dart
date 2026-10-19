@@ -249,6 +249,14 @@ class _ResetCooldownDialogState extends State<ResetCooldownDialog> {
           _buildTypeOption('bmi', 'BMI only'),
           _buildTypeOption('calories', 'Calories only'),
           _buildTypeOption('both', 'Both BMI and calories'),
+          if (_type != 'calories')
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Text(
+                'The client\'s latest BMI entry will be deleted from their history.',
+                style: TextStyle(fontSize: 12, color: Colors.orange[800]),
+              ),
+            ),
           const SizedBox(height: 8),
           const Text('Reason', style: TextStyle(fontWeight: FontWeight.bold)),
           ..._presetReasons.map(

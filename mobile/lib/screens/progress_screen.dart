@@ -249,7 +249,11 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   key: _resetRequestCardKey,
                   bmiLocked: !_canUpdateBmi,
                   caloriesLocked: !_canUpdateCalories,
-                  onStatusChanged: _checkUpdateStatus,
+                  onStatusChanged: () {
+                    // An approved BMI reset also deletes the wrong entry
+                    _checkUpdateStatus();
+                    _fetchProgressHistory();
+                  },
                 ),
                 const SizedBox(height: 14),
 
