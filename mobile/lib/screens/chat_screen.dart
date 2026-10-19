@@ -4,6 +4,7 @@ import '../providers/chat_provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/user.dart';
 import '../utils/app_theme.dart';
+import '../utils/ph_time.dart';
 
 class ChatScreen extends StatefulWidget {
   final User partner;
@@ -105,7 +106,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              msg.createdAt.toString().substring(11, 16),
+                              PhTime.formatChatTime(msg.createdAt),
                               style: const TextStyle(fontSize: 10, color: Colors.white54),
                             ),
                           ],
