@@ -147,29 +147,23 @@ router.post('/', verifyToken, async (req, res) => {
       });
     }
 
-    // Create new progress entry with updated values
-    // Only include fields that have actual values (not null/undefined)
+    // Create a new history entry holding only the values entered now.
+    // The other tracker's values are NOT copied forward: copying them made old
+    // (or reset) values reappear and every value show up twice in the history
+    // and charts. Only the update timestamps are carried forward, because the
+    // cooldown checks always read them from the latest entry.
     const newProgressData = {
       user: req.user._id,
       lastBmiUpdate: updateData.lastBmiUpdate || progress.lastBmiUpdate,
       lastCaloriesUpdate: updateData.lastCaloriesUpdate || progress.lastCaloriesUpdate
     };
 
-    // Only add BMI if it has a value
-    const bmiValue = updateData.bmi !== undefined ? updateData.bmi : progress.bmi;
-    if (bmiValue !== null && bmiValue !== undefined) {
-      newProgressData.bmi = bmiValue;
+    if (updateData.bmi !== undefined) {
+      newProgressData.bmi = updateData.bmi;
     }
-
-    // Only add calories fields if they have values
-    const caloriesIntakeValue = updateData.caloriesIntake !== undefined ? updateData.caloriesIntake : progress.caloriesIntake;
-    if (caloriesIntakeValue !== null && caloriesIntakeValue !== undefined) {
-      newProgressData.caloriesIntake = caloriesIntakeValue;
-    }
-
-    const calorieDeficitValue = updateData.calorieDeficit !== undefined ? updateData.calorieDeficit : progress.calorieDeficit;
-    if (calorieDeficitValue !== null && calorieDeficitValue !== undefined) {
-      newProgressData.calorieDeficit = calorieDeficitValue;
+    if (updateData.caloriesIntake !== undefined) {
+      newProgressData.caloriesIntake = updateData.caloriesIntake;
+      newProgressData.calorieDeficit = updateData.calorieDeficit;
     }
 
     const newProgress = new Progress(newProgressData);
@@ -507,15 +501,18 @@ const removeLatestTrackerEntry = async (userId, trackerName, referenceTime) => {
   const previous = await Progress.findOne({ user: userId, createdAt: { $lt: entry.createdAt } })
     .sort({ createdAt: -1 });
 
-  const $set = { [stamp]: previous && previous[stamp] ? previous[stamp] : null };
+  // Remove the wrong values and point the timer back to before the mistake.
+  // Values are never copied into other entries (that caused duplicates), so the
+  // previous correct values simply stay in their own earlier entry.
   const $unset = {};
-  for (const f of fields) {
-    if (previous && hasValue(previous[f])) $set[f] = previous[f];
-    else $unset[f] = 1;
-  }
-  const revert = Object.keys($unset).length ? { $set, $unset } : { $set };
+  for (const f of fields) $unset[f] = 1;
+  const revert = {
+    $set: { [stamp]: previous && previous[stamp] ? previous[stamp] : null },
+    $unset
+  };
 
-  // Later entries (e.g. updates of the other tracker) that carried the wrong values forward
+  // Later entries (e.g. updates of the other tracker) still carry the wrong
+  // timestamp, and older entries may also hold a copy of the wrong values.
   await Progress.updateMany(
     { user: userId, createdAt: { $gt: entry.createdAt }, [stamp]: wrongTime },
     revert
@@ -526,8 +523,9 @@ const removeLatestTrackerEntry = async (userId, trackerName, referenceTime) => {
 
   // If the other tracker was saved in the same entry, keep the entry and only
   // drop this tracker's values. Otherwise delete the whole entry.
-  const otherSavedTogether = entry[other] &&
-    new Date(entry[other]).getTime() === new Date(wrongTime).getTime();
+  const otherSavedTogether = !!entry[other] &&
+    new Date(entry[other]).getTime() === new Date(wrongTime).getTime() &&
+    TRACKERS[trackerName === 'bmi' ? 'calories' : 'bmi'].fields.some((f) => hasValue(entry[f]));
 
   if (otherSavedTogether) {
     await Progress.updateOne({ _id: entry._id }, revert);

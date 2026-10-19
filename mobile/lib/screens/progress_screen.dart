@@ -319,23 +319,37 @@ class _ProgressScreenState extends State<ProgressScreen> {
                         itemCount: _progressHistory.length,
                         itemBuilder: (context, index) {
                           final progress = _progressHistory[index];
+                          // Each entry holds only what was entered at that
+                          // time (BMI, calories, or both).
+                          final hasBmi = progress.bmi != null;
+                          final calorieLines = <Widget>[
+                            if (progress.caloriesIntake != null)
+                              Text(
+                                'Calories Intake: ${progress.caloriesIntake!.toInt()}',
+                              ),
+                            if (progress.calorieDeficit != null)
+                              Text(
+                                'Calorie Deficit: ${progress.calorieDeficit!.toInt()}',
+                              ),
+                          ];
+                          if (!hasBmi && calorieLines.isEmpty) {
+                            return const SizedBox.shrink();
+                          }
                           return Card(
                             margin: const EdgeInsets.only(bottom: 8),
                             child: ListTile(
                               title: Text(
-                                'BMI: ${progress.bmi?.toStringAsFixed(1) ?? 'N/A'}',
+                                hasBmi
+                                    ? 'BMI: ${progress.bmi!.toStringAsFixed(1)}'
+                                    : 'Calories',
                               ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Calories Intake: ${progress.caloriesIntake?.toInt() ?? 'N/A'}',
-                                  ),
-                                  Text(
-                                    'Calorie Deficit: ${progress.calorieDeficit?.toInt() ?? 'N/A'}',
-                                  ),
-                                ],
-                              ),
+                              subtitle: hasBmi && calorieLines.isEmpty
+                                  ? null
+                                  : Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: calorieLines,
+                                    ),
                               trailing: Text(
                                 '${progress.date.day}/${progress.date.month}/${progress.date.year}',
                               ),
