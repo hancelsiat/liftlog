@@ -201,7 +201,7 @@ class _SentToCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'LINK EXPIRES IN 24 HOURS',
+                  'LINK EXPIRES IN 5 MINUTES',
                   style: AuthType.mono(color: AuthColors.accent),
                 ),
               ],

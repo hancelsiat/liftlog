@@ -122,7 +122,7 @@ UserSchema.methods.comparePassword = async function(candidatePassword) {
 UserSchema.methods.generateEmailVerificationToken = function() {
   const token = crypto.randomBytes(32).toString('hex');
   this.emailVerificationToken = crypto.createHash('sha256').update(token).digest('hex');
-  this.emailVerificationExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+  this.emailVerificationExpires = Date.now() + 5 * 60 * 1000; // 5 minutes
   return token;
 };
 
