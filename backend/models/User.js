@@ -67,6 +67,17 @@ const UserSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  // Forgot-password flow. All hidden from normal queries (select: false);
+  // the auth routes opt in with .select('+field').
+  // 1) A 6-digit OTP is emailed; only its hash is stored.
+  passwordResetOtp: { type: String, default: null, select: false },
+  passwordResetOtpExpires: { type: Date, default: null, select: false },
+  passwordResetAttempts: { type: Number, default: 0, select: false },
+  passwordResetLastSentAt: { type: Date, default: null, select: false },
+  // 2) A correct OTP is swapped for a one-time token that allows the
+  //    actual password change.
+  passwordResetToken: { type: String, default: null, select: false },
+  passwordResetTokenExpires: { type: Date, default: null, select: false },
   isApproved: {
     type: Boolean,
     default: true // Members are auto-approved, trainers need admin approval
@@ -114,6 +125,54 @@ UserSchema.methods.generateEmailVerificationToken = function() {
   this.emailVerificationExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
   return token;
 };
+
+const sha256 = (value) => crypto.createHash('sha256').update(String(value)).digest('hex');
+
+UserSchema.statics.PASSWORD_RESET_OTP_TTL_MS = 10 * 60 * 1000; // 10 minutes
+UserSchema.statics.PASSWORD_RESET_MAX_ATTEMPTS = 5;
+UserSchema.statics.PASSWORD_RESET_RESEND_MS = 60 * 1000; // 1 email per minute
+
+// Creates a new 6-digit reset code (and cancels any earlier code or token).
+// Returns the plain code so it can be emailed; only the hash is stored.
+UserSchema.methods.generatePasswordResetOtp = function() {
+  const otp = crypto.randomInt(0, 1000000).toString().padStart(6, '0');
+  this.passwordResetOtp = sha256(otp);
+  this.passwordResetOtpExpires = Date.now() + UserSchema.statics.PASSWORD_RESET_OTP_TTL_MS;
+  this.passwordResetAttempts = 0;
+  this.passwordResetLastSentAt = Date.now();
+  this.passwordResetToken = null;
+  this.passwordResetTokenExpires = null;
+  return otp;
+};
+
+// Constant-time compare of a submitted code against the stored hash.
+UserSchema.methods.checkPasswordResetOtp = function(otp) {
+  if (!this.passwordResetOtp || !otp) return false;
+  const a = Buffer.from(sha256(otp), 'hex');
+  const b = Buffer.from(this.passwordResetOtp, 'hex');
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+};
+
+// Swaps a verified OTP for a one-time token that allows the password change.
+UserSchema.methods.generatePasswordResetToken = function() {
+  const token = crypto.randomBytes(32).toString('hex');
+  this.passwordResetToken = sha256(token);
+  this.passwordResetTokenExpires = Date.now() + UserSchema.statics.PASSWORD_RESET_OTP_TTL_MS;
+  this.passwordResetOtp = null;
+  this.passwordResetOtpExpires = null;
+  this.passwordResetAttempts = 0;
+  return token;
+};
+
+UserSchema.methods.clearPasswordReset = function() {
+  this.passwordResetOtp = null;
+  this.passwordResetOtpExpires = null;
+  this.passwordResetAttempts = 0;
+  this.passwordResetToken = null;
+  this.passwordResetTokenExpires = null;
+};
+
+UserSchema.statics.hashResetValue = sha256;
 
 // Check if user can access the system
 UserSchema.methods.canAccess = function() {

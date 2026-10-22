@@ -130,7 +130,8 @@ const sendVerificationEmail = async (to, token) => {
   const verificationUrl = `https://liftlog-7.onrender.com/api/auth/verify-email/${token}`;
   const templatePath = path.join(__dirname, '..', 'templates', 'verificationEmail.html');
   let htmlContent = fs.readFileSync(templatePath, 'utf8');
-  htmlContent = htmlContent.replace('{{verificationUrl}}', verificationUrl);
+  // The template uses the link more than once (button + plain-text fallback).
+  htmlContent = htmlContent.split('{{verificationUrl}}').join(verificationUrl);
 
   const result = await sendEmail(to, 'Verify Your Email Address', htmlContent);
   return result;
@@ -153,4 +154,30 @@ const sendRejectionEmail = async (to, username, rejectionReason) => {
   return sendEmail(to, 'An Update on Your Trainer Application', htmlContent);
 };
 
-module.exports = { sendVerificationEmail, sendApprovalEmail, sendRejectionEmail, sendEmail };
+// Escapes text that goes into the HTML template (usernames are user input).
+const escapeHtml = (value) => String(value)
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+const sendPasswordResetEmail = async (to, username, otp, minutes) => {
+  const templatePath = path.join(__dirname, '..', 'templates', 'passwordResetEmail.html');
+  let htmlContent = fs.readFileSync(templatePath, 'utf8');
+  htmlContent = htmlContent
+    .split('{{username}}').join(escapeHtml(username || 'there'))
+    .split('{{otp}}').join(escapeHtml(otp))
+    .split('{{minutes}}').join(String(minutes));
+
+  // Code stays out of the subject so it doesn't show on lock-screen previews.
+  return sendEmail(to, 'Your LiftLog password reset code', htmlContent);
+};
+
+module.exports = {
+  sendVerificationEmail,
+  sendApprovalEmail,
+  sendRejectionEmail,
+  sendPasswordResetEmail,
+  sendEmail,
+};

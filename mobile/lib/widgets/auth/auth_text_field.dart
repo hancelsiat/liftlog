@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../utils/auth_tokens.dart';
 
@@ -18,6 +19,7 @@ class AuthTextField extends StatefulWidget {
     this.obscurable = false,
     this.autofillHints,
     this.onSubmitted,
+    this.inputFormatters,
   });
 
   final String label;
@@ -28,6 +30,7 @@ class AuthTextField extends StatefulWidget {
   final bool obscurable;
   final Iterable<String>? autofillHints;
   final ValueChanged<String>? onSubmitted;
+  final List<TextInputFormatter>? inputFormatters;
 
   @override
   State<AuthTextField> createState() => _AuthTextFieldState();
@@ -160,6 +163,7 @@ class _AuthTextFieldState extends State<AuthTextField> {
       enableSuggestions: !widget.obscurable,
       autocorrect: false,
       autofillHints: widget.autofillHints,
+      inputFormatters: widget.inputFormatters,
       onSubmitted: widget.onSubmitted,
       onChanged: (value) {
         field.didChange(value);

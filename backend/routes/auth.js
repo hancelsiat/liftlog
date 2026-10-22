@@ -8,7 +8,12 @@ const User = require('../models/User');
 const Workout = require('../models/Workout');
 const ExerciseVideo = require('../models/ExerciseVideo');
 const { verifyToken, checkRole, generateToken } = require('../middleware/auth');
-const { sendVerificationEmail, sendApprovalEmail, sendRejectionEmail } = require('../services/emailService');
+const {
+  sendVerificationEmail,
+  sendApprovalEmail,
+  sendRejectionEmail,
+  sendPasswordResetEmail,
+} = require('../services/emailService');
 
 // Initialize Supabase
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
@@ -232,6 +237,138 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// Forgot password (3 steps)
+//   1. POST /forgot-password      { email }                       -> emails a 6-digit code
+//   2. POST /verify-reset-otp     { email, otp }                  -> { resetToken }
+//   3. POST /reset-password       { email, resetToken, password } -> password changed
+// The code only goes to the email the account signed up with, so only the
+// owner of that inbox can change the password.
+// ---------------------------------------------------------------------------
+const RESET_FIELDS = '+passwordResetOtp +passwordResetOtpExpires +passwordResetAttempts '
+  + '+passwordResetLastSentAt +passwordResetToken +passwordResetTokenExpires';
+const normalizeEmail = (raw) => String(raw || '').trim().toLowerCase();
+const OTP_RE = /^\d{6}$/;
+// Same reply whether or not the account exists, so this can't be used to
+// find out which emails are registered.
+const FORGOT_REPLY = 'If an account exists for that email, we sent a 6-digit code to it.';
+
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body.email);
+    if (!email || !email.includes('@')) {
+      return res.status(400).json({ error: 'Please enter a valid email address.' });
+    }
+
+    const user = await User.findOne({ email }).select(RESET_FIELDS);
+    // Unverified accounts never proved they own the inbox, so skip them too.
+    if (!user || !user.isEmailVerified) {
+      return res.json({ message: FORGOT_REPLY });
+    }
+
+    const lastSent = user.passwordResetLastSentAt ? user.passwordResetLastSentAt.getTime() : 0;
+    const wait = User.PASSWORD_RESET_RESEND_MS - (Date.now() - lastSent);
+    if (wait > 0) {
+      return res.status(429).json({
+        error: `Please wait ${Math.ceil(wait / 1000)} seconds before asking for a new code.`,
+        retryAfter: Math.ceil(wait / 1000),
+      });
+    }
+
+    const otp = user.generatePasswordResetOtp();
+    await user.save();
+
+    const minutes = Math.round(User.PASSWORD_RESET_OTP_TTL_MS / 60000);
+    const result = await sendPasswordResetEmail(user.email, user.username, otp, minutes);
+    if (!result || !result.success) {
+      // Let them try again straight away instead of waiting out the cooldown.
+      user.passwordResetLastSentAt = null;
+      await user.save();
+      console.error('Password reset email failed for', user.email);
+    }
+
+    res.json({ message: FORGOT_REPLY });
+  } catch (error) {
+    console.error('forgot-password error:', error);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
+  }
+});
+
+router.post('/verify-reset-otp', async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body.email);
+    const otp = String(req.body.otp || '').trim();
+    if (!OTP_RE.test(otp)) {
+      return res.status(400).json({ error: 'Enter the 6-digit code from your email.' });
+    }
+
+    const user = await User.findOne({ email }).select(RESET_FIELDS);
+    const expired = !user || !user.passwordResetOtp
+      || !user.passwordResetOtpExpires || user.passwordResetOtpExpires.getTime() < Date.now();
+    if (expired) {
+      return res.status(400).json({ error: 'This code has expired. Please request a new one.' });
+    }
+
+    if (!user.checkPasswordResetOtp(otp)) {
+      user.passwordResetAttempts += 1;
+      const left = User.PASSWORD_RESET_MAX_ATTEMPTS - user.passwordResetAttempts;
+      if (left <= 0) {
+        // Too many guesses: burn the code so it can't be brute-forced.
+        user.clearPasswordReset();
+        await user.save();
+        return res.status(429).json({ error: 'Too many wrong codes. Please request a new one.' });
+      }
+      await user.save();
+      return res.status(400).json({
+        error: `That code is incorrect. ${left} ${left === 1 ? 'try' : 'tries'} left.`,
+        attemptsLeft: left,
+      });
+    }
+
+    const resetToken = user.generatePasswordResetToken();
+    await user.save();
+    res.json({ message: 'Code verified.', resetToken });
+  } catch (error) {
+    console.error('verify-reset-otp error:', error);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
+  }
+});
+
+router.post('/reset-password', async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body.email);
+    const { resetToken, password } = req.body;
+
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/;
+    if (!password || !passwordRegex.test(password)) {
+      return res.status(400).json({
+        error: 'Your new password must be at least 6 characters long and contain at least one uppercase letter, one lowercase letter, and one number.'
+      });
+    }
+
+    const user = await User.findOne({ email }).select(`${RESET_FIELDS} +password`);
+    const valid = user && resetToken && user.passwordResetToken
+      && user.passwordResetTokenExpires && user.passwordResetTokenExpires.getTime() > Date.now()
+      && user.passwordResetToken === User.hashResetValue(resetToken);
+    if (!valid) {
+      return res.status(400).json({ error: 'Your reset session has expired. Please start again.' });
+    }
+
+    if (await user.comparePassword(password)) {
+      return res.status(400).json({ error: 'Your new password must be different from your old one.' });
+    }
+
+    user.password = password; // hashed by the pre-save hook
+    user.clearPasswordReset();
+    await user.save();
+
+    res.json({ message: 'Your password has been changed. You can now sign in.' });
+  } catch (error) {
+    console.error('reset-password error:', error);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
+  }
+});
+
 // Get User Profile (Authenticated Route)
 router.get('/profile', verifyToken, async (req, res) => {
   try {
@@ -250,7 +387,9 @@ router.patch('/profile', verifyToken, async (req, res) => {
     // the identity fields the admin checked (full name and credential photo).
     // Only an admin can change these, via PATCH /users/:id.
     for (const key of ['role', 'isApproved', 'isEmailVerified', 'emailVerificationToken',
-      'emailVerificationExpires', 'credentialImageUrl', 'fullName', 'clients', '_id']) {
+      'emailVerificationExpires', 'credentialImageUrl', 'fullName', 'clients', '_id',
+      'passwordResetOtp', 'passwordResetOtpExpires', 'passwordResetAttempts',
+      'passwordResetLastSentAt', 'passwordResetToken', 'passwordResetTokenExpires']) {
       delete updates[key];
     }
     if (updates.password) {

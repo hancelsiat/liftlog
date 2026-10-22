@@ -11,6 +11,7 @@ import '../widgets/auth/error_banner.dart';
 import '../widgets/auth/pressable_button.dart';
 import '../widgets/auth/shake_on_error.dart';
 import '../widgets/auth/staggered_entrance.dart';
+import 'forgot_password_screen.dart';
 import 'register_screen.dart';
 import 'dashboard_screen.dart';
 
@@ -130,7 +131,8 @@ class _LoginScreenState extends State<LoginScreen>
               EntranceRise(index: 1, child: _buildEmailField()),
               const SizedBox(height: AuthSpace.s),
               EntranceRise(index: 2, child: _buildPasswordField()),
-              const SizedBox(height: AuthSpace.m),
+              EntranceRise(index: 2, child: _buildForgotPasswordLink()),
+              const SizedBox(height: AuthSpace.xs),
               EntranceRise(index: 3, child: _buildLoginButton(authProvider)),
               // Special cases (unverified / pending) are handled by dialogs.
               ErrorBanner(
@@ -187,6 +189,56 @@ class _LoginScreenState extends State<LoginScreen>
         return null;
       },
     );
+  }
+
+  Widget _buildForgotPasswordLink() {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Semantics(
+        button: true,
+        label: 'Forgot password?',
+        excludeSemantics: true,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _openForgotPassword,
+          child: SizedBox(
+            height: AuthSpace.tapTarget,
+            child: Center(
+              child: Text(
+                'Forgot password?',
+                style:
+                    AuthType.body(
+                      color: AuthColors.textPrimary,
+                      size: 14,
+                      weight: FontWeight.w500,
+                    ).copyWith(
+                      decoration: TextDecoration.underline,
+                      decorationColor: AuthColors.accent,
+                      decorationThickness: 2,
+                    ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openForgotPassword() async {
+    FocusScope.of(context).unfocus();
+    Provider.of<AuthProvider>(context, listen: false).clearError();
+    final email = await Navigator.push<String>(
+      context,
+      AuthPageRoute(
+        builder: (context) =>
+            ForgotPasswordScreen(initialEmail: _emailController.text.trim()),
+      ),
+    );
+    // After a successful reset, fill in the email and clear the old password.
+    if (email != null && mounted) {
+      _emailController.text = email;
+      _passwordController.clear();
+    }
   }
 
   Widget _buildLoginButton(AuthProvider authProvider) {

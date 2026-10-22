@@ -369,7 +369,7 @@ class _RegisterScreenState extends State<RegisterScreen>
       if (success && mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
+          AuthPageRoute(
             builder: (context) =>
                 CheckEmailScreen(email: _emailController.text.trim()),
           ),

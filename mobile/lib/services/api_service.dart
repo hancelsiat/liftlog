@@ -285,6 +285,35 @@ class ApiService {
     await _postAnonymous('/auth/resend-verification', {'email': email});
   }
 
+  // Forgot password: email → 6-digit code → one-time reset token → new password.
+
+  /// Step 1: emails a 6-digit code to the address the account signed up with.
+  Future<void> requestPasswordReset(String email) async {
+    await _postAnonymous('/auth/forgot-password', {'email': email});
+  }
+
+  /// Step 2: checks the code and returns a short-lived reset token.
+  Future<String> verifyPasswordResetOtp(String email, String otp) async {
+    final response = await _postAnonymous('/auth/verify-reset-otp', {
+      'email': email,
+      'otp': otp,
+    });
+    return response['resetToken'] as String;
+  }
+
+  /// Step 3: sets the new password using the token from step 2.
+  Future<void> resetPassword(
+    String email,
+    String resetToken,
+    String password,
+  ) async {
+    await _postAnonymous('/auth/reset-password', {
+      'email': email,
+      'resetToken': resetToken,
+      'password': password,
+    });
+  }
+
   Future<Map<String, dynamic>> login(String email, String password) async {
     final response = await _post('/auth/login', {
       'email': email,
