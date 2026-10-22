@@ -163,11 +163,18 @@ class _TrainerFeedbackScreenState extends State<TrainerFeedbackScreen> {
             return const GymLoader();
           }
           if (snapshot.hasError) {
-            return Center(
-              child: GymEmptyState(
-                icon: Icons.error_outline,
-                danger: true,
-                message: 'Could not load feedback: ${snapshot.error}',
+            return GymRefresh(
+              onRefresh: _refresh,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(height: MediaQuery.sizeOf(context).height * 0.12),
+                  GymEmptyState(
+                    icon: Icons.error_outline,
+                    danger: true,
+                    message: 'Could not load feedback: ${snapshot.error}',
+                  ),
+                ],
               ),
             );
           }

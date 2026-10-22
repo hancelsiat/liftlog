@@ -9,15 +9,24 @@ import 'edit_user_screen.dart';
 import 'credential_viewer_screen.dart';
 
 class AdminUsersScreen extends StatefulWidget {
-  const AdminUsersScreen({super.key});
+  const AdminUsersScreen({super.key, this.api});
+
+  /// Injected in tests; defaults to the real [ApiService].
+  final ApiService? api;
 
   @override
   State<AdminUsersScreen> createState() => _AdminUsersScreenState();
 }
 
-class _AdminUsersScreenState extends State<AdminUsersScreen> {
+class _AdminUsersScreenState extends State<AdminUsersScreen>
+    with SingleTickerProviderStateMixin {
   late Future<Map<UserRole, List<User>>> _usersFuture;
-  final ApiService _apiService = ApiService();
+  late final ApiService _apiService = widget.api ?? ApiService();
+
+  // Trainers and members live on separate tabs, in this order.
+  static const _tabRoles = [UserRole.trainer, UserRole.member];
+  late final TabController _tabController;
+  int _tab = 0;
 
   // Multi-select (bulk approve / reject / delete). Admin accounts are never
   // listed, so every visible user can be selected.
@@ -26,17 +35,38 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   final Set<String> _selected = {};
   String? _bulkProgress;
 
-  // Search filters what is shown. Selections hidden by a search are kept,
-  // but bulk actions only touch selected users that are currently visible.
+  // Search and the current tab filter what is shown. Selections hidden by a
+  // search or on the other tab are kept, but bulk actions only touch selected
+  // users that are currently visible.
   String _query = '';
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: _tabRoles.length, vsync: this)
+      ..addListener(() {
+        // Fires during the swipe too; only rebuild once the index changes.
+        if (_tab != _tabController.index) {
+          setState(() => _tab = _tabController.index);
+        }
+      });
     _usersFuture = _fetchAndGroupUsers();
   }
 
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  UserRole get _currentRole => _tabRoles[_tab];
+
   bool _isPendingTrainer(User u) => u.role == UserRole.trainer && !u.isApproved;
+
+  /// Trainer who confirmed their email and is waiting for admin approval.
+  /// Unverified trainers are listed under "Unverified email" instead.
+  bool _awaitsApproval(User u) =>
+      u.role == UserRole.trainer && u.isEmailVerified && !u.isApproved;
 
   bool _matches(User u) => matchesSearch(_query, [
     u.username,
@@ -47,7 +77,8 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     u.profile?.lastName,
   ]);
 
-  List<User> get _visibleUsers => _listedUsers.where(_matches).toList();
+  List<User> get _visibleUsers =>
+      _listedUsers.where((u) => u.role == _currentRole && _matches(u)).toList();
 
   List<User> get _selectedUsers =>
       _visibleUsers.where((u) => _selected.contains(u.id)).toList();
@@ -123,35 +154,40 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
           // does not rebuild this action, so the button is not gated on it.
           onTap: busy ? null : (_selecting ? _stopSelecting : _startSelecting),
         ),
-        GymIconButton(
-          icon: Icons.refresh,
-          tooltip: 'Refresh',
-          onTap: busy ? null : _refresh,
-        ),
       ],
-      bottom: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          GymScaffold.side,
-          0,
-          GymScaffold.side,
-          AuthSpace.xs,
-        ),
-        child: GymSearchField(
-          hint: 'Search name, username or email',
-          enabled: !busy,
-          onChanged: (q) => setState(() => _query = q.trim()),
-        ),
+      bottom: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          GymTabBar(
+            controller: _tabController,
+            tabs: const ['Trainers', 'Members'],
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              GymScaffold.side,
+              AuthSpace.xs,
+              GymScaffold.side,
+              AuthSpace.xs,
+            ),
+            child: GymSearchField(
+              hint: 'Search name, username or email',
+              enabled: !busy,
+              onChanged: (q) => setState(() => _query = q.trim()),
+            ),
+          ),
+        ],
       ),
-      body: GymRefresh(
-        onRefresh: _refresh,
-        child: FutureBuilder<Map<UserRole, List<User>>>(
-          future: _usersFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const GymLoader();
-            }
-            if (snapshot.hasError) {
-              return _scrollableMessage(
+      body: FutureBuilder<Map<UserRole, List<User>>>(
+        future: _usersFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const GymLoader();
+          }
+          if (snapshot.hasError) {
+            return GymRefresh(
+              onRefresh: _refresh,
+              child: _scrollableMessage(
                 GymEmptyState(
                   icon: Icons.error_outline,
                   danger: true,
@@ -166,120 +202,134 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                     ),
                   ),
                 ),
-              );
-            }
-            if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return _scrollableMessage(
-                const GymEmptyState(
-                  icon: Icons.group_outlined,
-                  message: 'No users found.',
-                ),
-              );
-            }
-
-            final groupedUsers = snapshot.data!;
-            final trainers = groupedUsers[UserRole.trainer]!
-                .where(_matches)
-                .toList();
-            final members = groupedUsers[UserRole.member]!
-                .where(_matches)
-                .toList();
-            final searching = _query.isNotEmpty;
-            if (searching && trainers.isEmpty && members.isEmpty) {
-              return _scrollableMessage(
-                GymEmptyState(
-                  icon: Icons.search_off,
-                  message: 'No users match "$_query".',
-                ),
-              );
-            }
-            // Pending trainers first so they are easy to find.
-            final pending = trainers.where((u) => !u.isApproved).toList();
-            final approved = trainers.where((u) => u.isApproved).toList();
-
-            var reveal = 0;
-            Widget card(User u) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: StaggeredReveal(
-                index: reveal++,
-                child: _UserCard(
-                  user: u,
-                  // The bulk bar replaces per-card buttons while selecting.
-                  actions: _selecting
-                      ? const []
-                      : _buildActionButtons(u, context),
-                  selecting: _selecting,
-                  selected: _selected.contains(u.id),
-                  onToggle: () => _toggle(u.id),
-                  onLongPress: _bulkProgress == null
-                      ? () => _startSelecting(u.id)
-                      : null,
-                ),
               ),
             );
+          }
+          final grouped = snapshot.data ?? const {};
+          // Each tab has its own refresh indicator: the TabBarView is a
+          // scrollable too, so one placed above it would never fire.
+          return TabBarView(
+            controller: _tabController,
+            children: [
+              for (final role in _tabRoles)
+                GymRefresh(
+                  onRefresh: _refresh,
+                  child: _buildRoleList(role, grouped[role] ?? const []),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
 
-            return ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(
-                GymScaffold.side,
-                AuthSpace.xs,
-                GymScaffold.side,
-                AuthSpace.l,
-              ),
-              children: [
-                if (_selecting) ...[
-                  _buildQuickSelect(pending, approved, members),
-                  const SizedBox(height: AuthSpace.s),
-                ],
-                if (pending.isNotEmpty) ...[
-                  GymSectionLabel(
-                    index: 1,
-                    label: 'Pending approval (${pending.length})',
-                  ),
-                  const SizedBox(height: AuthSpace.s),
-                  ...pending.map(card),
-                  const SizedBox(height: AuthSpace.m),
-                ],
-                GymSectionLabel(
-                  index: pending.isNotEmpty ? 2 : 1,
-                  label: 'Trainers (${approved.length})',
-                ),
-                const SizedBox(height: AuthSpace.s),
-                if (approved.isEmpty)
-                  _emptyLine(
-                    searching
-                        ? 'No matching trainers.'
-                        : 'No approved trainers yet.',
-                  )
-                else
-                  ...approved.map(card),
-                const SizedBox(height: AuthSpace.m),
-                GymSectionLabel(
-                  index: pending.isNotEmpty ? 3 : 2,
-                  label: 'Members (${members.length})',
-                ),
-                const SizedBox(height: AuthSpace.s),
-                if (members.isEmpty)
-                  _emptyLine(
-                    searching ? 'No matching members.' : 'No members yet.',
-                  )
-                else
-                  ...members.map(card),
-              ],
-            );
-          },
+  /// One tab: users of [role], split into sections. Unverified accounts
+  /// always get their own section at the end.
+  Widget _buildRoleList(UserRole role, List<User> all) {
+    final isTrainer = role == UserRole.trainer;
+    final noun = isTrainer ? 'trainers' : 'members';
+    final users = all.where(_matches).toList();
+    final searching = _query.isNotEmpty;
+
+    if (users.isEmpty) {
+      return _scrollableMessage(
+        GymEmptyState(
+          icon: searching ? Icons.search_off : Icons.group_outlined,
+          message: searching ? 'No $noun match "$_query".' : 'No $noun yet.',
+        ),
+      );
+    }
+
+    final unverified = users.where((u) => !u.isEmailVerified).toList();
+    final pending = isTrainer
+        ? users.where(_awaitsApproval).toList()
+        : <User>[];
+    final active = users
+        .where((u) => u.isEmailVerified && (!isTrainer || u.isApproved))
+        .toList();
+
+    var reveal = 0;
+    Widget card(User u) => Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: StaggeredReveal(
+        index: reveal++,
+        child: _UserCard(
+          user: u,
+          // The bulk bar replaces per-card buttons while selecting.
+          actions: _selecting ? const [] : _buildActionButtons(u, context),
+          selecting: _selecting,
+          selected: _selected.contains(u.id),
+          onToggle: () => _toggle(u.id),
+          onLongPress: _bulkProgress == null
+              ? () => _startSelecting(u.id)
+              : null,
         ),
       ),
+    );
+
+    var section = 0;
+    List<Widget> group(
+      String label,
+      List<User> list, {
+      String? note,
+      String? emptyText,
+    }) {
+      if (list.isEmpty && emptyText == null) return const [];
+      return [
+        GymSectionLabel(index: ++section, label: '$label (${list.length})'),
+        if (note != null) ...[
+          const SizedBox(height: 6),
+          Text(note, style: AuthType.body(size: 13)),
+        ],
+        const SizedBox(height: AuthSpace.s),
+        if (list.isEmpty) _emptyLine(emptyText!) else ...list.map(card),
+        const SizedBox(height: AuthSpace.m),
+      ];
+    }
+
+    final activeLabel = isTrainer ? 'Approved trainers' : 'Verified members';
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(
+        GymScaffold.side,
+        AuthSpace.xs,
+        GymScaffold.side,
+        AuthSpace.l,
+      ),
+      children: [
+        if (_selecting) ...[
+          _buildQuickSelect([
+            if (isTrainer) ('Pending', pending),
+            (isTrainer ? 'Approved' : 'Verified', active),
+            ('Unverified', unverified),
+          ]),
+          const SizedBox(height: AuthSpace.s),
+        ],
+        // Pending trainers first so they are easy to find.
+        ...group('Pending approval', pending),
+        ...group(
+          activeLabel,
+          active,
+          emptyText: searching
+              ? 'No matching $noun.'
+              : (isTrainer
+                    ? 'No approved trainers yet.'
+                    : 'No verified members yet.'),
+        ),
+        ...group(
+          'Unverified email',
+          unverified,
+          note:
+              'These accounts have not confirmed their email, so they '
+              'cannot log in yet.',
+        ),
+      ],
     );
   }
 
   /// Chips that select a whole group at once. Tapping a fully selected
   /// group clears it.
-  Widget _buildQuickSelect(
-    List<User> pending,
-    List<User> approved,
-    List<User> members,
-  ) {
+  Widget _buildQuickSelect(List<(String, List<User>)> groups) {
     Widget chip(String label, List<User> group) {
       final ids = group.map((u) => u.id).toSet();
       final all = ids.isNotEmpty && _selected.containsAll(ids);
@@ -304,11 +354,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
-        children: [
-          chip('Pending', pending),
-          chip('Trainers', approved),
-          chip('Members', members),
-        ],
+        children: [for (final (label, users) in groups) chip(label, users)],
       ),
     );
   }
@@ -765,7 +811,11 @@ class _UserCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final pending = user.role == UserRole.trainer && !user.isApproved;
+    // Unverified accounts are tagged as such even when they are trainers
+    // awaiting approval; they are listed in the Unverified section.
+    final unverified = !user.isEmailVerified;
+    final pending =
+        user.role == UserRole.trainer && !user.isApproved && !unverified;
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
       onLongPress: selecting ? null : onLongPress,
@@ -829,12 +879,12 @@ class _UserCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (pending) ...[
-                  const SizedBox(width: 8),
-                  const GymTag(label: 'Pending', color: GymColors.warn),
-                ] else if (!user.isEmailVerified) ...[
+                if (unverified) ...[
                   const SizedBox(width: 8),
                   const GymTag(label: 'Unverified'),
+                ] else if (pending) ...[
+                  const SizedBox(width: 8),
+                  const GymTag(label: 'Pending', color: GymColors.warn),
                 ],
               ],
             ),

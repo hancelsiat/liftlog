@@ -206,11 +206,6 @@ class _TrainerClientsScreenState extends State<TrainerClientsScreen> {
           // does not rebuild this action, so the button is not gated on it.
           onTap: busy ? null : (_selecting ? _stopSelecting : _startSelecting),
         ),
-        GymIconButton(
-          icon: Icons.refresh,
-          tooltip: 'Refresh',
-          onTap: busy ? null : _refreshClients,
-        ),
       ],
       bottom: Padding(
         padding: const EdgeInsets.fromLTRB(

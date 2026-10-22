@@ -149,19 +149,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
             onTap: () => _showLogoutDialog(authProvider),
           ),
         ],
-        body: ListView(
-          padding: const EdgeInsets.fromLTRB(
-            GymScaffold.side,
-            AuthSpace.xs,
-            GymScaffold.side,
-            AuthSpace.l,
+        // Pull down to reload the profile (e.g. trainer approval status).
+        body: GymRefresh(
+          onRefresh: _loadUserProfile,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(
+              GymScaffold.side,
+              AuthSpace.xs,
+              GymScaffold.side,
+              AuthSpace.l,
+            ),
+            children: [
+              EntranceRise(index: 0, child: _WelcomeCard(user: user)),
+              const SizedBox(height: AuthSpace.l),
+              // Role-based Dashboard
+              ..._tilesFor(user.role),
+            ],
           ),
-          children: [
-            EntranceRise(index: 0, child: _WelcomeCard(user: user)),
-            const SizedBox(height: AuthSpace.l),
-            // Role-based Dashboard
-            ..._tilesFor(user.role),
-          ],
         ),
       ),
     );

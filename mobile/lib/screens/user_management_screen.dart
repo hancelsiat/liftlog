@@ -322,157 +322,167 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _users.isEmpty
-                ? const Center(child: Text('No users found'))
-                : ListView.builder(
-                    itemCount: _users.length,
-                    itemBuilder: (context, index) {
-                      final user = _users[index];
-                      final isTrainer = user.role == UserRole.trainer;
-                      final needsApproval = isTrainer && !user.isApproved;
+                : RefreshIndicator(
+                    onRefresh: _loadUsers,
+                    child: _users.isEmpty
+                        ? ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            children: const [
+                              SizedBox(height: 120),
+                              Center(child: Text('No users found')),
+                            ],
+                          )
+                        : ListView.builder(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            itemCount: _users.length,
+                            itemBuilder: (context, index) {
+                              final user = _users[index];
+                              final isTrainer = user.role == UserRole.trainer;
+                              final needsApproval =
+                                  isTrainer && !user.isApproved;
 
-                      return Card(
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 4,
-                        ),
-                        color: needsApproval
-                            ? Colors.orange.withValues(alpha: 0.1)
-                            : null,
-                        child: ListTile(
-                          leading: Stack(
-                            children: [
-                              CircleAvatar(
-                                backgroundColor: needsApproval
-                                    ? Colors.orange
+                              return Card(
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 4,
+                                ),
+                                color: needsApproval
+                                    ? Colors.orange.withValues(alpha: 0.1)
                                     : null,
-                                child: Text(user.username[0].toUpperCase()),
-                              ),
-                              if (needsApproval)
-                                Positioned(
-                                  right: 0,
-                                  bottom: 0,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(2),
-                                    decoration: const BoxDecoration(
-                                      color: Colors.orange,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.pending,
-                                      size: 12,
-                                      color: Colors.white,
-                                    ),
+                                child: ListTile(
+                                  leading: Stack(
+                                    children: [
+                                      CircleAvatar(
+                                        backgroundColor: needsApproval
+                                            ? Colors.orange
+                                            : null,
+                                        child: Text(
+                                          user.username[0].toUpperCase(),
+                                        ),
+                                      ),
+                                      if (needsApproval)
+                                        Positioned(
+                                          right: 0,
+                                          bottom: 0,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(2),
+                                            decoration: const BoxDecoration(
+                                              color: Colors.orange,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                              Icons.pending,
+                                              size: 12,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  title: Text(user.username),
+                                  subtitle: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '${user.email} • ${user.role.name.toUpperCase()}',
+                                      ),
+                                      if (isTrainer) ...[
+                                        const SizedBox(height: 4),
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              user.isApproved
+                                                  ? Icons.check_circle
+                                                  : Icons.pending,
+                                              size: 14,
+                                              color: user.isApproved
+                                                  ? Colors.green
+                                                  : Colors.orange,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              user.isApproved
+                                                  ? 'Approved'
+                                                  : 'Pending Approval',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: user.isApproved
+                                                    ? Colors.green
+                                                    : Colors.orange,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  trailing: PopupMenuButton<String>(
+                                    onSelected: (value) {
+                                      switch (value) {
+                                        case 'approve':
+                                          _approveTrainer(user, true);
+                                          break;
+                                        case 'reject':
+                                          _approveTrainer(user, false);
+                                          break;
+                                        case 'edit':
+                                          _showEditUserDialog(user);
+                                          break;
+                                        case 'delete':
+                                          _deleteUser(user);
+                                          break;
+                                      }
+                                    },
+                                    itemBuilder: (context) => [
+                                      if (isTrainer && !user.isApproved) ...[
+                                        const PopupMenuItem(
+                                          value: 'approve',
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.check,
+                                                color: Colors.green,
+                                                size: 20,
+                                              ),
+                                              SizedBox(width: 8),
+                                              Text('Approve Trainer'),
+                                            ],
+                                          ),
+                                        ),
+                                        const PopupMenuItem(
+                                          value: 'reject',
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.close,
+                                                color: Colors.red,
+                                                size: 20,
+                                              ),
+                                              SizedBox(width: 8),
+                                              Text('Reject Trainer'),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                      const PopupMenuItem(
+                                        value: 'edit',
+                                        child: Text('Edit'),
+                                      ),
+                                      const PopupMenuItem(
+                                        value: 'delete',
+                                        textStyle: TextStyle(color: Colors.red),
+                                        child: Text('Delete'),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                            ],
-                          ),
-                          title: Text(user.username),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '${user.email} • ${user.role.name.toUpperCase()}',
-                              ),
-                              if (isTrainer) ...[
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      user.isApproved
-                                          ? Icons.check_circle
-                                          : Icons.pending,
-                                      size: 14,
-                                      color: user.isApproved
-                                          ? Colors.green
-                                          : Colors.orange,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      user.isApproved
-                                          ? 'Approved'
-                                          : 'Pending Approval',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: user.isApproved
-                                            ? Colors.green
-                                            : Colors.orange,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ],
-                          ),
-                          trailing: PopupMenuButton<String>(
-                            onSelected: (value) {
-                              switch (value) {
-                                case 'approve':
-                                  _approveTrainer(user, true);
-                                  break;
-                                case 'reject':
-                                  _approveTrainer(user, false);
-                                  break;
-                                case 'edit':
-                                  _showEditUserDialog(user);
-                                  break;
-                                case 'delete':
-                                  _deleteUser(user);
-                                  break;
-                              }
+                              );
                             },
-                            itemBuilder: (context) => [
-                              if (isTrainer && !user.isApproved) ...[
-                                const PopupMenuItem(
-                                  value: 'approve',
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.check,
-                                        color: Colors.green,
-                                        size: 20,
-                                      ),
-                                      SizedBox(width: 8),
-                                      Text('Approve Trainer'),
-                                    ],
-                                  ),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'reject',
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.close,
-                                        color: Colors.red,
-                                        size: 20,
-                                      ),
-                                      SizedBox(width: 8),
-                                      Text('Reject Trainer'),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                              const PopupMenuItem(
-                                value: 'edit',
-                                child: Text('Edit'),
-                              ),
-                              const PopupMenuItem(
-                                value: 'delete',
-                                textStyle: TextStyle(color: Colors.red),
-                                child: Text('Delete'),
-                              ),
-                            ],
                           ),
-                        ),
-                      );
-                    },
                   ),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _loadUsers,
-        child: const Icon(Icons.refresh),
       ),
     );
   }

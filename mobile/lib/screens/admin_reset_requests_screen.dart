@@ -563,11 +563,6 @@ class _AdminResetRequestsScreenState extends State<AdminResetRequestsScreen> {
               ? _stopSelecting
               : (canSelect ? _startSelecting : null),
         ),
-        GymIconButton(
-          icon: Icons.refresh,
-          tooltip: 'Refresh',
-          onTap: _loading || _bulkProgress != null ? null : _load,
-        ),
       ],
       bottom: Column(
         mainAxisSize: MainAxisSize.min,

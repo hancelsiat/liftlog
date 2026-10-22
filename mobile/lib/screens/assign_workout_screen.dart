@@ -32,6 +32,31 @@ class _AssignWorkoutScreenState extends State<AssignWorkoutScreen> {
     return response.where((workout) => workout.trainerId == trainerId).toList();
   }
 
+  Future<void> _refresh() async {
+    setState(() {
+      _workoutsFuture = _fetchWorkoutTemplates();
+    });
+    try {
+      await _workoutsFuture;
+    } catch (_) {
+      // The FutureBuilder shows the error.
+    }
+  }
+
+  /// Pullable wrapper for the error and empty messages.
+  Widget _scrollableMessage(Widget child) {
+    return GymRefresh(
+      onRefresh: _refresh,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(height: MediaQuery.sizeOf(context).height * 0.12),
+          child,
+        ],
+      ),
+    );
+  }
+
   /// Id of the workout being assigned, so its row shows a loader and the
   /// rest are locked until the request finishes.
   String? _assigningId;
@@ -74,8 +99,8 @@ class _AssignWorkoutScreenState extends State<AssignWorkoutScreen> {
             return const GymLoader();
           }
           if (snapshot.hasError) {
-            return Center(
-              child: GymEmptyState(
+            return _scrollableMessage(
+              GymEmptyState(
                 icon: Icons.error_outline,
                 danger: true,
                 message: 'Error: ${snapshot.error}',
@@ -83,8 +108,8 @@ class _AssignWorkoutScreenState extends State<AssignWorkoutScreen> {
             );
           }
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(
-              child: GymEmptyState(
+            return _scrollableMessage(
+              const GymEmptyState(
                 icon: Icons.fitness_center,
                 message: 'You have no workout templates.',
               ),
@@ -92,82 +117,90 @@ class _AssignWorkoutScreenState extends State<AssignWorkoutScreen> {
           }
 
           final workouts = snapshot.data!;
-          return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(
-              GymScaffold.side,
-              AuthSpace.xs,
-              GymScaffold.side,
-              AuthSpace.l,
-            ),
-            itemCount: workouts.length + 1,
-            separatorBuilder: (context, index) =>
-                SizedBox(height: index == 0 ? AuthSpace.s : 10),
-            itemBuilder: (context, index) {
-              if (index == 0) {
-                return const GymSectionLabel(
-                  index: 1,
-                  label: 'Tap a template to assign',
-                );
-              }
-              final i = index - 1;
-              final workout = workouts[i];
-              final busy = _assigningId == workout.id;
-              final locked = _assigningId != null;
-              return StaggeredReveal(
-                index: i,
-                child: PressableSurface(
-                  highlighted: busy,
-                  semanticLabel: 'Assign ${workout.title}',
-                  onTap: locked ? null : () => _assignWorkout(workout.id),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 28,
-                        child: Text(
-                          (i + 1).toString().padLeft(2, '0'),
-                          style: AuthType.mono(color: AuthColors.accent),
-                        ),
-                      ),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              workout.title.toUpperCase(),
-                              style: AuthType.display(22).copyWith(height: 1),
-                            ),
-                            if (workout.exercises.isNotEmpty) ...[
-                              const SizedBox(height: 6),
-                              Text(
-                                '${workout.exercises.length} '
-                                '${workout.exercises.length == 1 ? 'exercise' : 'exercises'}',
-                                style: AuthType.body(size: 13),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      SizedBox(
-                        width: 28,
-                        child: busy
-                            ? const BarLoader(color: AuthColors.accent)
-                            : Icon(
-                                Icons.arrow_forward,
-                                size: 18,
-                                color: locked
-                                    ? AuthColors.textFaint
-                                    : AuthColors.textMuted,
-                              ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
+          return GymRefresh(
+            onRefresh: _refresh,
+            child: _templateList(workouts),
           );
         },
       ),
+    );
+  }
+
+  Widget _templateList(List<Workout> workouts) {
+    return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(
+        GymScaffold.side,
+        AuthSpace.xs,
+        GymScaffold.side,
+        AuthSpace.l,
+      ),
+      itemCount: workouts.length + 1,
+      separatorBuilder: (context, index) =>
+          SizedBox(height: index == 0 ? AuthSpace.s : 10),
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return const GymSectionLabel(
+            index: 1,
+            label: 'Tap a template to assign',
+          );
+        }
+        final i = index - 1;
+        final workout = workouts[i];
+        final busy = _assigningId == workout.id;
+        final locked = _assigningId != null;
+        return StaggeredReveal(
+          index: i,
+          child: PressableSurface(
+            highlighted: busy,
+            semanticLabel: 'Assign ${workout.title}',
+            onTap: locked ? null : () => _assignWorkout(workout.id),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 28,
+                  child: Text(
+                    (i + 1).toString().padLeft(2, '0'),
+                    style: AuthType.mono(color: AuthColors.accent),
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        workout.title.toUpperCase(),
+                        style: AuthType.display(22).copyWith(height: 1),
+                      ),
+                      if (workout.exercises.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          '${workout.exercises.length} '
+                          '${workout.exercises.length == 1 ? 'exercise' : 'exercises'}',
+                          style: AuthType.body(size: 13),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                SizedBox(
+                  width: 28,
+                  child: busy
+                      ? const BarLoader(color: AuthColors.accent)
+                      : Icon(
+                          Icons.arrow_forward,
+                          size: 18,
+                          color: locked
+                              ? AuthColors.textFaint
+                              : AuthColors.textMuted,
+                        ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

@@ -87,13 +87,6 @@ class _TrainingVideosScreenState extends State<TrainingVideosScreen> {
     return GymScaffold(
       eyebrow: 'Member / Library',
       title: 'Training Videos',
-      actions: [
-        GymIconButton(
-          icon: Icons.refresh,
-          tooltip: 'Refresh',
-          onTap: _isLoading ? null : _fetchVideos,
-        ),
-      ],
       body: GymRefresh(onRefresh: _fetchVideos, child: _buildBody()),
     );
   }

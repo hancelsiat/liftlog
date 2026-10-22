@@ -118,6 +118,16 @@ class _ClientDetailScreenState extends State<ClientDetailScreen>
     });
   }
 
+  /// Pull-to-refresh: reload and wait so the spinner stays until done.
+  Future<void> _pullRefresh() async {
+    _refresh();
+    try {
+      await _progressFuture;
+    } catch (_) {
+      // The FutureBuilder shows the error.
+    }
+  }
+
   Future<void> _confirmRemoveClient() async {
     final bool? confirmed = await showAuthDialog<bool>(
       context: context,
@@ -195,20 +205,27 @@ class _ClientDetailScreenState extends State<ClientDetailScreen>
             return const GymLoader();
           }
           if (snapshot.hasError) {
-            return Center(
-              child: GymEmptyState(
-                icon: Icons.error_outline,
-                danger: true,
-                message: 'Error: ${snapshot.error}',
-                action: SizedBox(
-                  width: 160,
-                  child: PressableButton(
-                    label: 'Retry',
-                    height: 48,
-                    showArrow: false,
-                    onPressed: _refresh,
+            return GymRefresh(
+              onRefresh: _pullRefresh,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(height: MediaQuery.sizeOf(context).height * 0.12),
+                  GymEmptyState(
+                    icon: Icons.error_outline,
+                    danger: true,
+                    message: 'Error: ${snapshot.error}',
+                    action: SizedBox(
+                      width: 160,
+                      child: PressableButton(
+                        label: 'Retry',
+                        height: 48,
+                        showArrow: false,
+                        onPressed: _refresh,
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
             );
           }
@@ -245,12 +262,31 @@ class _ClientDetailScreenState extends State<ClientDetailScreen>
     bool hasLeft,
   ) {
     if (workouts.isEmpty) {
-      return Center(
-        child: GymEmptyState(icon: Icons.fitness_center, message: emptyMessage),
+      return GymRefresh(
+        onRefresh: _pullRefresh,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SizedBox(height: MediaQuery.sizeOf(context).height * 0.12),
+            GymEmptyState(icon: Icons.fitness_center, message: emptyMessage),
+          ],
+        ),
       );
     }
 
+    return GymRefresh(
+      onRefresh: _pullRefresh,
+      child: _workoutsListView(workouts, currentTrainerId, hasLeft),
+    );
+  }
+
+  Widget _workoutsListView(
+    List<Workout> workouts,
+    String? currentTrainerId,
+    bool hasLeft,
+  ) {
     return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(
         GymScaffold.side,
         AuthSpace.s,

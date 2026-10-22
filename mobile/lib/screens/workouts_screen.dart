@@ -292,11 +292,25 @@ class _WorkoutsScreenState extends State<WorkoutsScreen>
             return const GymLoader();
           }
           if (snapshot.hasError) {
-            return Center(
-              child: GymEmptyState(
-                icon: Icons.error_outline,
-                danger: true,
-                message: 'Error: ${snapshot.error}',
+            return GymRefresh(
+              onRefresh: () async {
+                setState(() {
+                  _loadFuture = hasTrainer
+                      ? _fetchAssignedWorkouts()
+                      : _loadTrainers();
+                });
+                await _loadFuture?.catchError((_) {});
+              },
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(height: MediaQuery.sizeOf(context).height * 0.12),
+                  GymEmptyState(
+                    icon: Icons.error_outline,
+                    danger: true,
+                    message: 'Error: ${snapshot.error}',
+                  ),
+                ],
               ),
             );
           }

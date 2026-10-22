@@ -278,11 +278,6 @@ class _TrainerVideosScreenState extends State<TrainerVideosScreen> {
           tooltip: 'Recently deleted',
           onTap: busy || _selecting ? null : _openDeleted,
         ),
-        GymIconButton(
-          icon: Icons.refresh,
-          tooltip: 'Refresh',
-          onTap: _isLoading || busy ? null : _fetchTrainerVideos,
-        ),
       ],
       bottom: Padding(
         padding: const EdgeInsets.fromLTRB(
