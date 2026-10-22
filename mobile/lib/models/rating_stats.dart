@@ -15,7 +15,9 @@ class RatingStats {
 
   factory RatingStats.fromJson(Map<String, dynamic> json) {
     return RatingStats(
-      ratings: (json['ratings'] as List).map((i) => Rating.fromJson(i)).toList(),
+      ratings: (json['ratings'] as List)
+          .map((i) => Rating.fromJson(i))
+          .toList(),
       averageRating: (json['averageRating'] as num).toDouble(),
       totalRatings: json['totalRatings'] as int,
       ratingPercentage: (json['ratingPercentage'] as num).toDouble(),

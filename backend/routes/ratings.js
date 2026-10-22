@@ -1,13 +1,24 @@
 const express = require('express');
 const router = express.Router();
-const { verifyToken } = require('../middleware/auth');
+const mongoose = require('mongoose');
+const { verifyToken, checkRole } = require('../middleware/auth');
 const Rating = require('../models/rating');
+const User = require('../models/User');
 
-// Submit a rating for a trainer
-router.post('/', verifyToken, async (req, res) => {
+// Submit a rating for a trainer (members only; the app asks for it after a
+// member leaves their trainer).
+router.post('/', verifyToken, checkRole(['member']), async (req, res) => {
   try {
     const { trainerId, rating, feedback } = req.body;
     const memberId = req.user._id;
+
+    // Only real trainers can be rated (not members, admins or unknown ids).
+    const trainer = mongoose.Types.ObjectId.isValid(trainerId)
+      ? await User.findById(trainerId).select('role')
+      : null;
+    if (!trainer || trainer.role !== 'trainer') {
+      return res.status(404).json({ error: 'We could not find this trainer.' });
+    }
 
     const newRating = new Rating({
       trainer: trainerId,

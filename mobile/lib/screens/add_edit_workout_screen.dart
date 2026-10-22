@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 import '../providers/workout_provider.dart';
+import '../models/exercise.dart';
 import '../models/workout.dart';
 
 class AddEditWorkoutScreen extends StatefulWidget {
@@ -24,7 +26,7 @@ class _AddEditWorkoutScreenState extends State<AddEditWorkoutScreen> {
     if (widget.workout != null) {
       _nameController.text = widget.workout!.name;
       _descriptionController.text = widget.workout!.description;
-      _exercises.addAll(widget.workout!.exercises);
+      _exercises.addAll(widget.workout!.exercises.map((e) => e.name));
     }
   }
 
@@ -67,13 +69,17 @@ class _AddEditWorkoutScreenState extends State<AddEditWorkoutScreen> {
                 children: [
                   Expanded(
                     child: TextField(
-                      decoration: const InputDecoration(labelText: 'Add Exercise'),
+                      decoration: const InputDecoration(
+                        labelText: 'Add Exercise',
+                      ),
                       onSubmitted: _addExercise,
                     ),
                   ),
                   IconButton(
                     icon: const Icon(Icons.add),
-                    onPressed: () => _addExercise(_exercises.isNotEmpty ? _exercises.last : ''),
+                    onPressed: () => _addExercise(
+                      _exercises.isNotEmpty ? _exercises.last : '',
+                    ),
                   ),
                 ],
               ),
@@ -85,7 +91,8 @@ class _AddEditWorkoutScreenState extends State<AddEditWorkoutScreen> {
                       title: Text(_exercises[index]),
                       trailing: IconButton(
                         icon: const Icon(Icons.delete),
-                        onPressed: () => setState(() => _exercises.removeAt(index)),
+                        onPressed: () =>
+                            setState(() => _exercises.removeAt(index)),
                       ),
                     );
                   },
@@ -97,7 +104,9 @@ class _AddEditWorkoutScreenState extends State<AddEditWorkoutScreen> {
               else
                 ElevatedButton(
                   onPressed: _saveWorkout,
-                  child: Text(widget.workout == null ? 'Add Workout' : 'Update Workout'),
+                  child: Text(
+                    widget.workout == null ? 'Add Workout' : 'Update Workout',
+                  ),
                 ),
               if (workoutProvider.error != null)
                 Text(
@@ -119,17 +128,39 @@ class _AddEditWorkoutScreenState extends State<AddEditWorkoutScreen> {
 
   void _saveWorkout() async {
     if (_formKey.currentState!.validate() && _exercises.isNotEmpty) {
+      final workoutProvider = Provider.of<WorkoutProvider>(
+        context,
+        listen: false,
+      );
+      final navigator = Navigator.of(context);
+      // The API expects full exercise objects; this simple screen only
+      // collects names, so the remaining fields use the model defaults.
+      final exercises = _exercises
+          .map((name) => Exercise(name: name, sets: 3, reps: 10).toJson())
+          .toList();
       bool success;
       if (widget.workout == null) {
-        success = await Provider.of<WorkoutProvider>(context, listen: false)
-            .createWorkout(_nameController.text, _descriptionController.text, _exercises);
+        final trainerId =
+            Provider.of<AuthProvider>(context, listen: false).user?.id ?? '';
+        success = await workoutProvider.createWorkout(
+          _nameController.text,
+          _descriptionController.text,
+          exercises,
+          'mixed',
+          'moderate',
+          trainerId,
+        );
       } else {
-        success = await Provider.of<WorkoutProvider>(context, listen: false)
-            .updateWorkout(widget.workout!.id, _nameController.text, _descriptionController.text, _exercises);
+        success = await workoutProvider.updateWorkout(
+          widget.workout!.id,
+          _nameController.text,
+          _descriptionController.text,
+          exercises,
+        );
       }
 
       if (success && mounted) {
-        Navigator.pop(context);
+        navigator.pop();
       }
     }
   }

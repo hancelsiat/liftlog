@@ -1,4 +1,3 @@
-
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -65,7 +64,11 @@ class _CheckEmailScreenState extends State<CheckEmailScreen> {
               const SizedBox(height: 20),
               const Text(
                 'Please check your email',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
               const SizedBox(height: 10),
               Text(
@@ -75,25 +78,42 @@ class _CheckEmailScreenState extends State<CheckEmailScreen> {
               ),
               const SizedBox(height: 20),
               ElevatedButton(
-                onPressed: _isButtonDisabled ? null : () async {
-                  try {
-                    await Provider.of<AuthProvider>(context, listen: false).resendVerificationEmail(context, widget.email);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Verification email resent successfully!'), backgroundColor: Colors.green),
-                    );
-                    setState(() {
-                      _countdown = 60;
-                      _isButtonDisabled = true;
-                    });
-                    startTimer();
-                  } catch (e) {
-                    showErrorSnackBar(context, e.toString());
-                  }
-                },
+                onPressed: _isButtonDisabled
+                    ? null
+                    : () async {
+                        try {
+                          await Provider.of<AuthProvider>(
+                            context,
+                            listen: false,
+                          ).resendVerificationEmail(context, widget.email);
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Verification email resent successfully!',
+                              ),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                          setState(() {
+                            _countdown = 60;
+                            _isButtonDisabled = true;
+                          });
+                          startTimer();
+                        } catch (e) {
+                          if (context.mounted) {
+                            showErrorSnackBar(context, e.toString());
+                          }
+                        }
+                      },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _isButtonDisabled ? Colors.grey : AppTheme.primaryColor,
+                  backgroundColor: _isButtonDisabled
+                      ? Colors.grey
+                      : AppTheme.primaryColor,
                 ),
-                child: Text(_isButtonDisabled ? 'Resend in $_countdown' : 'Resend Email'),
+                child: Text(
+                  _isButtonDisabled ? 'Resend in $_countdown' : 'Resend Email',
+                ),
               ),
             ],
           ),

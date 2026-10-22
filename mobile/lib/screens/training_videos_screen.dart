@@ -5,6 +5,7 @@ import '../services/api_service.dart';
 import '../models/user.dart';
 import '../models/exercise_video.dart';
 import '../utils/url_helpers.dart';
+import '../widgets/gym/gym.dart';
 import 'video_player_screen.dart';
 
 class TrainingVideosScreen extends StatefulWidget {
@@ -34,19 +35,23 @@ class _TrainingVideosScreenState extends State<TrainingVideosScreen> {
 
       final apiService = ApiService();
       final videos = await apiService.getExerciseVideos();
+      if (!mounted) return;
 
       setState(() {
         _videos = videos;
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = 'Failed to load videos: ${e.toString()}';
         _isLoading = false;
       });
       if (e.toString().contains('Authentication required')) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Session expired. Please log in again.')),
+          const SnackBar(
+            content: Text('Session expired. Please log in again.'),
+          ),
         );
         // Navigate back to login
         Navigator.of(context).pushReplacementNamed('/login');
@@ -57,11 +62,9 @@ class _TrainingVideosScreenState extends State<TrainingVideosScreen> {
   void _playVideo(String videoUrl, String title) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => VideoPlayerScreen(
-          videoUrl: videoUrl,
-          title: title,
-        ),
+      GymPageRoute(
+        builder: (context) =>
+            VideoPlayerScreen(videoUrl: videoUrl, title: title),
       ),
     );
   }
@@ -72,298 +75,81 @@ class _TrainingVideosScreenState extends State<TrainingVideosScreen> {
     final user = authProvider.user;
 
     if (user?.role != UserRole.member) {
-      return const Scaffold(
-        body: Center(child: Text('This screen is only for members')),
+      return const GymScaffold(
+        title: 'Training Videos',
+        body: GymEmptyState(
+          icon: Icons.lock_outline,
+          message: 'This screen is only for members',
+        ),
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Training Videos'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _fetchVideos,
+    return GymScaffold(
+      eyebrow: 'Member / Library',
+      title: 'Training Videos',
+      actions: [
+        GymIconButton(
+          icon: Icons.refresh,
+          tooltip: 'Refresh',
+          onTap: _isLoading ? null : _fetchVideos,
+        ),
+      ],
+      body: GymRefresh(onRefresh: _fetchVideos, child: _buildBody()),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading) return const GymLoader();
+
+    if (_errorMessage != null) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(height: MediaQuery.sizeOf(context).height * 0.15),
+          GymEmptyState(
+            icon: Icons.error_outline,
+            danger: true,
+            message: _errorMessage!,
+            action: SizedBox(
+              width: 160,
+              child: PressableButton(
+                label: 'Retry',
+                height: 48,
+                showArrow: false,
+                onPressed: _fetchVideos,
+              ),
+            ),
           ),
         ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: _fetchVideos,
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _errorMessage != null
-                ? ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    children: [
-                      SizedBox(height: MediaQuery.of(context).size.height * 0.3),
-                      Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: _fetchVideos,
-                              child: const Text('Retry'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  )
-                : _videos.isEmpty
-                    ? ListView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        children: [
-                          SizedBox(height: MediaQuery.of(context).size.height * 0.3),
-                          const Center(
-                            child: Text(
-                              'No videos available',
-                              style: TextStyle(fontSize: 18),
-                            ),
-                          ),
-                        ],
-                      )
-                    : ListView.builder(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.all(8.0),
-                        itemCount: _videos.length,
-                        itemBuilder: (context, index) {
-                          final video = _videos[index];
-                          return _buildVideoCard(video);
-                        },
-                      ),
-      ),
-    );
-  }
+      );
+    }
 
-  Widget _buildVideoCard(ExerciseVideo video) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16.0),
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: InkWell(
-        onTap: () => _playVideo(video.videoUrl, video.title),
-        borderRadius: BorderRadius.circular(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Video Thumbnail (16:9 aspect ratio)
-            AspectRatio(
-              aspectRatio: 16 / 9,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(12),
-                    topRight: Radius.circular(12),
-                  ),
-                ),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    // Thumbnail image
-                    if (video.thumbnailUrl?.isNotEmpty ?? false)
-                      ClipRRect(
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(12),
-                          topRight: Radius.circular(12),
-                        ),
-                        child: Image.network(
-                          cleanSupabaseUrl(video.thumbnailUrl),
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              color: Colors.grey[800],
-                              child: const Icon(
-                                Icons.video_library,
-                                size: 64,
-                                color: Colors.white54,
-                              ),
-                            );
-                          },
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return Container(
-                              color: Colors.grey[800],
-                              child: Center(
-                                child: CircularProgressIndicator(
-                                  value: loadingProgress.expectedTotalBytes != null
-                                      ? loadingProgress.cumulativeBytesLoaded /
-                                          loadingProgress.expectedTotalBytes!
-                                      : null,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      )
-                    else
-                      Container(
-                        color: Colors.grey[800],
-                        child: const Icon(
-                          Icons.video_library,
-                          size: 64,
-                          color: Colors.white54,
-                        ),
-                      ),
-                    
-                    // Play button overlay
-                    Center(
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.black54,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.play_arrow,
-                          color: Colors.white,
-                          size: 40,
-                        ),
-                      ),
-                    ),
-                    
-                    // Duration badge (bottom right)
-                    if ((video.duration ?? 0) > 0)
-                      Positioned(
-                        bottom: 8,
-                        right: 8,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black87,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            video.formattedDuration,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-            
-            // Video Info
-            Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Title
-                  Text(
-                    video.title,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 8),
-                  
-                  // Trainer info row
-                  Row(
-                    children: [
-                      // Trainer avatar
-                      CircleAvatar(
-                        radius: 16,
-                        backgroundColor: Colors.blue,
-                        child: Text(
-                          video.trainerName.isNotEmpty
-                              ? video.trainerName[0].toUpperCase()
-                              : 'T',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      
-                      // Trainer name
-                      Expanded(
-                        child: Text(
-                          video.trainerName,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  
-                  // Description (if available)
-                  if (video.description.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      video.description,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey[700],
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                  
-                  // Tags/Badges
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      // Exercise type badge
-                      _buildBadge(
-                        video.exerciseType.toUpperCase(),
-                        Colors.blue,
-                      ),
-                      // Difficulty badge
-                      _buildBadge(
-                        video.difficulty.toUpperCase(),
-                        _getDifficultyColor(video.difficulty),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+    if (_videos.isEmpty) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(height: MediaQuery.sizeOf(context).height * 0.15),
+          const GymEmptyState(
+            icon: Icons.video_library_outlined,
+            message: 'No videos available',
+          ),
+        ],
+      );
+    }
 
-  Widget _buildBadge(String label, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+    return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(
+        GymScaffold.side,
+        AuthSpace.xs,
+        GymScaffold.side,
+        AuthSpace.l,
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
-        ),
+      itemCount: _videos.length,
+      separatorBuilder: (context, index) => const SizedBox(height: 14),
+      itemBuilder: (context, index) => StaggeredReveal(
+        index: index,
+        child: _buildVideoCard(_videos[index], index),
       ),
     );
   }
@@ -371,13 +157,174 @@ class _TrainingVideosScreenState extends State<TrainingVideosScreen> {
   Color _getDifficultyColor(String difficulty) {
     switch (difficulty.toLowerCase()) {
       case 'beginner':
-        return Colors.green;
+        return AuthColors.accent;
       case 'intermediate':
-        return Colors.orange;
+        return GymColors.warn;
       case 'advanced':
-        return Colors.red;
+        return AuthColors.danger;
       default:
-        return Colors.grey;
+        return AuthColors.textMuted;
     }
+  }
+
+  Widget _buildVideoCard(ExerciseVideo video, int index) {
+    return PressableSurface(
+      onTap: () => _playVideo(video.videoUrl, video.title),
+      semanticLabel: 'Play ${video.title} by ${video.trainerName}',
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Video Thumbnail (16:9 aspect ratio)
+          AspectRatio(
+            aspectRatio: 16 / 9,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (video.thumbnailUrl?.isNotEmpty ?? false)
+                  Image.network(
+                    cleanSupabaseUrl(video.thumbnailUrl),
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const _ThumbPlaceholder(),
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return const _ThumbPlaceholder(loading: true);
+                    },
+                  )
+                else
+                  const _ThumbPlaceholder(),
+
+                // Bottom scrim so the badges stay readable on any frame.
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      stops: [0.55, 1],
+                      colors: [Color(0x000E0E0D), Color(0xCC0E0E0D)],
+                    ),
+                  ),
+                ),
+
+                // Play button
+                Center(
+                  child: Container(
+                    width: 56,
+                    height: 56,
+                    decoration: const BoxDecoration(
+                      color: AuthColors.accent,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.play_arrow_rounded,
+                      color: AuthColors.onAccent,
+                      size: 32,
+                    ),
+                  ),
+                ),
+
+                // Index (top left)
+                Positioned(
+                  top: 10,
+                  left: 12,
+                  child: Text(
+                    (index + 1).toString().padLeft(2, '0'),
+                    style: AuthType.mono(color: AuthColors.textPrimary),
+                  ),
+                ),
+
+                // Duration badge (bottom right)
+                if ((video.duration ?? 0) > 0)
+                  Positioned(
+                    bottom: 10,
+                    right: 12,
+                    child: GymTag(
+                      label: video.formattedDuration,
+                      color: AuthColors.textPrimary,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          // Video Info
+          Padding(
+            padding: const EdgeInsets.all(AuthSpace.s),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  video.title.toUpperCase(),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AuthType.display(26).copyWith(height: 1),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    GymAvatar(text: video.trainerName, size: 28),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        video.trainerName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AuthType.body(size: 14),
+                      ),
+                    ),
+                  ],
+                ),
+
+                // Description (if available)
+                if (video.description.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    video.description,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AuthType.body(size: 13, color: AuthColors.textFaint),
+                  ),
+                ],
+
+                // Tags/Badges
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    GymTag(label: video.exerciseType),
+                    GymTag(
+                      label: video.difficulty,
+                      color: _getDifficultyColor(video.difficulty),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ThumbPlaceholder extends StatelessWidget {
+  const _ThumbPlaceholder({this.loading = false});
+
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: AuthColors.surfaceHi,
+      child: loading
+          ? const GymLoader()
+          : const Icon(
+              Icons.video_library_outlined,
+              size: 48,
+              color: AuthColors.textFaint,
+            ),
+    );
   }
 }

@@ -27,8 +27,12 @@ class Progress {
       caloriesIntake: (json['caloriesIntake'] as num?)?.toDouble(),
       calorieDeficit: (json['calorieDeficit'] as num?)?.toDouble(),
       date: json['date'] != null ? DateTime.parse(json['date']) : null,
-      lastBmiUpdate: json['lastBmiUpdate'] != null ? DateTime.parse(json['lastBmiUpdate']) : null,
-      lastCaloriesUpdate: json['lastCaloriesUpdate'] != null ? DateTime.parse(json['lastCaloriesUpdate']) : null,
+      lastBmiUpdate: json['lastBmiUpdate'] != null
+          ? DateTime.parse(json['lastBmiUpdate'])
+          : null,
+      lastCaloriesUpdate: json['lastCaloriesUpdate'] != null
+          ? DateTime.parse(json['lastCaloriesUpdate'])
+          : null,
     );
   }
 
@@ -40,8 +44,10 @@ class Progress {
       if (caloriesIntake != null) 'caloriesIntake': caloriesIntake,
       if (calorieDeficit != null) 'calorieDeficit': calorieDeficit,
       'date': date.toIso8601String(),
-      if (lastBmiUpdate != null) 'lastBmiUpdate': lastBmiUpdate!.toIso8601String(),
-      if (lastCaloriesUpdate != null) 'lastCaloriesUpdate': lastCaloriesUpdate!.toIso8601String(),
+      if (lastBmiUpdate != null)
+        'lastBmiUpdate': lastBmiUpdate!.toIso8601String(),
+      if (lastCaloriesUpdate != null)
+        'lastCaloriesUpdate': lastCaloriesUpdate!.toIso8601String(),
     };
   }
 

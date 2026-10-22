@@ -1,16 +1,16 @@
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/user.dart';
-import '../utils/app_theme.dart';
+import '../widgets/auth/barbell_indicator.dart';
+import '../widgets/auth/grain_background.dart';
+import '../widgets/gym/gym.dart';
 import 'login_screen.dart';
 import 'workouts_screen.dart';
 import 'progress_screen.dart';
 import 'training_videos_screen.dart';
 import 'video_upload_screen.dart';
 import 'trainer_videos_screen.dart';
-import 'settings_screen.dart';
 import 'create_workout_template_screen.dart';
 import 'manage_workouts_screen.dart';
 import 'admin_users_screen.dart';
@@ -26,27 +26,12 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProviderStateMixin {
+class _DashboardScreenState extends State<DashboardScreen> {
   bool _isLoading = true;
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
 
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
-    );
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _animationController, curve: Curves.easeOut));
-    
     _loadUserProfile();
   }
 
@@ -54,7 +39,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     try {
       await authProvider.loadProfile(context);
-      _animationController.forward();
     } catch (e) {
       // If profile loading fails due to invalid token, logout and redirect to login
       if (e.toString().contains('Authentication required')) {
@@ -67,9 +51,67 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       }
       return;
     }
+    if (!mounted) return;
     setState(() {
       _isLoading = false;
     });
+  }
+
+  void _open(Widget screen) {
+    Navigator.push(context, GymPageRoute(builder: (context) => screen));
+  }
+
+  Future<bool> _confirmExit() async {
+    final shouldExit = await showAuthDialog<bool>(
+      context: context,
+      eyebrow: 'Leaving',
+      title: 'Exit App',
+      message: 'Do you want to exit the app?',
+      actions: (dialogContext) => [
+        AuthDialogAction(
+          label: 'Cancel',
+          onPressed: () => Navigator.pop(dialogContext, false),
+        ),
+        AuthDialogAction(
+          label: 'Exit',
+          primary: true,
+          onPressed: () => Navigator.pop(dialogContext, true),
+        ),
+      ],
+    );
+    return shouldExit ?? false;
+  }
+
+  void _showLogoutDialog(AuthProvider authProvider) {
+    showAuthDialog<void>(
+      context: context,
+      eyebrow: 'Session',
+      title: 'Logout',
+      message: 'Are you sure you want to logout?',
+      actions: (dialogContext) => [
+        AuthDialogAction(
+          label: 'Cancel',
+          onPressed: () => Navigator.pop(dialogContext),
+        ),
+        AuthDialogAction(
+          label: 'Logout',
+          primary: true,
+          onPressed: () {
+            authProvider.logout();
+            Navigator.of(dialogContext).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (context) => const LoginScreen()),
+              (route) => false,
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _loadingScaffold() {
+    return const GrainBackground(
+      child: Scaffold(backgroundColor: Colors.transparent, body: GymLoader()),
+    );
   }
 
   @override
@@ -77,16 +119,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final authProvider = Provider.of<AuthProvider>(context);
     final user = authProvider.user;
 
-    if (_isLoading) {
-      return Scaffold(
-        body: Container(
-          decoration: const BoxDecoration(gradient: AppTheme.backgroundGradient),
-          child: const Center(
-            child: CircularProgressIndicator(color: AppTheme.primaryColor),
-          ),
-        ),
-      );
-    }
+    if (_isLoading) return _loadingScaffold();
 
     // Check if user is null
     if (user == null) {
@@ -96,569 +129,151 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           MaterialPageRoute(builder: (context) => const LoginScreen()),
         );
       });
-      return Scaffold(
-        body: Container(
-          decoration: const BoxDecoration(gradient: AppTheme.backgroundGradient),
-          child: const Center(
-            child: CircularProgressIndicator(color: AppTheme.primaryColor),
-          ),
-        ),
-      );
+      return _loadingScaffold();
     }
 
+    // Prevent back button from logging out; confirm exit instead.
+    // ignore: deprecated_member_use
     return WillPopScope(
-      onWillPop: () async {
-        // Prevent back button from logging out
-        // Show dialog to confirm exit
-        final shouldExit = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            backgroundColor: AppTheme.cardBackground,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: const Text('Exit App', style: TextStyle(color: AppTheme.textPrimary)),
-            content: const Text(
-              'Do you want to exit the app?',
-              style: TextStyle(color: AppTheme.textSecondary),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context, true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.errorColor,
-                ),
-                child: const Text('Exit'),
-              ),
-            ],
-          ),
-        );
-        return shouldExit ?? false;
-      },
-      child: Scaffold(
-        body: Container(
-          decoration: const BoxDecoration(gradient: AppTheme.backgroundGradient),
-          child: SafeArea(
-            child: CustomScrollView(
-              slivers: [
-                // Custom App Bar
-                _buildAppBar(context, authProvider, user),
-                
-                // Dashboard Content
-                SliverToBoxAdapter(
-                  child: FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: SlideTransition(
-                      position: _slideAnimation,
-                      child: Padding(
-                        padding: const EdgeInsets.all(20.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // Welcome Card
-                            _buildWelcomeCard(user),
-                            const SizedBox(height: 24),
-
-                            // Role-based Dashboard
-                            if (user.role == UserRole.member) ...[
-                              _buildMemberDashboard(context),
-                            ] else if (user.role == UserRole.trainer) ...[
-                              _buildTrainerDashboard(context),
-                            ] else if (user.role == UserRole.admin) ...[
-                              _buildAdminDashboard(context),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAppBar(BuildContext context, AuthProvider authProvider, User user) {
-    return SliverAppBar(
-      expandedHeight: 120,
-      floating: false,
-      pinned: true,
-      backgroundColor: Colors.transparent,
-      automaticallyImplyLeading: false, // Remove back button from dashboard
-      flexibleSpace: FlexibleSpaceBar(
-        background: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                AppTheme.primaryColor.withOpacity(0.3),
-                Colors.transparent,
-              ],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-          ),
-        ),
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.8),
-                shape: BoxShape.circle,
-              ),
-              child: ClipOval(
-                child: Image.asset(
-                  'assets/fitness_logo.webp',
-                  height: 24,
-                  width: 24,
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Text(
-              'LiftLog',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1,
-              ),
-            ),
-          ],
-        ),
-        centerTitle: true,
-      ),
-      actions: [
-        // Only show settings for admin users
-        if (user.role == UserRole.admin)
-          IconButton(
-            icon: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceColor.withOpacity(0.5),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.settings_outlined, size: 20),
-            ),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ServerSettingsScreen()),
-              );
-            },
-          ),
-        IconButton(
-          icon: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppTheme.errorColor.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.logout, size: 20, color: AppTheme.errorColor),
-          ),
-          onPressed: () {
-            _showLogoutDialog(context, authProvider);
-          },
-        ),
-        const SizedBox(width: 8),
-      ],
-    );
-  }
-
-  Widget _buildWelcomeCard(User user) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: AppTheme.primaryGradient,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.primaryColor.withOpacity(0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+      onWillPop: _confirmExit,
+      child: GymScaffold(
+        showBack: false,
+        leading: const _LogoMark(),
+        eyebrow: 'LiftLog / ${_getRoleText(user.role)}',
+        title: 'Dashboard',
+        actions: [
+          GymIconButton(
+            icon: Icons.logout,
+            tooltip: 'Logout',
+            danger: true,
+            onTap: () => _showLogoutDialog(authProvider),
           ),
         ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white.withOpacity(0.3), width: 2),
-                ),
-                child: Center(
-                  child: Text(
-                    user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Welcome back,',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      user.name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ],
+        body: ListView(
+          padding: const EdgeInsets.fromLTRB(
+            GymScaffold.side,
+            AuthSpace.xs,
+            GymScaffold.side,
+            AuthSpace.l,
           ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  _getRoleIcon(user.role),
-                  size: 16,
-                  color: Colors.white,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  _getRoleText(user.role),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMemberDashboard(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _buildSectionTitle('Your Fitness Journey'),
-        const SizedBox(height: 16),
-        _buildPremiumCard(
-          title: 'Workouts',
-          subtitle: 'Browse and track your workouts',
-          icon: Icons.fitness_center,
-          gradient: AppTheme.primaryGradient,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const WorkoutsScreen()),
-          ),
-        ),
-        const SizedBox(height: 16),
-        _buildPremiumCard(
-          title: 'Track Progress',
-          subtitle: 'Monitor your fitness journey',
-          icon: Icons.show_chart,
-          gradient: AppTheme.secondaryGradient,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const ProgressScreen()),
-          ),
-        ),
-        const SizedBox(height: 16),
-        _buildPremiumCard(
-          title: 'Training Videos',
-          subtitle: 'Learn from expert trainers',
-          icon: Icons.video_library,
-          gradient: AppTheme.accentGradient,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const TrainingVideosScreen()),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTrainerDashboard(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _buildSectionTitle('Trainer Tools'),
-        const SizedBox(height: 16),
-        _buildPremiumCard(
-          title: 'Create Workout',
-          subtitle: 'Design workout templates',
-          icon: Icons.add_circle_outline,
-          gradient: AppTheme.primaryGradient,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => CreateWorkoutTemplateScreen()),
-          ),
-        ),
-        const SizedBox(height: 16),
-        _buildPremiumCard(
-          title: 'Upload Video',
-          subtitle: 'Share training content',
-          icon: Icons.video_call,
-          gradient: AppTheme.secondaryGradient,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const VideoUploadScreen()),
-          ),
-        ),
-        const SizedBox(height: 16),
-        _buildPremiumCard(
-          title: 'My Videos',
-          subtitle: 'Manage your content',
-          icon: Icons.video_collection,
-          gradient: AppTheme.accentGradient,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const TrainerVideosScreen()),
-          ),
-        ),
-        const SizedBox(height: 16),
-        _buildPremiumCard(
-          title: 'My Clients',
-          subtitle: 'Manage your assigned members',
-          icon: Icons.group,
-          gradient: AppTheme.tertiaryGradient, // You may need to define this gradient
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const TrainerClientsScreen()),
-          ),
-        ),
-        const SizedBox(height: 16),
-        _buildPremiumCard(
-          title: 'Manage Workouts',
-          subtitle: 'Edit or delete your workouts',
-          icon: Icons.edit_note,
-          gradient: AppTheme.tertiaryGradient, // You may need to define this gradient
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const ManageWorkoutsScreen()),
-          ),
-        ),
-        const SizedBox(height: 16),
-        _buildPremiumCard(
-          title: 'My Ratings',
-          subtitle: 'View feedback from clients',
-          icon: Icons.star,
-          gradient: AppTheme.primaryGradient,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const TrainerRatingsScreen()),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAdminDashboard(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _buildSectionTitle('Admin Panel'),
-        const SizedBox(height: 16),
-        _buildPremiumCard(
-          title: 'User Management',
-          subtitle: 'Manage users and permissions',
-          icon: Icons.people,
-          gradient: AppTheme.primaryGradient,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const AdminUsersScreen()),
-          ),
-        ),
-        const SizedBox(height: 16),
-        _buildPremiumCard(
-          title: 'Trainer Videos',
-          subtitle: 'Review and remove inappropriate uploads',
-          icon: Icons.video_library,
-          gradient: AppTheme.secondaryGradient,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) =>
-                  const AdminContentModerationScreen(initialTab: 0),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        _buildPremiumCard(
-          title: 'Trainer Workouts',
-          subtitle: 'Review and remove inappropriate workouts',
-          icon: Icons.fitness_center,
-          gradient: AppTheme.primaryGradient,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) =>
-                  const AdminContentModerationScreen(initialTab: 1),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        _buildPremiumCard(
-          title: 'Reset Requests',
-          subtitle: 'Approve BMI / calorie cooldown resets',
-          icon: Icons.restart_alt,
-          gradient: AppTheme.accentGradient,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const AdminResetRequestsScreen(),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        _buildPremiumCard(
-          title: 'System Settings',
-          subtitle: 'Configure application',
-          icon: Icons.settings,
-          gradient: AppTheme.secondaryGradient,
-          onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Text('System settings coming soon'),
-                backgroundColor: AppTheme.surfaceColor,
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: const TextStyle(
-        fontSize: 20,
-        fontWeight: FontWeight.bold,
-        color: AppTheme.textPrimary,
-        letterSpacing: 0.5,
-      ),
-    );
-  }
-
-  Widget _buildPremiumCard({
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required LinearGradient gradient,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: AppTheme.glassMorphism,
-        child: Row(
           children: [
-            Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                gradient: gradient,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: gradient.colors.first.withOpacity(0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: Icon(icon, color: Colors.white, size: 28),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: AppTheme.textSecondary.withOpacity(0.8),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceColor.withOpacity(0.5),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.arrow_forward_ios,
-                size: 16,
-                color: AppTheme.textSecondary,
-              ),
-            ),
+            EntranceRise(index: 0, child: _WelcomeCard(user: user)),
+            const SizedBox(height: AuthSpace.l),
+            // Role-based Dashboard
+            ..._tilesFor(user.role),
           ],
         ),
       ),
     );
   }
 
-  IconData _getRoleIcon(UserRole role) {
+  List<Widget> _tilesFor(UserRole role) {
+    final List<_TileData> tiles;
+    final String section;
     switch (role) {
-      case UserRole.admin:
-        return Icons.admin_panel_settings;
-      case UserRole.trainer:
-        return Icons.sports;
       case UserRole.member:
-        return Icons.person;
+        section = 'Your Fitness Journey';
+        tiles = [
+          _TileData(
+            'Workouts',
+            'Browse and track your workouts',
+            Icons.fitness_center,
+            () => _open(const WorkoutsScreen()),
+          ),
+          _TileData(
+            'Track Progress',
+            'Monitor your fitness journey',
+            Icons.show_chart,
+            () => _open(const ProgressScreen()),
+          ),
+          _TileData(
+            'Training Videos',
+            'Learn from expert trainers',
+            Icons.video_library_outlined,
+            () => _open(const TrainingVideosScreen()),
+          ),
+        ];
+      case UserRole.trainer:
+        section = 'Trainer Tools';
+        tiles = [
+          _TileData(
+            'Create Workout',
+            'Design workout templates',
+            Icons.add_circle_outline,
+            () => _open(CreateWorkoutTemplateScreen()),
+          ),
+          _TileData(
+            'Upload Video',
+            'Share training content',
+            Icons.video_call_outlined,
+            () => _open(const VideoUploadScreen()),
+          ),
+          _TileData(
+            'My Videos',
+            'Manage your content',
+            Icons.video_collection_outlined,
+            () => _open(const TrainerVideosScreen()),
+          ),
+          _TileData(
+            'My Clients',
+            'Manage your assigned members',
+            Icons.group_outlined,
+            () => _open(const TrainerClientsScreen()),
+          ),
+          _TileData(
+            'Manage Workouts',
+            'Edit or delete your workouts',
+            Icons.edit_note,
+            () => _open(const ManageWorkoutsScreen()),
+          ),
+          _TileData(
+            'My Ratings',
+            'View feedback from clients',
+            Icons.star_outline,
+            () => _open(const TrainerRatingsScreen()),
+          ),
+        ];
+      case UserRole.admin:
+        section = 'Admin Panel';
+        tiles = [
+          _TileData(
+            'User Management',
+            'Manage users and permissions',
+            Icons.people_outline,
+            () => _open(const AdminUsersScreen()),
+          ),
+          _TileData(
+            'Trainer Videos',
+            'Review and remove inappropriate uploads',
+            Icons.video_library_outlined,
+            () => _open(const AdminContentModerationScreen(initialTab: 0)),
+          ),
+          _TileData(
+            'Trainer Workouts',
+            'Review and remove inappropriate workouts',
+            Icons.fitness_center,
+            () => _open(const AdminContentModerationScreen(initialTab: 1)),
+          ),
+          _TileData(
+            'Reset Requests',
+            'Approve BMI / calorie cooldown resets',
+            Icons.restart_alt,
+            () => _open(const AdminResetRequestsScreen()),
+          ),
+        ];
     }
+
+    return [
+      EntranceRise(index: 1, child: GymSectionLabel(label: section)),
+      const SizedBox(height: AuthSpace.s),
+      for (var i = 0; i < tiles.length; i++) ...[
+        if (i > 0) const SizedBox(height: 12),
+        EntranceRise(
+          index: 2 + i,
+          child: _DashTile(number: i + 1, data: tiles[i]),
+        ),
+      ],
+    ];
   }
 
   String _getRoleText(UserRole role) {
@@ -671,44 +286,147 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         return 'MEMBER';
     }
   }
+}
 
-  void _showLogoutDialog(BuildContext context, AuthProvider authProvider) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.cardBackground,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Logout', style: TextStyle(color: AppTheme.textPrimary)),
-        content: const Text(
-          'Are you sure you want to logout?',
-          style: TextStyle(color: AppTheme.textSecondary),
+class _TileData {
+  const _TileData(this.title, this.subtitle, this.icon, this.onTap);
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final VoidCallback onTap;
+}
+
+/// App logo in a 44px rounded square, in place of the back button.
+class _LogoMark extends StatelessWidget {
+  const _LogoMark();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 44,
+      height: 44,
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: AuthColors.textPrimary,
+        borderRadius: BorderRadius.circular(AuthRadius.field),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AuthRadius.thumb),
+        child: Image.asset(
+          'assets/fitness_logo.webp',
+          fit: BoxFit.cover,
+          semanticLabel: 'LiftLog',
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+      ),
+    );
+  }
+}
+
+class _WelcomeCard extends StatelessWidget {
+  const _WelcomeCard({required this.user});
+
+  final User user;
+
+  @override
+  Widget build(BuildContext context) {
+    return PressableSurface(
+      padding: const EdgeInsets.all(AuthSpace.m),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              GymAvatar(text: user.name, size: 52, highlighted: true),
+              const SizedBox(width: AuthSpace.s),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Welcome back,', style: AuthType.body(size: 14)),
+                    const SizedBox(height: 4),
+                    Text(
+                      user.name.toUpperCase(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AuthType.display(32),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () {
-              authProvider.logout();
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (context) => const LoginScreen()),
-                (route) => false,
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.errorColor,
+          const SizedBox(height: AuthSpace.m),
+          // The sign-in barbell, fully loaded and locked out: the lift is
+          // done. Same Hero tag as the auth screens, so on logout it flies
+          // back to the sign-in screen.
+          const FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: BarbellIndicator(
+              plates: 3,
+              maxPlates: 3,
+              phase: BarbellPhase.lockout,
             ),
-            child: const Text('Logout'),
           ),
         ],
       ),
     );
   }
+}
+
+class _DashTile extends StatelessWidget {
+  const _DashTile({required this.number, required this.data});
+
+  final int number;
+  final _TileData data;
 
   @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
+  Widget build(BuildContext context) {
+    return PressableSurface(
+      onTap: data.onTap,
+      semanticLabel: '${data.title}. ${data.subtitle}',
+      padding: const EdgeInsets.fromLTRB(AuthSpace.s, 18, 12, 18),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 28,
+            child: Text(
+              number.toString().padLeft(2, '0'),
+              style: AuthType.mono(color: AuthColors.accent),
+            ),
+          ),
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AuthColors.surfaceHi,
+              borderRadius: BorderRadius.circular(AuthRadius.field),
+              border: Border.all(color: AuthColors.line),
+            ),
+            child: Icon(data.icon, size: 20, color: AuthColors.textPrimary),
+          ),
+          const SizedBox(width: AuthSpace.s),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  data.title.toUpperCase(),
+                  style: AuthType.display(22).copyWith(height: 1),
+                ),
+                const SizedBox(height: 4),
+                Text(data.subtitle, style: AuthType.body(size: 13)),
+              ],
+            ),
+          ),
+          const Icon(
+            Icons.arrow_forward,
+            size: 18,
+            color: AuthColors.textMuted,
+          ),
+        ],
+      ),
+    );
   }
 }

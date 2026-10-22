@@ -4,9 +4,46 @@ import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 import '../providers/auth_provider.dart';
 import '../models/user.dart';
-import '../utils/app_theme.dart';
+import '../utils/auth_tokens.dart';
+import '../widgets/auth/auth_page_route.dart';
+import '../widgets/auth/auth_scaffold.dart';
+import '../widgets/auth/auth_text_field.dart';
+import '../widgets/auth/barbell_indicator.dart';
+import '../widgets/auth/credential_picker.dart';
+import '../widgets/auth/error_banner.dart';
+import '../widgets/auth/pressable_button.dart';
+import '../widgets/auth/role_segmented_control.dart';
+import '../widgets/auth/shake_on_error.dart';
+import '../widgets/auth/staggered_entrance.dart';
 import 'login_screen.dart';
 import 'check_email_screen.dart';
+
+// Same rules as validateFullName in backend/routes/auth.js.
+final _fullNameRule = RegExp(r"^\p{L}[\p{L} .'-]*$", unicode: true);
+final _letter = RegExp(r'\p{L}', unicode: true);
+
+/// Collapses repeated whitespace and trims, the form the server stores.
+String normalizeFullName(String value) =>
+    value.trim().replaceAll(RegExp(r'\s+'), ' ');
+
+/// Validates a trainer's legal name (first and last name, letters only).
+/// Used by sign-up and by the admin's Edit User screen.
+String? validateFullName(String? value) {
+  final name = normalizeFullName(value ?? '');
+  if (name.isEmpty) {
+    return 'Please enter your full name as it appears on your credential.';
+  }
+  if (name.length > 100) {
+    return 'Your full name must be 100 characters or fewer.';
+  }
+  if (!_fullNameRule.hasMatch(name)) {
+    return 'Use letters, spaces, periods, apostrophes and hyphens only.';
+  }
+  if (name.split(' ').where((p) => _letter.hasMatch(p)).length < 2) {
+    return 'Please enter your first and last name.';
+  }
+  return null;
+}
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -21,30 +58,63 @@ class _RegisterScreenState extends State<RegisterScreen>
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _usernameController = TextEditingController();
-  bool _obscurePassword = true;
+  final _fullNameController = TextEditingController();
   UserRole _selectedRole = UserRole.member;
   File? _credentialFile;
   late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
+
+  static final _passwordRule = RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)');
+
+  int _failCount = 0;
+  int _lastPlates = 0;
+  bool _credentialMissing = false;
 
   @override
   void initState() {
     super.initState();
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: AuthMotion.entranceTotalMs),
     );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
-    _animationController.forward();
+    _usernameController.addListener(_onFieldChanged);
+    _emailController.addListener(_onFieldChanged);
+    _passwordController.addListener(_onFieldChanged);
   }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_animationController.isDismissed) {
+      if (AuthMotion.reduced(context)) {
+        _animationController.value = 1;
+      } else {
+        _animationController.forward();
+      }
+    }
+  }
+
+  void _onFieldChanged() {
+    if (_plates != _lastPlates) setState(() => _lastPlates = _plates);
+  }
+
+  // Same rules as the validators below; drives the barbell plates only.
+  int get _plates {
+    final username = _usernameController.text;
+    final email = _emailController.text;
+    final password = _passwordController.text;
+    return (username.length >= 3 ? 1 : 0) +
+        (email.isNotEmpty && email.contains('@') ? 1 : 0) +
+        (password.length >= 6 && _passwordRule.hasMatch(password) ? 1 : 0);
+  }
+
+  void _fail() => setState(() => _failCount++);
 
   Future<void> _pickCredential() async {
     final result = await FilePicker.platform.pickFiles(type: FileType.image);
     if (result != null) {
       setState(() {
         _credentialFile = File(result.files.single.path!);
+        _credentialMissing = false;
       });
     }
   }
@@ -53,115 +123,228 @@ class _RegisterScreenState extends State<RegisterScreen>
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
 
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(gradient: AppTheme.backgroundGradient),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _buildHeader(),
-                      const SizedBox(height: 40),
-                      Container(
-                        decoration: AppTheme.glassMorphism,
-                        padding: const EdgeInsets.all(24),
+    return AuthScaffold(
+      entrance: _animationController,
+      step: '02 / Sign up',
+      header: _buildHeader(authProvider),
+      form: _buildForm(authProvider),
+      footer: _buildLoginLink(),
+    );
+  }
+
+  Widget _buildHeader(AuthProvider authProvider) {
+    final compact = MediaQuery.sizeOf(context).height < 700;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        BarbellIndicator(
+          plates: _plates,
+          maxPlates: 3,
+          failTrigger: _failCount,
+          phase: authProvider.isLoading
+              ? BarbellPhase.working
+              : BarbellPhase.idle,
+        ),
+        SizedBox(height: compact ? AuthSpace.s : AuthSpace.m),
+        HeadlineReveal(
+          lines: const ['LOAD THE', 'FIRST PLATE.'],
+          fontSize: compact ? 44 : 56,
+          semanticsLabel: 'Load the first plate.',
+        ),
+        const SizedBox(height: 12),
+        EntranceRise(
+          index: 0,
+          child: Text(
+            'Create your account. Every set gets logged.',
+            style: AuthType.body(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildForm(AuthProvider authProvider) {
+    final isTrainer = _selectedRole == UserRole.trainer;
+    return ShakeOnError(
+      trigger: _failCount,
+      child: Form(
+        key: _formKey,
+        child: AutofillGroup(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              EntranceRise(index: 1, child: _buildRoleSelection()),
+              AnimatedSize(
+                duration: AuthMotion.reduced(context)
+                    ? Duration.zero
+                    : AuthMotion.base,
+                curve: AuthMotion.enter,
+                alignment: Alignment.topCenter,
+                child: isTrainer
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: AuthSpace.s),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            _buildRoleSelection(),
-                            const SizedBox(height: 24),
-                            if (_selectedRole == UserRole.trainer)
-                              _buildCredentialPicker(),
-                            _buildUsernameField(),
-                            const SizedBox(height: 16),
-                            _buildEmailField(),
-                            const SizedBox(height: 16),
-                            _buildPasswordField(),
-                            const SizedBox(height: 30),
-                            _buildRegisterButton(authProvider),
-                            if (authProvider.error != null) ...[
-                              const SizedBox(height: 16),
-                              _buildErrorMessage(authProvider.error!),
-                            ],
+                            _buildFullNameField(),
+                            const SizedBox(height: AuthSpace.xs),
+                            Text(
+                              'Must match the name on your credential. '
+                              'An admin compares them before approving you.',
+                              style: AuthType.body(
+                                size: 13,
+                                color: AuthColors.textFaint,
+                              ),
+                            ),
+                            const SizedBox(height: AuthSpace.s),
+                            CredentialPicker(
+                              file: _credentialFile,
+                              onPick: _pickCredential,
+                              showRequired: _credentialMissing,
+                            ),
                           ],
                         ),
-                      ),
-                      const SizedBox(height: 24),
-                      _buildLoginLink(),
-                    ],
-                  ),
-                ),
+                      )
+                    : const SizedBox(width: double.infinity),
               ),
-            ),
+              const SizedBox(height: AuthSpace.s),
+              EntranceRise(index: 2, child: _buildUsernameField()),
+              const SizedBox(height: AuthSpace.s),
+              EntranceRise(index: 3, child: _buildEmailField()),
+              const SizedBox(height: AuthSpace.s),
+              EntranceRise(index: 4, child: _buildPasswordField()),
+              const SizedBox(height: AuthSpace.m),
+              EntranceRise(index: 5, child: _buildRegisterButton(authProvider)),
+              ErrorBanner(message: authProvider.error),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildCredentialPicker() {
+  Widget _buildRoleSelection() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        const Text(
-          'Upload Trainer Credential',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: AppTheme.textPrimary,
-          ),
+        Text('I AM A', style: AuthType.label()),
+        const SizedBox(height: AuthSpace.xs),
+        RoleSegmentedControl<UserRole>(
+          segments: const [
+            RoleSegment(value: UserRole.member, label: 'Member'),
+            RoleSegment(value: UserRole.trainer, label: 'Trainer'),
+          ],
+          selected: _selectedRole,
+          onChanged: (role) => setState(() => _selectedRole = role),
         ),
-        const SizedBox(height: 12),
-        InkWell(
-          onTap: _pickCredential,
-          child: Container(
-            height: 150,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: AppTheme.surfaceColor.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppTheme.surfaceColor.withOpacity(0.5)),
-            ),
-            child: _credentialFile != null
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.file(_credentialFile!, fit: BoxFit.cover),
-                  )
-                : const Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.cloud_upload_outlined,
-                        color: AppTheme.textSecondary,
-                        size: 40,
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Tap to select an image',
-                        style: TextStyle(color: AppTheme.textSecondary),
-                      ),
-                    ],
-                  ),
-          ),
+        const SizedBox(height: AuthSpace.xs),
+        RoleHelperLine(
+          text: _selectedRole == UserRole.trainer
+              ? 'Trainer accounts require admin approval before activation.'
+              : 'Track your lifts, sessions and progress.',
         ),
-        const SizedBox(height: 24),
       ],
     );
   }
 
+  Widget _buildFullNameField() {
+    return AuthTextField(
+      label: 'Full Name',
+      controller: _fullNameController,
+      keyboardType: TextInputType.name,
+      textInputAction: TextInputAction.next,
+      autofillHints: const [AutofillHints.name],
+      validator: validateFullName,
+    );
+  }
+
+  Widget _buildUsernameField() {
+    return AuthTextField(
+      label: 'Username',
+      controller: _usernameController,
+      textInputAction: TextInputAction.next,
+      autofillHints: const [AutofillHints.newUsername],
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return 'Please enter a username.';
+        }
+        if (value.length < 3) {
+          return 'Your username must be at least 3 characters long.';
+        }
+        return null;
+      },
+    );
+  }
+
+  Widget _buildEmailField() {
+    return AuthTextField(
+      label: 'Email',
+      controller: _emailController,
+      keyboardType: TextInputType.emailAddress,
+      textInputAction: TextInputAction.next,
+      autofillHints: const [AutofillHints.email],
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return 'Please enter your email address.';
+        }
+        if (!value.contains('@')) {
+          return 'This doesn\'t look like a valid email address.';
+        }
+        return null;
+      },
+    );
+  }
+
+  Widget _buildPasswordField() {
+    return AuthTextField(
+      label: 'Password',
+      controller: _passwordController,
+      obscurable: true,
+      textInputAction: TextInputAction.done,
+      autofillHints: const [AutofillHints.newPassword],
+      onSubmitted: (_) {
+        final auth = Provider.of<AuthProvider>(context, listen: false);
+        if (!auth.isLoading) _register();
+      },
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return 'Please enter a password.';
+        }
+        if (value.length < 6) {
+          return 'Your password must be at least 6 characters long.';
+        }
+        if (!_passwordRule.hasMatch(value)) {
+          return 'Password must contain at least 1 uppercase, 1 lowercase, and 1 number.';
+        }
+        return null;
+      },
+    );
+  }
+
+  Widget _buildRegisterButton(AuthProvider authProvider) {
+    bool canRegister = !authProvider.isLoading;
+    if (_selectedRole == UserRole.trainer && _credentialFile == null) {
+      canRegister = false;
+    }
+    return PressableButton(
+      label: 'Create Account',
+      loading: authProvider.isLoading,
+      onPressed: canRegister ? _register : null,
+    );
+  }
+
   void _register() async {
+    FocusScope.of(context).unfocus();
     Provider.of<AuthProvider>(context, listen: false).clearError();
 
     if (_formKey.currentState!.validate()) {
       if (_selectedRole == UserRole.trainer && _credentialFile == null) {
+        setState(() => _credentialMissing = true);
+        _fail();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Please upload your trainer credential.'),
@@ -178,6 +361,9 @@ class _RegisterScreenState extends State<RegisterScreen>
             _usernameController.text.trim(),
             role: _selectedRole,
             credentialFile: _credentialFile,
+            fullName: _selectedRole == UserRole.trainer
+                ? normalizeFullName(_fullNameController.text)
+                : null,
           );
 
       if (success && mounted) {
@@ -188,388 +374,27 @@ class _RegisterScreenState extends State<RegisterScreen>
                 CheckEmailScreen(email: _emailController.text.trim()),
           ),
         );
+      } else if (mounted) {
+        _fail();
       }
+    } else {
+      _fail();
     }
-  }
-
-  Widget _buildHeader() {
-    return Column(
-      children: [
-        Container(
-          width: 80,
-          height: 80,
-          decoration: BoxDecoration(
-            gradient: AppTheme.secondaryGradient,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: AppTheme.secondaryColor.withOpacity(0.4),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: const Icon(Icons.person_add, size: 40, color: Colors.white),
-        ),
-        const SizedBox(height: 20),
-
-        ShaderMask(
-          shaderCallback: (bounds) =>
-              AppTheme.secondaryGradient.createShader(bounds),
-          child: const Text(
-            'Create Account',
-            style: TextStyle(
-              fontSize: 36,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-              letterSpacing: 1,
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-
-        Text(
-          'Join the LiftLog community',
-          style: TextStyle(
-            fontSize: 16,
-            color: AppTheme.textSecondary.withOpacity(0.8),
-            letterSpacing: 0.5,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRoleSelection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Select Your Role',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: AppTheme.textPrimary,
-            letterSpacing: 0.5,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildRoleChip(UserRole.member, Icons.person, 'Member'),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _buildRoleChip(UserRole.trainer, Icons.sports, 'Trainer'),
-            ),
-          ],
-        ),
-        if (_selectedRole == UserRole.trainer) ...[
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppTheme.infoColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: AppTheme.infoColor.withOpacity(0.3),
-                width: 1,
-              ),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.info_outline,
-                  color: AppTheme.infoColor,
-                  size: 20,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Trainer accounts require admin approval before activation.',
-                    style: TextStyle(
-                      color: AppTheme.textSecondary.withOpacity(0.9),
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildRoleChip(UserRole role, IconData icon, String label) {
-    final isSelected = _selectedRole == role;
-    return InkWell(
-      onTap: () => setState(() => _selectedRole = role),
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          gradient: isSelected ? AppTheme.primaryGradient : null,
-          color: isSelected ? null : AppTheme.surfaceColor.withOpacity(0.3),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected
-                ? Colors.transparent
-                : AppTheme.surfaceColor.withOpacity(0.5),
-            width: 1,
-          ),
-        ),
-        child: Column(
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? Colors.white : AppTheme.textSecondary,
-              size: 24,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? Colors.white : AppTheme.textSecondary,
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildUsernameField() {
-    return TextFormField(
-      controller: _usernameController,
-      style: const TextStyle(color: AppTheme.textPrimary),
-      decoration: InputDecoration(
-        labelText: 'Username',
-        prefixIcon: Container(
-          margin: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            gradient: AppTheme.accentGradient,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Icon(
-            Icons.person_outline,
-            color: Colors.white,
-            size: 20,
-          ),
-        ),
-      ),
-      validator: (value) {
-        if (value == null || value.isEmpty) {
-          return 'Please enter a username.';
-        }
-        if (value.length < 3) {
-          return 'Your username must be at least 3 characters long.';
-        }
-        return null;
-      },
-    );
-  }
-
-  Widget _buildEmailField() {
-    return TextFormField(
-      controller: _emailController,
-      keyboardType: TextInputType.emailAddress,
-      style: const TextStyle(color: AppTheme.textPrimary),
-      decoration: InputDecoration(
-        labelText: 'Email',
-        prefixIcon: Container(
-          margin: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            gradient: AppTheme.primaryGradient,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Icon(
-            Icons.email_outlined,
-            color: Colors.white,
-            size: 20,
-          ),
-        ),
-      ),
-      validator: (value) {
-        if (value == null || value.isEmpty) {
-          return 'Please enter your email address.';
-        }
-        if (!value.contains('@')) {
-          return 'This doesn\'t look like a valid email address.';
-        }
-        return null;
-      },
-    );
-  }
-
-  Widget _buildPasswordField() {
-    return TextFormField(
-      controller: _passwordController,
-      obscureText: _obscurePassword,
-      style: const TextStyle(color: AppTheme.textPrimary),
-      decoration: InputDecoration(
-        labelText: 'Password',
-        prefixIcon: Container(
-          margin: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            gradient: AppTheme.secondaryGradient,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Icon(Icons.lock_outline, color: Colors.white, size: 20),
-        ),
-        suffixIcon: IconButton(
-          icon: Icon(
-            _obscurePassword
-                ? Icons.visibility_outlined
-                : Icons.visibility_off_outlined,
-            color: AppTheme.textSecondary,
-          ),
-          onPressed: () {
-            setState(() {
-              _obscurePassword = !_obscurePassword;
-            });
-          },
-        ),
-      ),
-      validator: (value) {
-        if (value == null || value.isEmpty) {
-          return 'Please enter a password.';
-        }
-        if (value.length < 6) {
-          return 'Your password must be at least 6 characters long.';
-        }
-        if (!RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)').hasMatch(value)) {
-          return 'Password must contain at least 1 uppercase, 1 lowercase, and 1 number.';
-        }
-        return null;
-      },
-    );
-  }
-
-  Widget _buildRegisterButton(AuthProvider authProvider) {
-    bool canRegister = !authProvider.isLoading;
-    if (_selectedRole == UserRole.trainer && _credentialFile == null) {
-      canRegister = false;
-    }
-
-    return Container(
-      height: 56,
-      decoration: BoxDecoration(
-        gradient: canRegister
-            ? AppTheme.secondaryGradient
-            : AppTheme.disabledGradient,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          if (canRegister)
-            BoxShadow(
-              color: AppTheme.secondaryColor.withOpacity(0.4),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
-            ),
-        ],
-      ),
-      child: ElevatedButton(
-        onPressed: canRegister ? _register : null,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-        child: authProvider.isLoading
-            ? const SizedBox(
-                height: 24,
-                width: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              )
-            : const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Create Account',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1,
-                    ),
-                  ),
-                  SizedBox(width: 8),
-                  Icon(Icons.arrow_forward, size: 20),
-                ],
-              ),
-      ),
-    );
-  }
-
-  Widget _buildErrorMessage(String error) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppTheme.errorColor.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppTheme.errorColor.withOpacity(0.3),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.error_outline, color: AppTheme.errorColor, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              error,
-              style: const TextStyle(color: AppTheme.errorColor, fontSize: 14),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   Widget _buildLoginLink() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          'Already have an account? ',
-          style: TextStyle(
-            color: AppTheme.textSecondary.withOpacity(0.8),
-            fontSize: 14,
+    return AuthFooterLink(
+      prompt: 'Already have an account?',
+      action: 'Sign In',
+      onTap: () {
+        Navigator.pushReplacement(
+          context,
+          AuthPageRoute(
+            reverse: true,
+            builder: (context) => const LoginScreen(),
           ),
-        ),
-        TextButton(
-          onPressed: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const LoginScreen()),
-            );
-          },
-          style: TextButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-          ),
-          child: ShaderMask(
-            shaderCallback: (bounds) =>
-                AppTheme.secondaryGradient.createShader(bounds),
-            child: const Text(
-              'Sign In',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-        ),
-      ],
+        );
+      },
     );
   }
 
@@ -579,6 +404,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     _emailController.dispose();
     _passwordController.dispose();
     _usernameController.dispose();
+    _fullNameController.dispose();
     super.dispose();
   }
 }

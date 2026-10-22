@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'dart:io' show Platform, File, NetworkInterface, InternetAddressType;
 import 'package:http/http.dart' as http;
 import 'package:dio/dio.dart';
@@ -21,7 +22,7 @@ class ApiService {
     'phone': '192.168.100.192',
     'emulator': '10.0.2.2',
   };
-  static String CURRENT_PC_IP = '192.168.1.16';
+  static String currentPcIp = '192.168.1.16';
 
   static Future<String> _detectNetworkIP() async {
     try {
@@ -80,7 +81,7 @@ class ApiService {
   }
 
   static void updatePCIP(String newIP) {
-    CURRENT_PC_IP = newIP;
+    currentPcIp = newIP;
     _networkConfigs['pc'] = newIP;
   }
 
@@ -101,8 +102,8 @@ class ApiService {
 
   Future<dynamic> _get(String endpoint) async {
     final token = await getToken();
-    print('GET request to: $baseUrl$endpoint');
-    print('Token: $token');
+    debugPrint('GET request to: $baseUrl$endpoint');
+    debugPrint('Token: $token');
     final response = await http.get(
       Uri.parse('$baseUrl$endpoint'),
       headers: {
@@ -176,8 +177,8 @@ class ApiService {
   }
 
   dynamic _handleResponse(http.Response response) {
-    print('Response status: ${response.statusCode}');
-    print('Response body: ${response.body}');
+    debugPrint('Response status: ${response.statusCode}');
+    debugPrint('Response body: ${response.body}');
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return jsonDecode(response.body);
     } else {
@@ -223,6 +224,7 @@ class ApiService {
     String username, {
     UserRole role = UserRole.member,
     File? credentialFile,
+    String? fullName,
   }) async {
     var request = http.MultipartRequest(
       'POST',
@@ -232,6 +234,9 @@ class ApiService {
     request.fields['password'] = password;
     request.fields['username'] = username;
     request.fields['role'] = role.toString().split('.').last;
+    if (fullName != null && fullName.isNotEmpty) {
+      request.fields['fullName'] = fullName;
+    }
 
     if (credentialFile != null) {
       request.files.add(
@@ -322,6 +327,8 @@ class ApiService {
     List<Map<String, dynamic>> exercises,
   ) async {
     final response = await _patch('/workouts/$id', {
+      // The schema field is `title`; `name` is kept for older servers.
+      'title': name,
       'name': name,
       'description': description,
       'exercises': exercises,
@@ -335,6 +342,24 @@ class ApiService {
 
   Future<void> deleteWorkouts(List<String> workoutIds) async {
     await _deleteWithBody('/workouts', {'workoutIds': workoutIds});
+  }
+
+  /// Trainer: own templates in "Recently deleted" (deleted by the trainer or
+  /// removed by an admin, not yet deleted permanently).
+  Future<List<Workout>> getDeletedTrainerWorkouts() async {
+    final response = await _get('/workouts/trainer/deleted');
+    final List<dynamic> workoutsJson = response['workouts'] ?? [];
+    return workoutsJson.map((json) => Workout.fromJson(json)).toList();
+  }
+
+  /// Trainer: restore a template they deleted. Members can see it again.
+  Future<void> restoreWorkout(String workoutId) async {
+    await _post('/workouts/$workoutId/restore', {});
+  }
+
+  /// Trainer: remove a deleted template for good.
+  Future<void> permanentlyDeleteWorkout(String workoutId) async {
+    await _delete('/workouts/$workoutId/permanent');
   }
 
   Future<List<Map<String, dynamic>>> getAvailableTrainers() async {
@@ -465,8 +490,27 @@ class ApiService {
     return videosJson.map((json) => ExerciseVideo.fromJson(json)).toList();
   }
 
+  /// Moves the video to the trainer's "Recently deleted" (restorable).
   Future<void> deleteVideo(String videoId) async {
     await _delete('/videos/$videoId');
+  }
+
+  /// Trainer: own videos in "Recently deleted" (deleted by the trainer or
+  /// removed by an admin, not yet deleted permanently).
+  Future<List<ExerciseVideo>> getDeletedTrainerVideos() async {
+    final response = await _get('/videos/trainer/deleted');
+    final List<dynamic> videosJson = response['videos'] ?? [];
+    return videosJson.map((json) => ExerciseVideo.fromJson(json)).toList();
+  }
+
+  /// Trainer: restore a video they deleted. Members can see it again.
+  Future<void> restoreVideo(String videoId) async {
+    await _post('/videos/$videoId/restore', {});
+  }
+
+  /// Trainer: erase a deleted video and its files for good.
+  Future<void> permanentlyDeleteVideo(String videoId) async {
+    await _delete('/videos/$videoId/permanent');
   }
 
   // ============ ADMIN CONTENT MODERATION ============
@@ -521,6 +565,17 @@ class ApiService {
       'reason': reason,
       'removeAssignedCopies': removeAssignedCopies,
     });
+  }
+
+  /// Admin: undo a moderation removal (not allowed for trainer deletions).
+  Future<Map<String, dynamic>> adminRestoreVideo(String videoId) async {
+    return await _post('/videos/admin/$videoId/restore', {});
+  }
+
+  /// Admin: undo a moderation removal (not allowed for trainer deletions).
+  /// Member copies hidden by that removal come back too.
+  Future<Map<String, dynamic>> adminRestoreWorkout(String workoutId) async {
+    return await _post('/workouts/admin/$workoutId/restore', {});
   }
 
   Future<Map<String, dynamic>> getUsers({
@@ -653,7 +708,9 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  Future<User> approveTrainer(
+  /// Admin: approve or reject a pending trainer. Rejecting deletes the
+  /// account, so older servers send no `user` back; that returns null.
+  Future<User?> approveTrainer(
     String userId,
     bool isApproved, {
     String? rejectionReason,
@@ -663,7 +720,8 @@ class ApiService {
       if (rejectionReason != null) 'rejectionReason': rejectionReason,
     };
     final response = await _patch('/auth/users/$userId/approve', body);
-    return User.fromJson(response['user']);
+    final user = response['user'];
+    return user is Map<String, dynamic> ? User.fromJson(user) : null;
   }
 
   Future<List<dynamic>> getClients() async {
@@ -741,7 +799,9 @@ class ApiService {
   Future<List<Message>> getChatHistory(String partnerId) async {
     final response = await _get('/chat/history/$partnerId');
     if (response is List) {
-      return response.map((m) => Message.fromJson(m as Map<String, dynamic>)).toList();
+      return response
+          .map((m) => Message.fromJson(m as Map<String, dynamic>))
+          .toList();
     }
     return [];
   }
@@ -777,4 +837,3 @@ class ApiException implements Exception {
     return message;
   }
 }
-

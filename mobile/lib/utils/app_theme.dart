@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 
 class AppTheme {
@@ -9,20 +8,20 @@ class AppTheme {
   static const Color darkBackground = Color(0xFF1A1A2E); // Deep Navy
   static const Color cardBackground = Color(0xFF16213E); // Dark Blue
   static const Color surfaceColor = Color(0xFF0F3460); // Medium Blue
-  
+
   // Gradient Colors
   static const LinearGradient primaryGradient = LinearGradient(
     colors: [Color(0xFF6C63FF), Color(0xFF5A52D5)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
-  
+
   static const LinearGradient secondaryGradient = LinearGradient(
     colors: [Color(0xFFFF6584), Color(0xFFFF8A9B)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
-  
+
   static const LinearGradient accentGradient = LinearGradient(
     colors: [Color(0xFF4ECDC4), Color(0xFF44A08D)],
     begin: Alignment.topLeft,
@@ -34,7 +33,7 @@ class AppTheme {
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
-  
+
   static const LinearGradient backgroundGradient = LinearGradient(
     colors: [Color(0xFF1A1A2E), Color(0xFF16213E), Color(0xFF0F3460)],
     begin: Alignment.topCenter,
@@ -65,7 +64,7 @@ class AppTheme {
       brightness: Brightness.dark,
       primaryColor: primaryColor,
       scaffoldBackgroundColor: darkBackground,
-      
+
       // Color Scheme
       colorScheme: const ColorScheme.dark(
         primary: primaryColor,
@@ -77,7 +76,7 @@ class AppTheme {
         onSecondary: Colors.white,
         onSurface: textPrimary,
       ),
-      
+
       // AppBar Theme
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
@@ -91,24 +90,22 @@ class AppTheme {
           letterSpacing: 0.5,
         ),
       ),
-      
+
       // Card Theme
       cardTheme: CardThemeData(
         color: cardBackground,
         elevation: 8,
-        shadowColor: Colors.black.withOpacity(0.3),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shadowColor: Colors.black.withValues(alpha: 0.3),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
-      
+
       // Elevated Button Theme
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: primaryColor,
           foregroundColor: Colors.white,
           elevation: 8,
-          shadowColor: primaryColor.withOpacity(0.5),
+          shadowColor: primaryColor.withValues(alpha: 0.5),
           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -120,7 +117,7 @@ class AppTheme {
           ),
         ),
       ),
-      
+
       // Text Button Theme
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
@@ -132,18 +129,21 @@ class AppTheme {
           ),
         ),
       ),
-      
+
       // Input Decoration Theme
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: surfaceColor.withOpacity(0.5),
+        fillColor: surfaceColor.withValues(alpha: 0.5),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: surfaceColor.withOpacity(0.3), width: 1),
+          borderSide: BorderSide(
+            color: surfaceColor.withValues(alpha: 0.3),
+            width: 1,
+          ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
@@ -158,16 +158,16 @@ class AppTheme {
           borderSide: const BorderSide(color: errorColor, width: 2),
         ),
         labelStyle: const TextStyle(color: textSecondary),
-        hintStyle: TextStyle(color: textTertiary.withOpacity(0.6)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        hintStyle: TextStyle(color: textTertiary.withValues(alpha: 0.6)),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 16,
+        ),
       ),
-      
+
       // Icon Theme
-      iconTheme: const IconThemeData(
-        color: textPrimary,
-        size: 24,
-      ),
-      
+      iconTheme: const IconThemeData(color: textPrimary, size: 24),
+
       // Text Theme
       textTheme: const TextTheme(
         displayLarge: TextStyle(
@@ -203,32 +203,19 @@ class AppTheme {
           fontWeight: FontWeight.w500,
           color: textPrimary,
         ),
-        bodyLarge: TextStyle(
-          fontSize: 16,
-          color: textSecondary,
-          height: 1.5,
-        ),
-        bodyMedium: TextStyle(
-          fontSize: 14,
-          color: textSecondary,
-          height: 1.4,
-        ),
-        bodySmall: TextStyle(
-          fontSize: 12,
-          color: textTertiary,
-        ),
+        bodyLarge: TextStyle(fontSize: 16, color: textSecondary, height: 1.5),
+        bodyMedium: TextStyle(fontSize: 14, color: textSecondary, height: 1.4),
+        bodySmall: TextStyle(fontSize: 12, color: textTertiary),
       ),
-      
+
       // Floating Action Button Theme
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: secondaryColor,
         foregroundColor: Colors.white,
         elevation: 12,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
-      
+
       // Bottom Navigation Bar Theme
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: cardBackground,
@@ -243,7 +230,7 @@ class AppTheme {
   // Custom Shadows
   static List<BoxShadow> get cardShadow => [
     BoxShadow(
-      color: Colors.black.withOpacity(0.2),
+      color: Colors.black.withValues(alpha: 0.2),
       blurRadius: 20,
       offset: const Offset(0, 10),
     ),
@@ -251,7 +238,7 @@ class AppTheme {
 
   static List<BoxShadow> get glowShadow => [
     BoxShadow(
-      color: primaryColor.withOpacity(0.3),
+      color: primaryColor.withValues(alpha: 0.3),
       blurRadius: 20,
       spreadRadius: 2,
     ),
@@ -259,15 +246,12 @@ class AppTheme {
 
   // Custom Decorations
   static BoxDecoration get glassMorphism => BoxDecoration(
-    color: surfaceColor.withOpacity(0.3),
+    color: surfaceColor.withValues(alpha: 0.3),
     borderRadius: BorderRadius.circular(20),
-    border: Border.all(
-      color: Colors.white.withOpacity(0.1),
-      width: 1,
-    ),
+    border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1),
     boxShadow: [
       BoxShadow(
-        color: Colors.black.withOpacity(0.1),
+        color: Colors.black.withValues(alpha: 0.1),
         blurRadius: 10,
         offset: const Offset(0, 5),
       ),
@@ -276,10 +260,7 @@ class AppTheme {
 
   static BoxDecoration get gradientCard => BoxDecoration(
     gradient: LinearGradient(
-      colors: [
-        cardBackground,
-        surfaceColor.withOpacity(0.8),
-      ],
+      colors: [cardBackground, surfaceColor.withValues(alpha: 0.8)],
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
     ),

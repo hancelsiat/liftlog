@@ -28,15 +28,31 @@ class Message {
   factory Message.fromJson(Map<String, dynamic> json) {
     return Message(
       id: json['_id'] ?? json['id'] ?? '',
-      from: User.fromJson(json['from'] is Map ? json['from'] : {'_id': json['from'], 'username': 'User'}),
-      to: User.fromJson(json['to'] is Map ? json['to'] : {'_id': json['to'], 'username': 'User'}),
+      from: User.fromJson(
+        json['from'] is Map
+            ? json['from']
+            : {'_id': json['from'], 'username': 'User'},
+      ),
+      to: User.fromJson(
+        json['to'] is Map
+            ? json['to']
+            : {'_id': json['to'], 'username': 'User'},
+      ),
       content: json['content'] ?? '',
-      readBy: (json['readBy'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
+      readBy:
+          (json['readBy'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
       isEdited: json['isEdited'] ?? false,
       isDeleted: json['isDeleted'] ?? false,
       reported: json['reported'] ?? false,
-      createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : DateTime.now(),
-      updatedAt: json['updatedAt'] != null ? DateTime.parse(json['updatedAt'].toString()) : null,
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'])
+          : DateTime.now(),
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.parse(json['updatedAt'].toString())
+          : null,
     );
   }
 

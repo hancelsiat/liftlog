@@ -12,6 +12,16 @@ class Workout {
   final String? trainerName;
   final String? trainerId;
 
+  /// Set for templates in "Recently deleted".
+  final DateTime? deletedAt;
+
+  /// 'trainer' or 'admin' (older removals without it were made by an admin).
+  final String? deletedByRole;
+  final String? deletionReason;
+
+  /// True when the trainer can restore it (they deleted it themselves).
+  bool get deletedByTrainer => deletedByRole == 'trainer';
+
   Workout({
     required this.id,
     this.userId,
@@ -23,6 +33,9 @@ class Workout {
     this.completedAt,
     this.trainerName,
     this.trainerId,
+    this.deletedAt,
+    this.deletedByRole,
+    this.deletionReason,
   });
 
   factory Workout.fromJson(Map<String, dynamic> json) {
@@ -36,16 +49,28 @@ class Workout {
     return Workout(
       id: json['_id']?.toString() ?? '',
       userId: json['user']?.toString(),
-      name: json['title']?.toString() ?? json['name']?.toString() ?? 'Unnamed Workout',
+      name:
+          json['title']?.toString() ??
+          json['name']?.toString() ??
+          'Unnamed Workout',
       description: json['description']?.toString() ?? '',
-      date: json['date'] != null ? DateTime.tryParse(json['date'].toString()) ?? DateTime.now() : DateTime.now(),
+      date: json['date'] != null
+          ? DateTime.tryParse(json['date'].toString()) ?? DateTime.now()
+          : DateTime.now(),
       exercises: json['exercises'] != null
-          ? (json['exercises'] as List<dynamic>).map((e) => Exercise.fromJson(e as Map<String, dynamic>)).toList()
+          ? (json['exercises'] as List<dynamic>)
+                .map((e) => Exercise.fromJson(e as Map<String, dynamic>))
+                .toList()
           : [],
       title: json['title'] ?? 'Unnamed Workout',
-      completedAt: json['completedAt'] != null ? DateTime.tryParse(json['completedAt']) : null,
+      completedAt: json['completedAt'] != null
+          ? DateTime.tryParse(json['completedAt'])
+          : null,
       trainerName: trainerName,
       trainerId: trainerId,
+      deletedAt: DateTime.tryParse(json['deletedAt']?.toString() ?? ''),
+      deletedByRole: json['deletedByRole']?.toString(),
+      deletionReason: json['deletionReason']?.toString(),
     );
   }
 

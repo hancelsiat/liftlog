@@ -5,7 +5,7 @@ import '../models/user.dart';
 import '../models/workout.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
-import '../utils/app_theme.dart';
+import '../widgets/gym/gym.dart';
 import 'assign_workout_screen.dart';
 import 'create_workout_template_screen.dart';
 import 'workout_detail_screen.dart';
@@ -41,17 +41,15 @@ class _ClientDetailScreenState extends State<ClientDetailScreen>
 
   Future<List<Workout>> _fetchProgress() async {
     final response = await _apiService.getClientProgress(widget.client.id);
-    return (response as List).map((data) => Workout.fromJson(data)).toList();
+    return response.map((data) => Workout.fromJson(data)).toList();
   }
 
   void _removeClient() async {
     try {
       await _apiService.removeClient(widget.client.id);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Client removed successfully!'),
-          backgroundColor: Colors.green,
-        ),
+        const SnackBar(content: Text('Client removed successfully!')),
       );
       Navigator.of(context).pop();
     } catch (e) {
@@ -59,7 +57,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Failed to remove client. Please try again.'),
-            backgroundColor: Colors.red,
+            backgroundColor: AuthColors.danger,
           ),
         );
       }
@@ -69,25 +67,76 @@ class _ClientDetailScreenState extends State<ClientDetailScreen>
   void _deleteWorkout(String workoutId) async {
     try {
       await _apiService.deleteWorkout(workoutId);
+      if (!mounted) return;
       setState(() {
         _progressFuture = _fetchProgress();
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Workout deleted successfully!'),
-          backgroundColor: Colors.green,
-        ),
+        const SnackBar(content: Text('Workout deleted successfully!')),
       );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Failed to delete workout. Please try again.'),
-            backgroundColor: Colors.red,
+            backgroundColor: AuthColors.danger,
           ),
         );
       }
     }
+  }
+
+  /// The member loses this workout from their plan, and it can't be
+  /// restored, so ask first.
+  Future<void> _confirmDeleteWorkout(Workout workout) async {
+    final bool? confirmed = await showAuthDialog<bool>(
+      context: context,
+      eyebrow: 'Client / Plan',
+      title: 'Delete Workout',
+      message:
+          'Remove "${workout.title}" from ${widget.client.username}\'s plan? '
+          'This cannot be undone.',
+      actions: (dialogContext) => [
+        AuthDialogAction(
+          label: 'Cancel',
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+        ),
+        AuthDialogAction(
+          label: 'Delete',
+          primary: true,
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+        ),
+      ],
+    );
+    if (confirmed == true && mounted) _deleteWorkout(workout.id);
+  }
+
+  void _refresh() {
+    if (!mounted) return;
+    setState(() {
+      _progressFuture = _fetchProgress();
+    });
+  }
+
+  Future<void> _confirmRemoveClient() async {
+    final bool? confirmed = await showAuthDialog<bool>(
+      context: context,
+      eyebrow: 'Client',
+      title: 'Remove Client',
+      message: 'Are you sure you want to remove this client?',
+      actions: (dialogContext) => [
+        AuthDialogAction(
+          label: 'Cancel',
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+        ),
+        AuthDialogAction(
+          label: 'Remove',
+          primary: true,
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+        ),
+      ],
+    );
+    if (confirmed == true && mounted) _removeClient();
   }
 
   @override
@@ -96,95 +145,76 @@ class _ClientDetailScreenState extends State<ClientDetailScreen>
     final currentTrainerId = authProvider.user?.id;
     final bool hasLeft = widget.client.trainer != currentTrainerId;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.client.username),
-        backgroundColor: AppTheme.darkBackground,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.message, color: AppTheme.primaryColor),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ChatScreen(partner: widget.client),
-                ),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete, color: Colors.red),
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (BuildContext context) {
-                  return AlertDialog(
-                    title: const Text('Remove Client'),
-                    content: const Text(
-                      'Are you sure you want to remove this client?',
-                    ),
-                    actions: <Widget>[
-                      TextButton(
-                        child: const Text('Cancel'),
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                        },
-                      ),
-                      TextButton(
-                        child: const Text(
-                          'Remove',
-                          style: TextStyle(color: Colors.red),
-                        ),
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                          _removeClient();
-                        },
-                      ),
-                    ],
-                  );
-                },
-              );
-            },
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Assigned'),
-            Tab(text: 'Completed'),
-          ],
+    return GymScaffold(
+      eyebrow: hasLeft ? 'Client / Left' : 'Client',
+      title: widget.client.username,
+      actions: [
+        GymIconButton(
+          icon: Icons.chat_bubble_outline,
+          tooltip: 'Message ${widget.client.username}',
+          onTap: () {
+            Navigator.push(
+              context,
+              GymPageRoute(
+                builder: (context) => ChatScreen(partner: widget.client),
+              ),
+            );
+          },
         ),
+        GymIconButton(
+          icon: Icons.person_remove_outlined,
+          tooltip: 'Remove client',
+          danger: true,
+          onTap: _confirmRemoveClient,
+        ),
+      ],
+      bottom: GymTabBar(
+        controller: _tabController!,
+        tabs: const ['Assigned', 'Completed'],
       ),
-      backgroundColor: AppTheme.darkBackground,
+      bottomBar: hasLeft
+          ? null
+          : GymBottomBar(
+              child: PressableButton(
+                label: 'Assign Workout',
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    GymPageRoute(
+                      builder: (context) =>
+                          AssignWorkoutScreen(memberId: widget.client.id),
+                    ),
+                  ).then((_) => _refresh());
+                },
+              ),
+            ),
       body: FutureBuilder<List<Workout>>(
         future: _progressFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const GymLoader();
           }
           if (snapshot.hasError) {
             return Center(
-              child: Text(
-                'Error: ${snapshot.error}',
-                style: const TextStyle(color: Colors.white),
+              child: GymEmptyState(
+                icon: Icons.error_outline,
+                danger: true,
+                message: 'Error: ${snapshot.error}',
+                action: SizedBox(
+                  width: 160,
+                  child: PressableButton(
+                    label: 'Retry',
+                    height: 48,
+                    showArrow: false,
+                    onPressed: _refresh,
+                  ),
+                ),
               ),
             );
           }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(
-              child: Text(
-                'No workouts assigned yet.',
-                style: TextStyle(color: Colors.white),
-              ),
-            );
-          }
-
-          final assigned = snapshot.data!
-              .where((w) => w.completedAt == null)
-              .toList();
-          final completed = snapshot.data!
-              .where((w) => w.completedAt != null)
-              .toList();
+          final all = snapshot.data ?? const <Workout>[];
+          final assigned = all.where((w) => w.completedAt == null).toList();
+          final completed = all.where((w) => w.completedAt != null).toList();
 
           return TabBarView(
             controller: _tabController,
@@ -205,26 +235,6 @@ class _ClientDetailScreenState extends State<ClientDetailScreen>
           );
         },
       ),
-      floatingActionButton: hasLeft
-          ? null
-          : FloatingActionButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        AssignWorkoutScreen(memberId: widget.client.id),
-                  ),
-                ).then((_) {
-                  // Refresh progress when coming back
-                  setState(() {
-                    _progressFuture = _fetchProgress();
-                  });
-                });
-              },
-              child: const Icon(Icons.assignment),
-              backgroundColor: AppTheme.primaryColor,
-            ),
     );
   }
 
@@ -236,81 +246,100 @@ class _ClientDetailScreenState extends State<ClientDetailScreen>
   ) {
     if (workouts.isEmpty) {
       return Center(
-        child: Text(emptyMessage, style: const TextStyle(color: Colors.white)),
+        child: GymEmptyState(icon: Icons.fitness_center, message: emptyMessage),
       );
     }
 
-    return ListView.builder(
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(
+        GymScaffold.side,
+        AuthSpace.s,
+        GymScaffold.side,
+        AuthSpace.l,
+      ),
       itemCount: workouts.length,
+      separatorBuilder: (context, index) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final workout = workouts[index];
         final formattedDate = DateFormat.yMMMd().format(workout.date.toLocal());
         final bool isOwner = workout.trainerId == currentTrainerId;
+        final bool done = workout.completedAt != null;
 
-        return Card(
-          color: AppTheme.cardBackground,
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: ListTile(
-            title: Text(
-              workout.title,
-              style: const TextStyle(color: Colors.white),
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        return StaggeredReveal(
+          index: index,
+          child: PressableSurface(
+            semanticLabel: done ? 'Open ${workout.title}' : null,
+            onTap: done
+                ? () {
+                    Navigator.push(
+                      context,
+                      GymPageRoute(
+                        builder: (context) =>
+                            WorkoutDetailScreen(workout: workout),
+                      ),
+                    );
+                  }
+                : null,
+            child: Row(
               children: [
-                Text(
-                  'Assigned on: $formattedDate',
-                  style: const TextStyle(color: Colors.white70),
-                ),
-                if (workout.trainerName != null)
-                  Text(
-                    'by ${workout.trainerName}',
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontStyle: FontStyle.italic,
+                SizedBox(
+                  width: 28,
+                  child: Text(
+                    (index + 1).toString().padLeft(2, '0'),
+                    style: AuthType.mono(
+                      color: done ? AuthColors.textFaint : AuthColors.accent,
                     ),
                   ),
-              ],
-            ),
-            trailing: workout.completedAt != null
-                ? const Icon(Icons.check_circle, color: Colors.green)
-                : isOwner && !hasLeft
-                ? Row(
-                    mainAxisSize: MainAxisSize.min,
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      IconButton(
-                        icon: const Icon(Icons.edit, color: Colors.blue),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  CreateWorkoutTemplateScreen(workout: workout),
-                            ),
-                          ).then((_) {
-                            setState(() {
-                              _progressFuture = _fetchProgress();
-                            });
-                          });
-                        },
+                      Text(
+                        workout.title.toUpperCase(),
+                        style: AuthType.display(22).copyWith(height: 1),
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () => _deleteWorkout(workout.id),
+                      const SizedBox(height: 6),
+                      Text(
+                        workout.trainerName != null
+                            ? 'Assigned on: $formattedDate | by ${workout.trainerName}'
+                            : 'Assigned on: $formattedDate',
+                        style: AuthType.body(size: 13),
                       ),
                     ],
-                  )
-                : null,
-            onTap: () {
-              if (workout.completedAt != null) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => WorkoutDetailScreen(workout: workout),
                   ),
-                );
-              }
-            },
+                ),
+                const SizedBox(width: 12),
+                if (done)
+                  const GymAvatar(
+                    icon: Icons.check,
+                    size: 36,
+                    highlighted: true,
+                  )
+                else if (isOwner && !hasLeft) ...[
+                  GymIconButton(
+                    icon: Icons.edit_outlined,
+                    tooltip: 'Edit ${workout.title}',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        GymPageRoute(
+                          builder: (context) =>
+                              CreateWorkoutTemplateScreen(workout: workout),
+                        ),
+                      ).then((_) => _refresh());
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  GymIconButton(
+                    icon: Icons.delete_outline,
+                    tooltip: 'Delete ${workout.title}',
+                    danger: true,
+                    onTap: () => _confirmDeleteWorkout(workout),
+                  ),
+                ],
+              ],
+            ),
           ),
         );
       },

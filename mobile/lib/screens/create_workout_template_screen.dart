@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/workout_provider.dart';
-import '../services/api_service.dart';
 import '../models/workout.dart';
 import '../models/user.dart';
+import '../widgets/gym/gym.dart';
 
 class CreateWorkoutTemplateScreen extends StatefulWidget {
   final Workout? workout;
@@ -262,113 +262,32 @@ class _CreateWorkoutTemplateScreenState
     final filteredExercises = (_predefinedExercises[_category] ?? [])
         .where((exercise) => exercise['intensity'] == _intensity)
         .toList();
+    final theme = GymTheme.of(context);
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: AuthColors.surface,
+      barrierColor: AuthColors.barrier,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AuthRadius.dialog),
+        ),
+        side: BorderSide(color: AuthColors.line),
       ),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (context, scrollController) => Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(20),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Select Exercises (${_category.toUpperCase()})',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: ListView(
-                controller: scrollController,
-                padding: const EdgeInsets.all(16),
-                children: [
-                  if (filteredExercises.isEmpty)
-                    const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(32.0),
-                        child: Text(
-                          'No exercises found for the selected category and intensity.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ),
-                    )
-                  else
-                    ...filteredExercises.map(
-                      (exercise) => Card(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        child: ListTile(
-                          leading: Icon(
-                            exercise['icon'] as IconData,
-                            color: Theme.of(context).primaryColor,
-                          ),
-                          title: Text(exercise['name'] as String),
-                          subtitle: Text(
-                            '${exercise['defaultSets']} sets × ${exercise['defaultReps']} reps',
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                          trailing: const Icon(Icons.add_circle_outline),
-                          onTap: () {
-                            _addPredefinedExercise(exercise);
-                            Navigator.pop(context, true);
-                          },
-                        ),
-                      ),
-                    ),
-                  const SizedBox(height: 16),
-                  // Custom exercise option
-                  Card(
-                    color: Colors.blue.shade100,
-                    child: ListTile(
-                      leading: const Icon(Icons.edit, color: Colors.blue),
-                      title: const Text(
-                        'Custom Exercise',
-                        style: TextStyle(color: Colors.black),
-                      ),
-                      subtitle: const Text(
-                        'Create your own exercise',
-                        style: TextStyle(color: Colors.black54),
-                      ),
-                      trailing: const Icon(
-                        Icons.arrow_forward,
-                        color: Colors.black,
-                      ),
-                      onTap: () {
-                        Navigator.pop(context);
-                        _addCustomExercise();
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+      builder: (sheetContext) => Theme(
+        data: theme,
+        child: _ExercisePickerSheet(
+          eyebrow: '${_category.toUpperCase()} / ${_intensity.toUpperCase()}',
+          exercises: filteredExercises,
+          onPick: (exercise) {
+            _addPredefinedExercise(exercise);
+            Navigator.pop(sheetContext, true);
+          },
+          onCustom: () {
+            Navigator.pop(sheetContext);
+            _addCustomExercise();
+          },
         ),
       ),
     );
@@ -431,6 +350,21 @@ class _CreateWorkoutTemplateScreenState
     });
   }
 
+  /// Shows the server's error and clears it from the provider so the
+  /// Manage Workouts list doesn't switch to its error view.
+  void _showSaveError(WorkoutProvider provider) {
+    final error = provider.error?.replaceFirst('Exception: ', '');
+    provider.clearError();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Failed to save workout template. ${error ?? 'Please try again.'}',
+        ),
+        backgroundColor: AuthColors.danger,
+      ),
+    );
+  }
+
   Future<void> _saveWorkoutTemplate() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -451,8 +385,11 @@ class _CreateWorkoutTemplateScreenState
         listen: false,
       );
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      // The provider catches API errors and returns false (the message is
+      // in `workoutProvider.error`), so check the result before showing
+      // success.
       if (widget.workout == null) {
-        await workoutProvider.createWorkout(
+        final ok = await workoutProvider.createWorkout(
           _titleController.text.trim(),
           _descriptionController.text.trim(),
           _exercises,
@@ -460,6 +397,11 @@ class _CreateWorkoutTemplateScreenState
           _intensity,
           authProvider.user!.id,
         );
+        if (!mounted) return;
+        if (!ok) {
+          _showSaveError(workoutProvider);
+          return;
+        }
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -467,12 +409,17 @@ class _CreateWorkoutTemplateScreenState
           ),
         );
       } else {
-        await workoutProvider.updateWorkout(
+        final ok = await workoutProvider.updateWorkout(
           widget.workout!.id,
           _titleController.text.trim(),
           _descriptionController.text.trim(),
           _exercises,
         );
+        if (!mounted) return;
+        if (!ok) {
+          _showSaveError(workoutProvider);
+          return;
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Workout template updated successfully!'),
@@ -480,19 +427,23 @@ class _CreateWorkoutTemplateScreenState
         );
       }
 
+      if (!mounted) return;
       Navigator.pop(context);
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Failed to save workout template. Please try again.'),
+            backgroundColor: AuthColors.danger,
           ),
         );
       }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -502,34 +453,50 @@ class _CreateWorkoutTemplateScreenState
     final user = authProvider.user;
 
     if (user?.role != UserRole.trainer) {
-      return const Scaffold(
-        body: Center(child: Text('This screen is only for trainers')),
+      return const GymScaffold(
+        title: 'Workout Template',
+        body: GymEmptyState(
+          icon: Icons.lock_outline,
+          message: 'This screen is only for trainers',
+        ),
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Create Workout Template')),
+    final editing = widget.workout != null;
+
+    return GymScaffold(
+      eyebrow: editing ? 'Trainer / Edit template' : 'Trainer / New template',
+      title: editing ? 'Edit Workout' : 'Create Workout',
+      bottomBar: _exercises.isEmpty
+          ? null
+          : GymBottomBar(
+              child: PressableButton(
+                label: 'Save Workout Template',
+                loading: _isLoading,
+                onPressed: _isLoading ? null : _saveWorkoutTemplate,
+              ),
+            ),
       body: Form(
         key: _formKey,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Basic Information
-              const Text(
-                'Basic Information',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-
-              TextFormField(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(
+            GymScaffold.side,
+            AuthSpace.xs,
+            GymScaffold.side,
+            AuthSpace.l,
+          ),
+          children: [
+            const EntranceRise(
+              index: 0,
+              child: GymSectionLabel(index: 1, label: 'Basic Information'),
+            ),
+            const SizedBox(height: AuthSpace.s),
+            EntranceRise(
+              index: 1,
+              child: AuthTextField(
+                label: 'Workout Title',
                 controller: _titleController,
-                decoration: const InputDecoration(
-                  labelText: 'Workout Title',
-                  border: OutlineInputBorder(),
-                  icon: Icon(Icons.title),
-                ),
+                textInputAction: TextInputAction.next,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter a workout title';
@@ -537,303 +504,379 @@ class _CreateWorkoutTemplateScreenState
                   return null;
                 },
               ),
-              const SizedBox(height: 16),
-
-              TextFormField(
-                controller: _descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'Description',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 3,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a description';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      initialValue: _category,
-                      decoration: const InputDecoration(
-                        labelText: 'Category',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: _categories.map((category) {
-                        return DropdownMenuItem(
-                          value: category,
-                          child: Text(category.toUpperCase()),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          _category = value!;
-                        });
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      initialValue: _intensity,
-                      decoration: const InputDecoration(
-                        labelText: 'Intensity',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: _intensities.map((intensity) {
-                        return DropdownMenuItem(
-                          value: intensity,
-                          child: Text(intensity.toUpperCase()),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          _intensity = value!;
-                        });
-                      },
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              const SizedBox(height: 32),
-
-              // Exercises Section
-              const Text(
-                'Exercises',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-
-              if (_exercises.isEmpty)
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32.0),
-                    child: Column(
-                      children: [
-                        Icon(
-                          Icons.fitness_center,
-                          size: 64,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'No exercises added yet.\nTap "Add Exercise" to get started.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              else
-                ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _exercises.length,
-                  itemBuilder: (context, index) {
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 16),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: Theme.of(
-                                      context,
-                                    ).primaryColor.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    '${index + 1}',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                      color: Theme.of(context).primaryColor,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    _exercises[index]['name'].isEmpty
-                                        ? 'Exercise ${index + 1}'
-                                        : _exercises[index]['name'],
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.delete,
-                                    color: Colors.red,
-                                  ),
-                                  onPressed: () => _removeExercise(index),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            TextFormField(
-                              initialValue: _exercises[index]['name'],
-                              decoration: const InputDecoration(
-                                labelText: 'Exercise Name',
-                                border: OutlineInputBorder(),
-                              ),
-                              onChanged: (value) =>
-                                  _updateExercise(index, 'name', value),
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Please enter exercise name';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 16),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: TextFormField(
-                                    initialValue: _exercises[index]['sets']
-                                        .toString(),
-                                    decoration: const InputDecoration(
-                                      labelText: 'Sets',
-                                      border: OutlineInputBorder(),
-                                    ),
-                                    keyboardType: TextInputType.number,
-                                    onChanged: (value) => _updateExercise(
-                                      index,
-                                      'sets',
-                                      int.tryParse(value) ?? 3,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: TextFormField(
-                                    initialValue: _exercises[index]['reps']
-                                        .toString(),
-                                    decoration: const InputDecoration(
-                                      labelText: 'Reps',
-                                      border: OutlineInputBorder(),
-                                    ),
-                                    keyboardType: TextInputType.number,
-                                    onChanged: (value) => _updateExercise(
-                                      index,
-                                      'reps',
-                                      int.tryParse(value) ?? 10,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: TextFormField(
-                                    initialValue: _exercises[index]['weight']
-                                        .toString(),
-                                    decoration: const InputDecoration(
-                                      labelText: 'Weight (lbs)',
-                                      border: OutlineInputBorder(),
-                                    ),
-                                    keyboardType: TextInputType.number,
-                                    onChanged: (value) => _updateExercise(
-                                      index,
-                                      'weight',
-                                      int.tryParse(value) ?? 0,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            TextFormField(
-                              initialValue: _exercises[index]['notes'],
-                              decoration: const InputDecoration(
-                                labelText: 'Notes (optional)',
-                                border: OutlineInputBorder(),
-                              ),
-                              maxLines: 2,
-                              onChanged: (value) =>
-                                  _updateExercise(index, 'notes', value),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
+            ),
+            const SizedBox(height: AuthSpace.s),
+            EntranceRise(
+              index: 2,
+              child: GymLabeledField(
+                label: 'Description',
+                child: TextFormField(
+                  controller: _descriptionController,
+                  maxLines: 3,
+                  style: AuthType.input(),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter a description';
+                    }
+                    return null;
                   },
                 ),
-              const SizedBox(height: 24),
-
-              // Add Exercise Button
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton.icon(
-                  onPressed: _showExerciseSelector,
-                  icon: const Icon(Icons.add_circle_outline, size: 28),
-                  label: const Text(
-                    'Add Exercise',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).primaryColor,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
+              ),
+            ),
+            const SizedBox(height: AuthSpace.m),
+            EntranceRise(
+              index: 3,
+              child: GymLabeledField(
+                label: 'Category',
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final category in _categories)
+                      GymChoiceChip(
+                        label: category,
+                        selected: _category == category,
+                        onTap: () => setState(() => _category = category),
+                      ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 16),
-
-              // Save Workout Button
-              if (_exercises.isNotEmpty)
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton.icon(
-                    onPressed: _isLoading ? null : _saveWorkoutTemplate,
-                    icon: _isLoading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(Icons.check_circle, size: 28),
-                    label: Text(
-                      _isLoading ? 'Saving...' : 'Save Workout Template',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+            ),
+            const SizedBox(height: AuthSpace.s),
+            EntranceRise(
+              index: 4,
+              child: GymLabeledField(
+                label: 'Intensity',
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final intensity in _intensities)
+                      GymChoiceChip(
+                        label: intensity,
+                        selected: _intensity == intensity,
+                        onTap: () => setState(() => _intensity = intensity),
                       ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: AuthSpace.l),
+            EntranceRise(
+              index: 5,
+              child: GymSectionLabel(
+                index: 2,
+                label: 'Exercises (${_exercises.length})',
+              ),
+            ),
+            const SizedBox(height: AuthSpace.s),
+            if (_exercises.isEmpty)
+              const GymEmptyState(
+                icon: Icons.fitness_center,
+                message:
+                    'No exercises added yet.\nTap "Add Exercise" to get started.',
+              )
+            else
+              for (var index = 0; index < _exercises.length; index++)
+                Padding(
+                  key: ObjectKey(_exercises[index]),
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _ExerciseEditor(
+                    index: index,
+                    exercise: _exercises[index],
+                    onRemove: () => _removeExercise(index),
+                    onChanged: (field, value) =>
+                        _updateExercise(index, field, value),
                   ),
                 ),
-              const SizedBox(height: 32),
+            const SizedBox(height: AuthSpace.xs),
+            PressableButton(
+              label: 'Add Exercise',
+              variant: PressableVariant.ghost,
+              showArrow: false,
+              onPressed: _showExerciseSelector,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ExercisePickerSheet extends StatelessWidget {
+  const _ExercisePickerSheet({
+    required this.eyebrow,
+    required this.exercises,
+    required this.onPick,
+    required this.onCustom,
+  });
+
+  final String eyebrow;
+  final List<Map<String, dynamic>> exercises;
+  final ValueChanged<Map<String, dynamic>> onPick;
+  final VoidCallback onCustom;
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.7,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (context, scrollController) => Column(
+        children: [
+          const SizedBox(height: 10),
+          Container(
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AuthColors.line,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AuthSpace.m,
+              AuthSpace.s,
+              AuthSpace.s,
+              AuthSpace.xs,
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        eyebrow,
+                        style: AuthType.mono(color: AuthColors.accent),
+                      ),
+                      const SizedBox(height: 6),
+                      Text('SELECT EXERCISES', style: AuthType.display(28)),
+                    ],
+                  ),
+                ),
+                GymIconButton(
+                  icon: Icons.close,
+                  tooltip: 'Close',
+                  onTap: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              controller: scrollController,
+              padding: const EdgeInsets.fromLTRB(
+                AuthSpace.m,
+                AuthSpace.xs,
+                AuthSpace.m,
+                AuthSpace.l,
+              ),
+              children: [
+                if (exercises.isEmpty)
+                  const GymEmptyState(
+                    icon: Icons.search_off,
+                    message:
+                        'No exercises found for the selected category and intensity.',
+                  )
+                else
+                  for (final exercise in exercises)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _PickerRow(
+                        icon: exercise['icon'] as IconData,
+                        title: exercise['name'] as String,
+                        subtitle:
+                            '${exercise['defaultSets']} sets × ${exercise['defaultReps']} reps',
+                        trailing: Icons.add,
+                        onTap: () => onPick(exercise),
+                      ),
+                    ),
+                const SizedBox(height: AuthSpace.s),
+                // Custom exercise option
+                _PickerRow(
+                  icon: Icons.edit_outlined,
+                  title: 'Custom Exercise',
+                  subtitle: 'Create your own exercise',
+                  trailing: Icons.arrow_forward,
+                  highlighted: true,
+                  onTap: onCustom,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PickerRow extends StatelessWidget {
+  const _PickerRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.trailing,
+    required this.onTap,
+    this.highlighted = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final IconData trailing;
+  final VoidCallback onTap;
+  final bool highlighted;
+
+  @override
+  Widget build(BuildContext context) {
+    return PressableSurface(
+      highlighted: highlighted,
+      semanticLabel: title,
+      padding: const EdgeInsets.all(14),
+      onTap: onTap,
+      child: Row(
+        children: [
+          GymAvatar(icon: icon, size: 40, highlighted: highlighted),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title.toUpperCase(), style: AuthType.display(20)),
+                const SizedBox(height: 4),
+                Text(subtitle, style: AuthType.mono()),
+              ],
+            ),
+          ),
+          Icon(trailing, size: 20, color: AuthColors.accent),
+        ],
+      ),
+    );
+  }
+}
+
+/// One editable exercise. Fields use `initialValue` + `onChanged` exactly
+/// like before, so the parent's `_exercises` list stays the source of truth.
+class _ExerciseEditor extends StatelessWidget {
+  const _ExerciseEditor({
+    required this.index,
+    required this.exercise,
+    required this.onRemove,
+    required this.onChanged,
+  });
+
+  final int index;
+  final Map<String, dynamic> exercise;
+  final VoidCallback onRemove;
+  final void Function(String field, dynamic value) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final String name = exercise['name'] ?? '';
+    return PressableSurface(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              SizedBox(
+                width: 28,
+                child: Text(
+                  (index + 1).toString().padLeft(2, '0'),
+                  style: AuthType.mono(color: AuthColors.accent),
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  (name.isEmpty ? 'Exercise ${index + 1}' : name).toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AuthType.display(22).copyWith(height: 1),
+                ),
+              ),
+              const SizedBox(width: 8),
+              GymIconButton(
+                icon: Icons.delete_outline,
+                tooltip: 'Remove exercise',
+                danger: true,
+                onTap: onRemove,
+              ),
             ],
           ),
-        ),
+          const SizedBox(height: AuthSpace.s),
+          GymLabeledField(
+            label: 'Exercise Name',
+            child: TextFormField(
+              initialValue: exercise['name'],
+              style: AuthType.input(),
+              onChanged: (value) => onChanged('name', value),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter exercise name';
+                }
+                return null;
+              },
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _numberField(
+                  label: 'Sets',
+                  initial: exercise['sets'],
+                  onChanged: (v) => onChanged('sets', int.tryParse(v) ?? 3),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _numberField(
+                  label: 'Reps',
+                  initial: exercise['reps'],
+                  onChanged: (v) => onChanged('reps', int.tryParse(v) ?? 10),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _numberField(
+                  label: 'Weight (lbs)',
+                  initial: exercise['weight'],
+                  onChanged: (v) => onChanged('weight', int.tryParse(v) ?? 0),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          GymLabeledField(
+            label: 'Notes (optional)',
+            child: TextFormField(
+              initialValue: exercise['notes'],
+              maxLines: 2,
+              style: AuthType.input(),
+              onChanged: (value) => onChanged('notes', value),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _numberField({
+    required String label,
+    required dynamic initial,
+    required ValueChanged<String> onChanged,
+  }) {
+    return GymLabeledField(
+      label: label,
+      child: TextFormField(
+        initialValue: initial.toString(),
+        keyboardType: TextInputType.number,
+        textAlign: TextAlign.center,
+        style: AuthType.input(),
+        onChanged: onChanged,
       ),
     );
   }

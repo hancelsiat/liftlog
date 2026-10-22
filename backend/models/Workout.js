@@ -108,8 +108,32 @@ const WorkoutSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   },
+  // Who removed it: the trainer who owns the template or an admin (moderation).
+  // Older removals without this field were made by an admin.
+  deletedByRole: {
+    type: String,
+    enum: ['trainer', 'admin']
+  },
   deletedAt: {
     type: Date
+  },
+  // Set when the trainer deletes it permanently from "Recently deleted".
+  // The record stays (hidden from the trainer) so admins keep the audit trail.
+  purgedAt: {
+    type: Date
+  },
+  // Last restore: the trainer restores their own deletions, an admin
+  // restores moderation removals.
+  restoredAt: {
+    type: Date
+  },
+  restoredBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  restoredByRole: {
+    type: String,
+    enum: ['trainer', 'admin']
   }
 }, {
   timestamps: true

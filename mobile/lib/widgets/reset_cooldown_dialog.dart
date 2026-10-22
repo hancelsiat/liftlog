@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
+import 'gym/gym.dart';
 
 /// Admin dialog for resetting a client's BMI / calorie tracking cooldown
 /// (e.g. when the client misclicked the update button).
@@ -31,8 +32,7 @@ class _ResetCooldownDialogState extends State<ResetCooldownDialog> {
   ];
 
   final ApiService _apiService = ApiService();
-  final TextEditingController _customReasonController =
-      TextEditingController();
+  final TextEditingController _customReasonController = TextEditingController();
 
   Map<String, dynamic>? _status;
   String? _loadError;
@@ -85,10 +85,7 @@ class _ResetCooldownDialogState extends State<ResetCooldownDialog> {
       : _selectedReason;
 
   bool get _canSubmit =>
-      !_submitting &&
-      _hasProgress &&
-      _anyActive &&
-      _reason.length >= 5;
+      !_submitting && _hasProgress && _anyActive && _reason.length >= 5;
 
   Future<void> _submit() async {
     if (!_canSubmit) return;
@@ -102,9 +99,9 @@ class _ResetCooldownDialogState extends State<ResetCooldownDialog> {
         reason: _reason,
       );
       if (!mounted) return;
-      Navigator.of(context).pop(
-        result['message']?.toString() ?? 'Cooldown reset successfully.',
-      );
+      Navigator.of(
+        context,
+      ).pop(result['message']?.toString() ?? 'Cooldown reset successfully.');
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -130,66 +127,50 @@ class _ResetCooldownDialogState extends State<ResetCooldownDialog> {
 
   Widget _buildStatusTile(String label, IconData icon, dynamic data) {
     final bool active = data?['active'] == true;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: (active ? Colors.orange : Colors.green).withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: active ? Colors.orange : Colors.green, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-                Text(
-                  active
-                      ? 'On cooldown - ${_formatRemaining(data?['remainingMs'])}'
-                      : 'No active cooldown',
-                  style: const TextStyle(fontSize: 12),
-                ),
-                if (data?['lastUpdate'] != null)
-                  Text(
-                    'Last update: ${_formatDate(data?['lastUpdate'])}',
-                    style: const TextStyle(fontSize: 11, color: Colors.grey),
-                  ),
-              ],
-            ),
-          ),
-        ],
+    final lines = <String>[
+      active
+          ? 'On cooldown - ${_formatRemaining(data?['remainingMs'])}'
+          : 'No active cooldown',
+      if (data?['lastUpdate'] != null)
+        'Last update: ${_formatDate(data?['lastUpdate'])}',
+    ];
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: GymStatusStrip(
+        color: active ? GymColors.warn : AuthColors.accent,
+        icon: icon,
+        title: label,
+        lines: lines,
       ),
     );
   }
 
   Widget _buildContent() {
     if (_loading) {
-      return const SizedBox(
-        height: 120,
-        child: Center(child: CircularProgressIndicator()),
-      );
+      return const SizedBox(height: 120, child: GymLoader());
     }
     if (_loadError != null) {
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(_loadError!, style: const TextStyle(color: Colors.red)),
-          const SizedBox(height: 8),
-          TextButton.icon(
+      return GymEmptyState(
+        icon: Icons.error_outline,
+        danger: true,
+        message: _loadError!,
+        action: SizedBox(
+          width: 160,
+          child: PressableButton(
+            label: 'Retry',
+            height: 48,
+            showArrow: false,
+            variant: PressableVariant.ghost,
             onPressed: _loadStatus,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Retry'),
           ),
-        ],
+        ),
       );
     }
     if (!_hasProgress) {
-      return const Text(
+      return Text(
         'This user has not logged any BMI or calorie data yet, '
         'so there is no cooldown to reset.',
+        style: AuthType.body(),
       );
     }
 
@@ -198,18 +179,24 @@ class _ResetCooldownDialogState extends State<ResetCooldownDialog> {
 
     return Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildStatusTile('BMI (7-day cooldown)', Icons.monitor_weight_outlined,
-            _status?['bmi']),
-        _buildStatusTile('Calories (24-hour cooldown)',
-            Icons.local_fire_department_outlined, _status?['calories']),
+        _buildStatusTile(
+          'BMI (7-day cooldown)',
+          Icons.monitor_weight_outlined,
+          _status?['bmi'],
+        ),
+        _buildStatusTile(
+          'Calories (24-hour cooldown)',
+          Icons.local_fire_department_outlined,
+          _status?['calories'],
+        ),
         if (!anyActive)
-          const Padding(
-            padding: EdgeInsets.only(top: 4),
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
             child: Text(
               'The client can already update BMI and calories. Nothing to reset.',
-              style: TextStyle(fontStyle: FontStyle.italic),
+              style: AuthType.body(size: 14),
             ),
           )
         else ...[
@@ -219,22 +206,18 @@ class _ResetCooldownDialogState extends State<ResetCooldownDialog> {
               'Both BMI and calories will be reset. The client\'s latest BMI '
               'and calorie entries still on cooldown will be deleted from '
               'their history and their update timers will start over.',
-              style: TextStyle(fontSize: 12, color: Colors.orange[800]),
+              style: AuthType.body(size: 13, color: GymColors.warn),
             ),
           ),
-          const SizedBox(height: 8),
-          const Text('Reason', style: TextStyle(fontWeight: FontWeight.bold)),
-          ..._presetReasons.map(
-            (reason) => RadioListTile<String>(
-              title: Text(reason, style: const TextStyle(fontSize: 14)),
-              value: reason,
-              groupValue: _selectedReason,
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-              onChanged: _submitting
-                  ? null
-                  : (v) => setState(() => _selectedReason = v!),
-            ),
+          const SizedBox(height: AuthSpace.s),
+          const GymSectionLabel(label: 'Reason'),
+          const SizedBox(height: 12),
+          GymRadioList<String>(
+            options: _presetReasons,
+            selected: _selectedReason,
+            onChanged: _submitting
+                ? null
+                : (v) => setState(() => _selectedReason = v),
           ),
           if (_selectedReason == _customReason)
             TextField(
@@ -242,6 +225,8 @@ class _ResetCooldownDialogState extends State<ResetCooldownDialog> {
               maxLength: 500,
               maxLines: 2,
               enabled: !_submitting,
+              autofocus: true,
+              style: AuthType.input(),
               decoration: const InputDecoration(
                 hintText: 'Describe the client request (min 5 characters)',
               ),
@@ -249,22 +234,27 @@ class _ResetCooldownDialogState extends State<ResetCooldownDialog> {
             ),
         ],
         if (recentResets.isNotEmpty) ...[
-          const Divider(height: 24),
-          const Text('Recent resets',
-              style: TextStyle(fontWeight: FontWeight.bold)),
-          ...recentResets.map((r) => Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  '${_formatDate(r['resetAt'])} - ${r['type']} - '
-                  '${r['reason'] ?? ''}'
-                  '${r['admin'] != null ? ' (by ${r['admin']})' : ''}',
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                ),
-              )),
+          const SizedBox(height: AuthSpace.s),
+          const GymSectionLabel(label: 'Recent resets'),
+          const SizedBox(height: 8),
+          ...recentResets.map(
+            (r) => Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                '${_formatDate(r['resetAt'])} - ${r['type']} - '
+                '${r['reason'] ?? ''}'
+                '${r['admin'] != null ? ' (by ${r['admin']})' : ''}',
+                style: AuthType.mono(),
+              ),
+            ),
+          ),
         ],
         if (_submitError != null) ...[
-          const SizedBox(height: 8),
-          Text(_submitError!, style: const TextStyle(color: Colors.red)),
+          const SizedBox(height: AuthSpace.s),
+          Semantics(
+            liveRegion: true,
+            child: Text(_submitError!, style: AuthType.error()),
+          ),
         ],
       ],
     );
@@ -272,29 +262,13 @@ class _ResetCooldownDialogState extends State<ResetCooldownDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text('Reset Cooldown - ${widget.username}'),
-      content: SizedBox(
-        width: double.maxFinite,
-        child: SingleChildScrollView(child: _buildContent()),
-      ),
-      actions: [
-        TextButton(
-          onPressed: _submitting ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: _canSubmit ? _submit : null,
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-          child: _submitting
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Reset'),
-        ),
-      ],
+    return GymFormDialog(
+      eyebrow: 'Admin / ${widget.username}',
+      title: 'Reset Cooldown',
+      confirmLabel: 'Reset',
+      loading: _submitting,
+      onConfirm: _canSubmit ? _submit : null,
+      child: _buildContent(),
     );
   }
 }

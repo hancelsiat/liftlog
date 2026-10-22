@@ -28,7 +28,14 @@ class WorkoutProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> createWorkout(String name, String description, List<Map<String, dynamic>> exercises, String category, String intensity, String trainerId) async {
+  Future<bool> createWorkout(
+    String name,
+    String description,
+    List<Map<String, dynamic>> exercises,
+    String category,
+    String intensity,
+    String trainerId,
+  ) async {
     try {
       final newWorkout = await _apiService.createWorkoutTemplate(
         title: name,
@@ -48,9 +55,19 @@ class WorkoutProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> updateWorkout(String id, String name, String description, List<Map<String, dynamic>> exercises) async {
+  Future<bool> updateWorkout(
+    String id,
+    String name,
+    String description,
+    List<Map<String, dynamic>> exercises,
+  ) async {
     try {
-      final updatedWorkout = await _apiService.updateWorkout(id, name, description, exercises);
+      final updatedWorkout = await _apiService.updateWorkout(
+        id,
+        name,
+        description,
+        exercises,
+      );
       final index = _workouts.indexWhere((w) => w.id == id);
       if (index != -1) {
         _workouts[index] = updatedWorkout;

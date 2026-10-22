@@ -17,6 +17,22 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
+// Full name rules (kept in sync with register_screen.dart): letters, spaces,
+// periods, apostrophes and hyphens, at least first + last name, max 100.
+const FULL_NAME_RE = /^\p{L}[\p{L} .'-]*$/u;
+const validateFullName = (raw) => {
+  const name = String(raw || '').trim().replace(/\s+/g, ' ');
+  if (!name) return { error: 'Please enter your full name as it appears on your credential.' };
+  if (name.length > 100) return { error: 'Your full name must be 100 characters or fewer.' };
+  if (!FULL_NAME_RE.test(name)) {
+    return { error: 'Your full name can only contain letters, spaces, periods, apostrophes and hyphens.' };
+  }
+  if (name.split(' ').filter((p) => /\p{L}/u.test(p)).length < 2) {
+    return { error: 'Please enter your first and last name.' };
+  }
+  return { name };
+};
+
 // User Registration
 router.post('/register', upload.single('credential'), async (req, res) => {
   try {
@@ -32,6 +48,16 @@ router.post('/register', upload.single('credential'), async (req, res) => {
       return res.status(403).json({ 
         error: 'Admin accounts cannot be created through registration.' 
       });
+    }
+
+    // Trainers must give their legal name so the admin can match it to the
+    // credential photo. Checked before the upload so a bad name doesn't
+    // leave an orphaned file in storage.
+    let fullName = '';
+    if (role === 'trainer') {
+      const checked = validateFullName(req.body.fullName);
+      if (checked.error) return res.status(400).json({ error: checked.error });
+      fullName = checked.name;
     }
 
     if (password) {
@@ -83,6 +109,7 @@ router.post('/register', upload.single('credential'), async (req, res) => {
 
     const user = new User({
       username,
+      fullName,
       email,
       password,
       role,
@@ -117,6 +144,7 @@ router.post('/register', upload.single('credential'), async (req, res) => {
       user: {
         id: user._id,
         username: user.username,
+        fullName: user.fullName,
         email: user.email,
         role: user.role
       },
@@ -217,7 +245,14 @@ router.get('/profile', verifyToken, async (req, res) => {
 // Update User Profile (Authenticated Route)
 router.patch('/profile', verifyToken, async (req, res) => {
   try {
-    const updates = req.body;
+    const updates = { ...req.body };
+    // Users can't change their own role, approval or verification state, or
+    // the identity fields the admin checked (full name and credential photo).
+    // Only an admin can change these, via PATCH /users/:id.
+    for (const key of ['role', 'isApproved', 'isEmailVerified', 'emailVerificationToken',
+      'emailVerificationExpires', 'credentialImageUrl', 'fullName', 'clients', '_id']) {
+      delete updates[key];
+    }
     if (updates.password) {
       const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/;
       if (!passwordRegex.test(updates.password)) {
@@ -259,6 +294,7 @@ router.get('/users',
       if (search) {
         query.$or = [
           { username: { $regex: search, $options: 'i' } },
+          { fullName: { $regex: search, $options: 'i' } },
           { email: { $regex: search, $options: 'i' } }
         ];
       }
@@ -285,6 +321,18 @@ router.get('/users',
 // Admin: Update user
 router.patch('/users/:id', verifyToken, checkRole(['admin']), async (req, res) => {
   try {
+    // An admin may fix a trainer's full name (blank is allowed for older
+    // accounts); otherwise it uses the same rules as sign-up.
+    if (req.body.fullName !== undefined) {
+      const raw = String(req.body.fullName || '').trim();
+      if (raw) {
+        const checked = validateFullName(raw);
+        if (checked.error) return res.status(400).json({ error: checked.error });
+        req.body.fullName = checked.name;
+      } else {
+        req.body.fullName = '';
+      }
+    }
     if (req.body.password) {
       const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/;
       if (!passwordRegex.test(req.body.password)) {
@@ -295,7 +343,7 @@ router.patch('/users/:id', verifyToken, checkRole(['admin']), async (req, res) =
       const bcrypt = require('bcryptjs');
       req.body.password = await bcrypt.hash(req.body.password, 10);
     }
-    const user = await User.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    const user = await User.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true }).select('-password');
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json(user);
   } catch (error) {
@@ -334,17 +382,35 @@ router.patch('/users/:id/approve', verifyToken, checkRole(['admin']), async (req
       return res.status(404).json({ error: 'Trainer not found' });
     }
 
+    // Never send the password hash back to the app.
+    const safeUser = () => {
+      const obj = user.toObject();
+      delete obj.password;
+      return obj;
+    };
+
     if (isApproved) {
       user.isApproved = true;
       await user.save();
-      await sendApprovalEmail(user.email, user.username);
-      res.json({ message: 'Trainer has been approved.', user });
+      try {
+        await sendApprovalEmail(user.email, user.fullName || user.username);
+      } catch (emailErr) {
+        console.warn('Approval email failed (non-blocking):', emailErr.message);
+      }
+      res.json({ message: 'Trainer has been approved.', user: safeUser() });
     } else {
-      await sendRejectionEmail(user.email, user.username, rejectionReason || 'No reason provided.');
+      // Email first (needs the user's details), but never let it block the reject.
+      try {
+        await sendRejectionEmail(user.email, user.fullName || user.username, rejectionReason || 'No reason provided.');
+      } catch (emailErr) {
+        console.warn('Rejection email failed (non-blocking):', emailErr.message);
+      }
+      const rejected = safeUser();
       await User.findByIdAndDelete(req.params.id);
       await Workout.deleteMany({ user: req.params.id });
       await ExerciseVideo.deleteMany({ trainer: req.params.id });
-      res.json({ message: 'Trainer has been rejected and their data deleted.' });
+      // `user` is included so older app versions that always parse it don't crash.
+      res.json({ message: 'Trainer has been rejected and their data deleted.', user: rejected });
     }
   } catch (error) {
     res.status(500).json({ error: error.message });

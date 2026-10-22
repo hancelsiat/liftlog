@@ -17,7 +17,7 @@ class DriveUploadScreen extends StatefulWidget {
   const DriveUploadScreen({super.key});
 
   @override
-  _DriveUploadScreenState createState() => _DriveUploadScreenState();
+  State<DriveUploadScreen> createState() => _DriveUploadScreenState();
 }
 
 class _DriveUploadScreenState extends State<DriveUploadScreen> {
@@ -69,8 +69,9 @@ class _DriveUploadScreenState extends State<DriveUploadScreen> {
         Uri.parse(url),
         headers: {'Authorization': 'Bearer $_accessToken'},
       );
-      if (resp.statusCode != 200)
+      if (resp.statusCode != 200) {
         throw Exception('Failed to connect to Google Drive. Please try again.');
+      }
 
       final data = json.decode(resp.body) as Map<String, dynamic>;
       final files = (data['files'] as List<dynamic>)
@@ -102,25 +103,33 @@ class _DriveUploadScreenState extends State<DriveUploadScreen> {
     });
 
     try {
+      final fileName =
+          _files
+              .firstWhere((f) => f['id'] == fileId, orElse: () => {})['name']
+              ?.toString() ??
+          'Drive video';
       final result = await _apiService.uploadVideoFromDrive(
         fileId: fileId,
         accessToken: _accessToken!,
         userId: _account?.id,
+        metadata: {'title': fileName},
       );
+      if (!mounted) return;
 
       setState(() {
-        _status = 'Upload successful! File: ${result['filename']}';
+        _status = 'Upload successful! File: ${result.title}';
       });
 
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Video "${result['filename']}" uploaded successfully from Drive',
+            'Video "${result.title}" uploaded successfully from Drive',
           ),
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _status = 'Upload request error: $e';
       });
@@ -134,7 +143,7 @@ class _DriveUploadScreenState extends State<DriveUploadScreen> {
         );
       }
     } finally {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 

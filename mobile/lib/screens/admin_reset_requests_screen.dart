@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../utils/bulk_action.dart';
+import '../widgets/gym/gym.dart';
 
 /// Admin: review members' requests to reset their BMI / calorie cooldown.
 class AdminResetRequestsScreen extends StatefulWidget {
@@ -12,7 +14,12 @@ class AdminResetRequestsScreen extends StatefulWidget {
 
 class _AdminResetRequestsScreenState extends State<AdminResetRequestsScreen> {
   final ApiService _apiService = ApiService();
-  static const List<String> _filters = ['pending', 'approved', 'rejected', 'all'];
+  static const List<String> _filters = [
+    'pending',
+    'approved',
+    'rejected',
+    'all',
+  ];
 
   String _status = 'pending';
   List<Map<String, dynamic>> _requests = [];
@@ -21,10 +28,67 @@ class _AdminResetRequestsScreenState extends State<AdminResetRequestsScreen> {
   String? _error;
   final Set<String> _busyIds = {};
 
+  // Multi-select (bulk approve / reject). Only pending requests can be picked.
+  bool _selecting = false;
+  final Set<String> _selected = {};
+  String? _bulkProgress;
+
+  // Client-side search over the loaded requests. Selections hidden by a
+  // search are kept, but bulk actions only touch visible ones.
+  String _query = '';
+
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  String _idOf(Map<String, dynamic> r) => r['_id'].toString();
+
+  bool _isPending(Map<String, dynamic> r) => r['status'] == 'pending';
+
+  bool _matches(Map<String, dynamic> r) {
+    final user = r['user'] as Map?;
+    final handledBy = r['handledBy'] as Map?;
+    return matchesSearch(_query, [
+      user?['username']?.toString(),
+      user?['email']?.toString(),
+      r['reason']?.toString(),
+      r['adminNote']?.toString(),
+      _typeLabel(r['type']?.toString()),
+      handledBy?['username']?.toString(),
+    ]);
+  }
+
+  /// Requests shown under the current status filter and search.
+  List<Map<String, dynamic>> get _visibleRequests =>
+      _requests.where(_matches).toList();
+
+  /// Pending requests that are visible, i.e. the ones that can be selected.
+  List<Map<String, dynamic>> get _pendingRequests =>
+      _visibleRequests.where(_isPending).toList();
+
+  int get _visibleSelectedCount =>
+      _pendingRequests.where((r) => _selected.contains(_idOf(r))).length;
+
+  void _startSelecting([String? firstId]) {
+    setState(() {
+      _selecting = true;
+      if (firstId != null) _selected.add(firstId);
+    });
+  }
+
+  void _stopSelecting() {
+    setState(() {
+      _selecting = false;
+      _selected.clear();
+    });
+  }
+
+  void _toggle(String id) {
+    setState(() {
+      if (!_selected.remove(id)) _selected.add(id);
+    });
   }
 
   Future<void> _load() async {
@@ -41,6 +105,11 @@ class _AdminResetRequestsScreenState extends State<AdminResetRequestsScreen> {
             .toList();
         _pendingCount = (data['pendingCount'] as num?)?.toInt() ?? 0;
         _loading = false;
+        // Drop selections that are gone or no longer pending (ignoring the
+        // search, so hidden selections survive a reload).
+        final pendingIds = _requests.where(_isPending).map(_idOf).toSet();
+        _selected.retainWhere(pendingIds.contains);
+        if (pendingIds.isEmpty) _selecting = false;
       });
     } catch (e) {
       if (!mounted) return;
@@ -72,11 +141,11 @@ class _AdminResetRequestsScreenState extends State<AdminResetRequestsScreen> {
   Color _statusColor(String? status) {
     switch (status) {
       case 'approved':
-        return Colors.green;
+        return AuthColors.accent;
       case 'rejected':
-        return Colors.red;
+        return AuthColors.danger;
       default:
-        return Colors.orange;
+        return GymColors.warn;
     }
   }
 
@@ -85,53 +154,44 @@ class _AdminResetRequestsScreenState extends State<AdminResetRequestsScreen> {
     final username = user?['username']?.toString() ?? 'this member';
     final noteController = TextEditingController();
 
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGymDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
           final noteOk = approve || noteController.text.trim().length >= 5;
-          return AlertDialog(
-            title: Text(approve ? 'Approve Reset?' : 'Reject Request?'),
-            content: Column(
+          return GymFormDialog(
+            eyebrow: 'Admin / Reset request',
+            title: approve ? 'Approve Reset?' : 'Reject Request?',
+            confirmLabel: approve ? 'Approve' : 'Reject',
+            onConfirm: noteOk ? () => Navigator.pop(ctx, true) : null,
+            child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
                   approve
                       ? 'This will reset the BMI & Calories cooldown for $username right away.'
-                          '\n\nTheir latest BMI and calorie entries will also be deleted from their progress history, '
-                          'and their update timers will start over.'
+                            '\n\nTheir latest BMI and calorie entries will also be deleted from their progress history, '
+                            'and their update timers will start over.'
                       : 'Tell $username why the request is rejected.',
+                  style: AuthType.body(),
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: noteController,
-                  maxLength: 500,
-                  maxLines: 2,
-                  decoration: InputDecoration(
-                    labelText: approve
-                        ? 'Note (optional)'
-                        : 'Reason (min 5 characters)',
-                    border: const OutlineInputBorder(),
+                const SizedBox(height: AuthSpace.s),
+                GymLabeledField(
+                  label: approve
+                      ? 'Note (optional)'
+                      : 'Reason (min 5 characters)',
+                  child: TextField(
+                    controller: noteController,
+                    maxLength: 500,
+                    maxLines: 2,
+                    autofocus: !approve,
+                    style: AuthType.input(),
+                    onChanged: (_) => setDialogState(() {}),
                   ),
-                  onChanged: (_) => setDialogState(() {}),
                 ),
               ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: approve ? Colors.green : Colors.red,
-                  foregroundColor: Colors.white,
-                ),
-                onPressed: noteOk ? () => Navigator.pop(ctx, true) : null,
-                child: Text(approve ? 'Approve' : 'Reject'),
-              ),
-            ],
           );
         },
       ),
@@ -153,17 +213,114 @@ class _AdminResetRequestsScreenState extends State<AdminResetRequestsScreen> {
       messenger.showSnackBar(
         SnackBar(
           content: Text(response['message']?.toString() ?? 'Done.'),
-          backgroundColor: approve ? Colors.green : Colors.orange,
+          backgroundColor: approve ? null : GymColors.warn,
         ),
       );
       await _load();
     } catch (e) {
       messenger.showSnackBar(
-        SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text(e.toString()),
+          backgroundColor: AuthColors.danger,
+        ),
       );
     } finally {
       if (mounted) setState(() => _busyIds.remove(id));
     }
+  }
+
+  /// Approve or reject every selected request with one shared note.
+  Future<void> _handleSelected(bool approve) async {
+    final targets = _pendingRequests
+        .where((r) => _selected.contains(_idOf(r)))
+        .toList();
+    if (targets.isEmpty) return;
+    final count = targets.length;
+    final noteController = TextEditingController();
+
+    final confirmed = await showGymDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final noteOk = approve || noteController.text.trim().length >= 5;
+          return GymFormDialog(
+            eyebrow: 'Admin / $count selected',
+            title: approve
+                ? 'Approve $count Resets?'
+                : 'Reject $count Requests?',
+            confirmLabel: approve ? 'Approve all' : 'Reject all',
+            onConfirm: noteOk ? () => Navigator.pop(ctx, true) : null,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  approve
+                      ? 'This resets the BMI & Calories cooldown for $count member(s). '
+                            'Their latest BMI and calorie entries are deleted and their '
+                            'update timers start over.'
+                      : 'All $count member(s) will see this reason.',
+                  style: AuthType.body(),
+                ),
+                const SizedBox(height: AuthSpace.s),
+                GymLabeledField(
+                  label: approve
+                      ? 'Note (optional, sent to all)'
+                      : 'Reason (min 5 characters)',
+                  child: TextField(
+                    controller: noteController,
+                    maxLength: 500,
+                    maxLines: 2,
+                    autofocus: !approve,
+                    style: AuthType.input(),
+                    onChanged: (_) => setDialogState(() {}),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    final note = noteController.text.trim();
+    noteController.dispose();
+    if (confirmed != true || !mounted) return;
+
+    final verb = approve ? 'Approving' : 'Rejecting';
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _bulkProgress = '$verb 0/$count…');
+    final result = await runBulk<Map<String, dynamic>>(
+      targets,
+      (r) => _apiService.handleCooldownResetRequest(
+        _idOf(r),
+        approve: approve,
+        note: note,
+      ),
+      onProgress: (done, total) {
+        if (mounted) setState(() => _bulkProgress = '$verb $done/$total…');
+      },
+    );
+    if (!mounted) return;
+    setState(() {
+      _bulkProgress = null;
+      _selecting = false;
+      _selected.clear();
+    });
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          result.message(
+            verb: approve ? 'Approved' : 'Rejected',
+            noun: 'request',
+          ),
+        ),
+        backgroundColor: result.failed > 0
+            ? AuthColors.danger
+            : (approve ? null : GymColors.warn),
+      ),
+    );
+    await _load();
   }
 
   Widget _buildRequestCard(Map<String, dynamic> r) {
@@ -172,96 +329,118 @@ class _AdminResetRequestsScreenState extends State<AdminResetRequestsScreen> {
     final status = r['status']?.toString();
     final id = r['_id'].toString();
     final busy = _busyIds.contains(id);
+    final username = user?['username']?.toString() ?? 'Deleted user';
+    final selectable = _selecting && status == 'pending';
+    final selected = _selected.contains(id);
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
+    return PressableSurface(
+      highlighted: selectable ? selected : status == 'pending',
+      padding: const EdgeInsets.all(14),
+      onTap: selectable ? () => _toggle(id) : null,
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onLongPress: !_selecting && status == 'pending' && _bulkProgress == null
+            ? () => _startSelecting(id)
+            : null,
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
-                const CircleAvatar(child: Icon(Icons.person)),
-                const SizedBox(width: 12),
+                if (selectable) ...[
+                  GymCheckbox(
+                    value: selected,
+                    semanticLabel: 'Select $username',
+                    onChanged: (_) => _toggle(id),
+                  ),
+                  const SizedBox(width: 4),
+                ],
+                GymAvatar(
+                  text: username,
+                  icon: user == null ? Icons.person_off_outlined : null,
+                  size: 44,
+                ),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        user?['username']?.toString() ?? 'Deleted user',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        username.toUpperCase(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AuthType.display(22).copyWith(height: 1),
                       ),
-                      if (user?['email'] != null)
+                      if (user?['email'] != null) ...[
+                        const SizedBox(height: 4),
                         Text(
                           user!['email'].toString(),
-                          style: const TextStyle(fontSize: 12),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AuthType.body(size: 13),
                         ),
+                      ],
                     ],
                   ),
                 ),
-                Chip(
-                  label: Text(
-                    (status ?? 'pending').toUpperCase(),
-                    style: const TextStyle(color: Colors.white, fontSize: 11),
-                  ),
-                  backgroundColor: _statusColor(status),
-                  visualDensity: VisualDensity.compact,
-                ),
+                const SizedBox(width: 8),
+                GymTag(label: status ?? 'pending', color: _statusColor(status)),
               ],
+            ),
+            const SizedBox(height: 14),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: GymTag(
+                label: 'Reset: ${_typeLabel(r['type'])}',
+                icon: Icons.restart_alt,
+                color: AuthColors.textPrimary,
+              ),
             ),
             const SizedBox(height: 10),
             Text(
-              'Reset: ${_typeLabel(r['type'])}',
-              style: const TextStyle(fontWeight: FontWeight.w600),
+              'Reason: ${r['reason'] ?? ''}',
+              style: AuthType.body(size: 14, color: AuthColors.textPrimary),
             ),
-            const SizedBox(height: 4),
-            Text('Reason: ${r['reason'] ?? ''}'),
-            const SizedBox(height: 4),
+            const SizedBox(height: 8),
             Text(
-              'Requested: ${_formatDate(r['createdAt'])}',
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
+              'REQUESTED ${_formatDate(r['createdAt'])}',
+              style: AuthType.mono(color: AuthColors.textFaint),
             ),
             if (status != 'pending') ...[
               const SizedBox(height: 4),
               Text(
-                'Handled${handledBy?['username'] != null ? ' by ${handledBy!['username']}' : ''}'
-                ' on ${_formatDate(r['handledAt'])}',
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                'HANDLED'
+                '${handledBy?['username'] != null ? ' BY ${handledBy!['username'].toString().toUpperCase()}' : ''}'
+                ' ON ${_formatDate(r['handledAt'])}',
+                style: AuthType.mono(color: AuthColors.textFaint),
               ),
-              if (r['adminNote'] != null)
-                Text(
-                  'Note: ${r['adminNote']}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
+              if (r['adminNote'] != null) ...[
+                const SizedBox(height: 8),
+                Text('Note: ${r['adminNote']}', style: AuthType.body(size: 13)),
+              ],
             ],
-            if (status == 'pending') ...[
-              const SizedBox(height: 10),
+            // In selection mode the bulk bar replaces the per-card buttons.
+            if (status == 'pending' && !_selecting) ...[
+              const SizedBox(height: 14),
               if (busy)
-                const Center(child: CircularProgressIndicator())
+                const SizedBox(height: 40, child: GymLoader())
               else
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    OutlinedButton.icon(
-                      onPressed: () => _handle(r, false),
-                      icon: const Icon(Icons.close, color: Colors.red),
-                      label: const Text(
-                        'Reject',
-                        style: TextStyle(color: Colors.red),
+                    Expanded(
+                      child: GymSmallButton(
+                        label: 'Reject',
+                        icon: Icons.close,
+                        onTap: () => _handle(r, false),
                       ),
                     ),
                     const SizedBox(width: 8),
-                    ElevatedButton.icon(
-                      onPressed: () => _handle(r, true),
-                      icon: const Icon(Icons.restart_alt),
-                      label: const Text('Approve & Reset'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
+                    Expanded(
+                      child: GymSmallButton(
+                        label: 'Approve & Reset',
+                        icon: Icons.restart_alt,
+                        primary: true,
+                        onTap: () => _handle(r, true),
                       ),
                     ),
                   ],
@@ -273,87 +452,170 @@ class _AdminResetRequestsScreenState extends State<AdminResetRequestsScreen> {
     );
   }
 
+  Widget _scrollableMessage(Widget child) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(height: MediaQuery.sizeOf(context).height * 0.1),
+        child,
+      ],
+    );
+  }
+
   Widget _buildBody() {
-    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_loading) return const GymLoader();
     if (_error != null) {
-      return ListView(
-        children: [
-          const SizedBox(height: 80),
-          const Icon(Icons.error_outline, size: 48, color: Colors.red),
-          const SizedBox(height: 12),
-          Center(child: Text(_error!, textAlign: TextAlign.center)),
-          const SizedBox(height: 12),
-          Center(
-            child: ElevatedButton(onPressed: _load, child: const Text('Retry')),
+      return _scrollableMessage(
+        GymEmptyState(
+          icon: Icons.error_outline,
+          danger: true,
+          message: _error!,
+          action: SizedBox(
+            width: 160,
+            child: PressableButton(
+              label: 'Retry',
+              height: 48,
+              showArrow: false,
+              onPressed: _load,
+            ),
           ),
-        ],
+        ),
       );
     }
     if (_requests.isEmpty) {
-      return ListView(
-        children: [
-          const SizedBox(height: 80),
-          const Icon(Icons.inbox, size: 56, color: Colors.grey),
-          const SizedBox(height: 12),
-          Center(
-            child: Text(
-              _status == 'pending'
-                  ? 'No pending reset requests.'
-                  : 'No $_status requests.',
-            ),
-          ),
-        ],
+      return _scrollableMessage(
+        GymEmptyState(
+          icon: Icons.inbox_outlined,
+          message: _status == 'pending'
+              ? 'No pending reset requests.'
+              : 'No $_status requests.',
+        ),
       );
     }
-    return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 16),
-      itemCount: _requests.length,
-      itemBuilder: (_, i) => _buildRequestCard(_requests[i]),
+    final visible = _visibleRequests;
+    if (visible.isEmpty) {
+      return _scrollableMessage(
+        GymEmptyState(
+          icon: Icons.search_off,
+          message: 'No requests match "$_query".',
+        ),
+      );
+    }
+    return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(
+        GymScaffold.side,
+        AuthSpace.xs,
+        GymScaffold.side,
+        AuthSpace.l,
+      ),
+      itemCount: visible.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      itemBuilder: (_, i) =>
+          StaggeredReveal(index: i, child: _buildRequestCard(visible[i])),
+    );
+  }
+
+  Widget? _buildSelectionBar() {
+    if (!_selecting) return null;
+    final count = _visibleSelectedCount;
+    final none = count == 0;
+    final visibleIds = _pendingRequests.map(_idOf).toList();
+    return GymSelectionBar(
+      selectedCount: count,
+      selectableCount: visibleIds.length,
+      busyLabel: _bulkProgress,
+      onSelectAll: () => setState(() => _selected.addAll(visibleIds)),
+      onClear: () => setState(() => _selected.removeAll(visibleIds)),
+      onClose: _stopSelecting,
+      actions: [
+        GymSmallButton(
+          label: 'Reject',
+          icon: Icons.close,
+          onTap: none ? null : () => _handleSelected(false),
+        ),
+        GymSmallButton(
+          label: 'Approve',
+          icon: Icons.restart_alt,
+          primary: true,
+          onTap: none ? null : () => _handleSelected(true),
+        ),
+      ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          _pendingCount > 0
-              ? 'Reset Requests ($_pendingCount pending)'
-              : 'Reset Requests',
+    final canSelect = !_loading && _pendingRequests.isNotEmpty;
+    return GymScaffold(
+      eyebrow: _pendingCount > 0
+          ? 'Admin / $_pendingCount pending'
+          : 'Admin / Cooldowns',
+      title: 'Reset Requests',
+      bottomBar: _buildSelectionBar(),
+      actions: [
+        GymIconButton(
+          icon: _selecting ? Icons.close : Icons.checklist,
+          tooltip: _selecting ? 'Exit selection' : 'Select multiple',
+          onTap: _bulkProgress != null
+              ? null
+              : _selecting
+              ? _stopSelecting
+              : (canSelect ? _startSelecting : null),
         ),
-        actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
-        ],
-      ),
-      body: Column(
+        GymIconButton(
+          icon: Icons.refresh,
+          tooltip: 'Refresh',
+          onTap: _loading || _bulkProgress != null ? null : _load,
+        ),
+      ],
+      bottom: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              children: _filters
-                  .map(
-                    (f) => Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ChoiceChip(
-                        label: Text(f[0].toUpperCase() + f.substring(1)),
-                        selected: _status == f,
-                        onSelected: (_) {
-                          if (_status == f) return;
-                          setState(() => _status = f);
-                          _load();
-                        },
-                      ),
-                    ),
-                  )
-                  .toList(),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              GymScaffold.side,
+              0,
+              GymScaffold.side,
+              AuthSpace.xs,
+            ),
+            child: GymSearchField(
+              hint: 'Search member, email or reason',
+              enabled: _bulkProgress == null,
+              onChanged: (q) => setState(() => _query = q.trim()),
             ),
           ),
-          Expanded(
-            child: RefreshIndicator(onRefresh: _load, child: _buildBody()),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.fromLTRB(
+              GymScaffold.side,
+              0,
+              GymScaffold.side,
+              AuthSpace.xs,
+            ),
+            child: Row(
+              children: [
+                for (final f in _filters) ...[
+                  GymChoiceChip(
+                    label: f,
+                    selected: _status == f,
+                    onTap: _bulkProgress != null
+                        ? null
+                        : () {
+                            if (_status == f) return;
+                            setState(() => _status = f);
+                            _load();
+                          },
+                  ),
+                  const SizedBox(width: 8),
+                ],
+              ],
+            ),
           ),
         ],
       ),
+      body: GymRefresh(onRefresh: _load, child: _buildBody()),
     );
   }
 }

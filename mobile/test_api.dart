@@ -1,4 +1,6 @@
-import 'dart:io';
+// Manual command-line smoke test: `dart run test_api.dart`.
+// Console output is the whole point here, so print is intentional.
+// ignore_for_file: avoid_print
 import 'package:liftlog_mobile/services/api_service.dart';
 
 void main() async {

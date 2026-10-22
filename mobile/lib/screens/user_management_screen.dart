@@ -259,6 +259,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                 }
 
                 await _updateUser(user, updates);
+                if (!context.mounted) return;
                 Navigator.of(context).pop();
               },
               child: const Text('Save'),
@@ -336,7 +337,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                           vertical: 4,
                         ),
                         color: needsApproval
-                            ? Colors.orange.withOpacity(0.1)
+                            ? Colors.orange.withValues(alpha: 0.1)
                             : null,
                         child: ListTile(
                           leading: Stack(

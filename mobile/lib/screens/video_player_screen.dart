@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import '../utils/url_helpers.dart';
+import '../widgets/gym/gym.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
   final String videoUrl;
@@ -13,7 +14,7 @@ class VideoPlayerScreen extends StatefulWidget {
   });
 
   @override
-  _VideoPlayerScreenState createState() => _VideoPlayerScreenState();
+  State<VideoPlayerScreen> createState() => _VideoPlayerScreenState();
 }
 
 class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
@@ -41,7 +42,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       // Clean the video URL to ensure it's properly formatted
       final cleanedUrl = cleanSupabaseUrl(widget.videoUrl);
 
-      print('Initializing video player with URL: $cleanedUrl');
+      debugPrint('Initializing video player with URL: $cleanedUrl');
 
       if (cleanedUrl.isEmpty) {
         throw Exception(
@@ -94,9 +95,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         _controller!.play();
       }
 
-      print('Video player initialized successfully');
+      debugPrint('Video player initialized successfully');
     } catch (e) {
-      print('Error initializing video player: $e');
+      debugPrint('Error initializing video player: $e');
       if (mounted) {
         setState(() {
           _errorMessage = 'Failed to load video: ${e.toString()}';
@@ -158,171 +159,169 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        title: Text(widget.title),
-        backgroundColor: Colors.black87,
-      ),
-      body: Center(
-        child: _errorMessage != null
-            ? Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.error_outline,
-                      size: 64,
-                      color: Colors.red,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      _errorMessage!,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'URL: ${widget.videoUrl}',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.white54,
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                      child: const Text('Go Back'),
-                    ),
-                    const SizedBox(height: 8),
-                    ElevatedButton(
-                      onPressed: _initializePlayer,
-                      child: const Text('Retry'),
-                    ),
-                  ],
-                ),
-              )
-            : !_isInitialized
-            ? Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const CircularProgressIndicator(color: Colors.white),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Loading video...',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ],
-              )
-            : GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _showControls = !_showControls;
-                  });
-                },
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // Video player
-                    Center(
-                      child: AspectRatio(
-                        aspectRatio: _controller!.value.aspectRatio,
-                        child: VideoPlayer(_controller!),
-                      ),
-                    ),
-
-                    // Controls overlay
-                    if (_showControls)
-                      Container(
-                        color: Colors.black45,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            // Play/Pause and skip controls
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.replay_10,
-                                    size: 36,
-                                    color: Colors.white,
-                                  ),
-                                  onPressed: _skipBackward,
-                                ),
-                                const SizedBox(width: 20),
-                                IconButton(
-                                  icon: Icon(
-                                    _isPlaying
-                                        ? Icons.pause_circle_filled
-                                        : Icons.play_circle_filled,
-                                    size: 64,
-                                    color: Colors.white,
-                                  ),
-                                  onPressed: _togglePlayPause,
-                                ),
-                                const SizedBox(width: 20),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.forward_10,
-                                    size: 36,
-                                    color: Colors.white,
-                                  ),
-                                  onPressed: _skipForward,
-                                ),
-                              ],
-                            ),
-
-                            // Progress bar
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16.0,
-                              ),
-                              child: Row(
-                                children: [
-                                  Text(
-                                    _formatDuration(_currentPosition),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Slider(
-                                      value: _currentPosition.inSeconds
-                                          .toDouble(),
-                                      min: 0.0,
-                                      max: _totalDuration.inSeconds.toDouble(),
-                                      onChanged: (value) {
-                                        _seekTo(
-                                          Duration(seconds: value.toInt()),
-                                        );
-                                      },
-                                      activeColor: Colors.red,
-                                      inactiveColor: Colors.white30,
-                                    ),
-                                  ),
-                                  Text(
-                                    _formatDuration(_totalDuration),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                          ],
+    return GymScaffold(
+      eyebrow: 'Video',
+      title: widget.title,
+      body: _errorMessage != null
+          ? Center(
+              child: SingleChildScrollView(
+                child: GymEmptyState(
+                  icon: Icons.error_outline,
+                  danger: true,
+                  message: '$_errorMessage\n\nURL: ${widget.videoUrl}',
+                  action: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 130,
+                        child: PressableButton(
+                          label: 'Go Back',
+                          height: 48,
+                          showArrow: false,
+                          variant: PressableVariant.ghost,
+                          onPressed: () => Navigator.of(context).pop(),
                         ),
                       ),
-                  ],
+                      const SizedBox(width: 12),
+                      SizedBox(
+                        width: 130,
+                        child: PressableButton(
+                          label: 'Retry',
+                          height: 48,
+                          showArrow: false,
+                          onPressed: _initializePlayer,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
+            )
+          : !_isInitialized
+          ? const GymLoader()
+          : _buildPlayer(),
+    );
+  }
+
+  Widget _buildVideo() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AuthRadius.dialog),
+      child: GestureDetector(
+        onTap: () => setState(() => _showControls = !_showControls),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            AspectRatio(
+              aspectRatio: _controller!.value.aspectRatio,
+              child: VideoPlayer(_controller!),
+            ),
+            Positioned.fill(
+              child: AnimatedOpacity(
+                opacity: _showControls ? 1 : 0,
+                duration: AuthMotion.reduced(context)
+                    ? Duration.zero
+                    : AuthMotion.fast,
+                child: IgnorePointer(
+                  ignoring: !_showControls,
+                  child: ColoredBox(
+                    color: AuthColors.bg.withValues(alpha: 0.45),
+                    child: Center(
+                      child: GymIconButton(
+                        icon: _isPlaying
+                            ? Icons.pause
+                            : Icons.play_arrow_rounded,
+                        tooltip: _isPlaying ? 'Pause' : 'Play',
+                        filled: true,
+                        onTap: _togglePlayPause,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlayer() {
+    final maxSeconds = _totalDuration.inSeconds.toDouble();
+    final position = _currentPosition.inSeconds.toDouble().clamp(
+      0.0,
+      maxSeconds > 0 ? maxSeconds : 0.0,
+    );
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        GymScaffold.side,
+        AuthSpace.xs,
+        GymScaffold.side,
+        AuthSpace.m,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(child: Center(child: _buildVideo())),
+          const SizedBox(height: AuthSpace.s),
+          // Progress bar
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 3,
+              activeTrackColor: AuthColors.accent,
+              inactiveTrackColor: AuthColors.line,
+              thumbColor: AuthColors.accent,
+              overlayColor: AuthColors.accent.withValues(alpha: 0.12),
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+            ),
+            child: Slider(
+              value: position,
+              min: 0.0,
+              max: maxSeconds > 0 ? maxSeconds : 1.0,
+              onChanged: maxSeconds > 0
+                  ? (value) => _seekTo(Duration(seconds: value.toInt()))
+                  : null,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              children: [
+                Text(
+                  _formatDuration(_currentPosition),
+                  style: AuthType.mono(color: AuthColors.textPrimary),
+                ),
+                const Spacer(),
+                Text(_formatDuration(_totalDuration), style: AuthType.mono()),
+              ],
+            ),
+          ),
+          const SizedBox(height: AuthSpace.s),
+          // Play/Pause and skip controls
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              GymIconButton(
+                icon: Icons.replay_10,
+                tooltip: 'Back 10 seconds',
+                onTap: _skipBackward,
+              ),
+              const SizedBox(width: AuthSpace.m),
+              GymIconButton(
+                icon: _isPlaying ? Icons.pause : Icons.play_arrow_rounded,
+                tooltip: _isPlaying ? 'Pause' : 'Play',
+                filled: true,
+                onTap: _togglePlayPause,
+              ),
+              const SizedBox(width: AuthSpace.m),
+              GymIconButton(
+                icon: Icons.forward_10,
+                tooltip: 'Forward 10 seconds',
+                onTap: _skipForward,
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

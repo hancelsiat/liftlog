@@ -52,6 +52,15 @@ router.post('/:memberId/assign-workout', verifyToken, checkRole(['trainer']), as
       return res.status(404).json({ error: 'The requested member or workout could not be found.' });
     }
 
+    // Trainers can only assign their own templates, and only to their own clients.
+    const trainerId = String(req.user._id);
+    if (!workoutTemplate.isTemplate || String(workoutTemplate.trainer) !== trainerId) {
+      return res.status(403).json({ error: 'You can only assign your own workouts.' });
+    }
+    if (String(member.trainer) !== trainerId) {
+      return res.status(403).json({ error: 'This member is not one of your clients.' });
+    }
+
     const workoutInstance = new Workout({
       ...workoutTemplate.toObject(),
       _id: undefined,
@@ -85,9 +94,12 @@ router.delete('/:memberId/remove', verifyToken, checkRole(['trainer']), async (r
     trainer.clients.pull(req.params.memberId);
     await trainer.save();
 
-    // Clear trainer from member's profile
-    member.trainer = null;
-    await member.save();
+    // Clear trainer from member's profile, but only if it is this trainer.
+    // Otherwise any trainer could unlink another trainer's client.
+    if (String(member.trainer) === String(req.user._id)) {
+      member.trainer = null;
+      await member.save();
+    }
 
     res.json({ message: 'Client removed successfully' });
   } catch (error) {
@@ -105,7 +117,7 @@ router.get('/trainers', verifyToken, async (req, res) => {
       isApproved: true,
       isEmailVerified: true
     })
-    .select('username bio profile.firstName profile.lastName email') // public fields only (no privateNotes)
+    .select('username fullName bio profile.firstName profile.lastName email') // public fields only (no privateNotes)
     .sort({ createdAt: -1 });
 
     res.json({ 

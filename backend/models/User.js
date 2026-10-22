@@ -11,6 +11,14 @@ const UserSchema = new mongoose.Schema({
     trim: true,
     minlength: 3
   },
+  // Legal full name. Required for trainers at sign-up so the admin can
+  // check it against the uploaded credential photo.
+  fullName: {
+    type: String,
+    trim: true,
+    maxlength: 100,
+    default: ''
+  },
   email: {
     type: String,
     required: true,

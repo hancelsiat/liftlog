@@ -1,21 +1,29 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../widgets/gym/gym.dart';
 
 class ServerSettingsScreen extends StatefulWidget {
   const ServerSettingsScreen({super.key});
 
   @override
-  _ServerSettingsScreenState createState() => _ServerSettingsScreenState();
+  State<ServerSettingsScreen> createState() => _ServerSettingsScreenState();
 }
 
 class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
   final TextEditingController _urlController = TextEditingController();
   String _currentBaseUrl = '';
+  bool _saving = false;
 
   @override
   void initState() {
     super.initState();
     _loadCurrentBaseUrl();
+  }
+
+  @override
+  void dispose() {
+    _urlController.dispose();
+    super.dispose();
   }
 
   void _loadCurrentBaseUrl() {
@@ -28,6 +36,7 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
   void _saveServerUrl() async {
     final url = _urlController.text.trim();
     if (url.isNotEmpty) {
+      setState(() => _saving = true);
       try {
         if (url.startsWith('http://') || url.startsWith('https://')) {
           // Full URL provided (for production/Render)
@@ -38,75 +47,131 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
           await ApiService.configureBaseUrl(manualIp: url);
         }
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Server URL updated successfully')),
-          );
-        }
-
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Server URL updated successfully')),
+        );
         setState(() {
           _currentBaseUrl = ApiService.getCurrentBaseUrl();
         });
       } catch (e) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error updating server URL: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AuthColors.danger,
           ),
         );
+      } finally {
+        if (mounted) setState(() => _saving = false);
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Server Configuration'),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Current Server URL:',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            Text(
-              _currentBaseUrl,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.grey[600],
-              ),
-            ),
-            SizedBox(height: 20),
-            TextField(
-              controller: _urlController,
-              decoration: InputDecoration(
-                labelText: 'Server URL',
-                border: OutlineInputBorder(),
-                helperText: 'Examples:\n• Development: 192.168.1.16\n• Production: https://liftlog-6.onrender.com',
-              ),
-            ),
-            SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _saveServerUrl,
-              child: Text('Update Server URL'),
-            ),
-            SizedBox(height: 20),
-            Text(
-              'How to set up your server:',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            Text(
-              '1. Run your backend server\n'
-              '2. Find your computer\'s IP address\n'
-              '3. Enter the URL in this screen\n'
-              '4. Example: http://192.168.1.16:5000',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-          ],
+    return GymScaffold(
+      eyebrow: 'Admin / Settings',
+      title: 'Server',
+      bottomBar: GymBottomBar(
+        child: PressableButton(
+          label: 'Update Server URL',
+          loading: _saving,
+          onPressed: _saving ? null : _saveServerUrl,
         ),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(
+          GymScaffold.side,
+          AuthSpace.xs,
+          GymScaffold.side,
+          AuthSpace.l,
+        ),
+        children: [
+          EntranceRise(
+            index: 0,
+            child: PressableSurface(
+              highlighted: true,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'CURRENT SERVER URL',
+                    style: AuthType.mono(color: AuthColors.accent),
+                  ),
+                  const SizedBox(height: 8),
+                  SelectableText(_currentBaseUrl, style: AuthType.input()),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: AuthSpace.l),
+          const EntranceRise(
+            index: 1,
+            child: GymSectionLabel(index: 1, label: 'Change server'),
+          ),
+          const SizedBox(height: AuthSpace.s),
+          EntranceRise(
+            index: 2,
+            child: AuthTextField(
+              label: 'Server URL',
+              controller: _urlController,
+              keyboardType: TextInputType.url,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _saving ? null : _saveServerUrl(),
+            ),
+          ),
+          const SizedBox(height: AuthSpace.xs),
+          EntranceRise(
+            index: 3,
+            child: Text(
+              'Examples:\n'
+              '• Development: 192.168.1.16\n'
+              '• Production: https://liftlog-6.onrender.com',
+              style: AuthType.body(size: 13, color: AuthColors.textFaint),
+            ),
+          ),
+          const SizedBox(height: AuthSpace.l),
+          const EntranceRise(
+            index: 4,
+            child: GymSectionLabel(
+              index: 2,
+              label: 'How to set up your server',
+            ),
+          ),
+          const SizedBox(height: AuthSpace.s),
+          EntranceRise(
+            index: 5,
+            child: Column(
+              children: [
+                for (final (i, step) in const [
+                  'Run your backend server',
+                  "Find your computer's IP address",
+                  'Enter the URL in this screen',
+                  'Example: http://192.168.1.16:5000',
+                ].indexed)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          width: 28,
+                          child: Text(
+                            (i + 1).toString().padLeft(2, '0'),
+                            style: AuthType.mono(color: AuthColors.accent),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(step, style: AuthType.body(size: 14)),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

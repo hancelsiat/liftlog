@@ -23,10 +23,12 @@ dependencies:
   fl_chart: ^0.66.2
   dio: ^5.9.0
   mime: ^2.0.0
+  http_parser: ^4.1.2
   dart_jsonwebtoken: ^3.3.1
   intl: ^0.20.2
   flutter_rating_bar: ^4.0.1
   socket_io_client: ^2.0.3
+  google_fonts: ^8.2.1
 
 dev_dependencies:
   flutter_test:

@@ -84,7 +84,9 @@ async function generateThumbnail(videoBuffer) {
 }
 
 // POST /api/videos
-router.post('/', verifyToken, upload.single('video'), async (req, res) => {
+// Trainers only: the role is checked before multer reads the file, so other
+// users can't upload videos by calling the API directly.
+router.post('/', verifyToken, checkRole(['trainer']), upload.single('video'), async (req, res) => {
   try {
     console.log('Incoming request: POST /api/videos from', req.ip);
     console.log('DEBUG content-type:', req.headers['content-type']);
@@ -344,7 +346,7 @@ router.delete('/:id', verifyToken, async (req, res) => {
     }
 
     const video = await ExerciseVideo.findById(videoId);
-    if (!video) {
+    if (!video || video.isDeleted) {
       return res.status(404).json({ error: 'We could not find this video to delete.' });
     }
 
@@ -353,30 +355,150 @@ router.delete('/:id', verifyToken, async (req, res) => {
       return res.status(403).json({ error: 'You do not have permission to delete this video.' });
     }
 
-    // Delete from Supabase storage
-    const filesToDelete = [video.videoPath];
-    if (video.thumbnailPath) {
-      filesToDelete.push(video.thumbnailPath);
-    }
+    // Soft delete: the record AND the files stay, so the trainer can restore
+    // it from "Recently deleted" and admins can see it in Content moderation.
+    // Files are only erased by DELETE /:id/permanent. Hidden from members.
     
-    const { error: deleteError } = await supabase
-      .storage
-      .from(BUCKET)
-      .remove(filesToDelete);
-
-    if (deleteError) {
-      console.error('Supabase delete error:', deleteError);
-      // Continue with DB deletion even if storage deletion fails
-    }
-
-    // Delete from database
-    await ExerciseVideo.findByIdAndDelete(videoId);
-    console.log('Video deleted:', videoId);
+    video.isDeleted = true;
+    video.deletedBy = req.user._id;
+    video.deletedByRole = 'trainer';
+    video.deletedAt = new Date();
+    video.deletionReason = 'Deleted by the trainer.';
+    await video.save();
+    console.log(`[TRAINER] Video ${videoId} deleted by trainer ${req.user._id}`);
 
     return res.json({ message: 'Video deleted successfully' });
   } catch (err) {
     console.error('videos delete error:', err && err.stack ? err.stack : err);
     return res.status(500).json({ error: 'Failed to delete video', message: err.message || String(err) });
+  }
+});
+
+// Adds 1-hour signed URLs for the video file and thumbnail (if they exist).
+async function withSignedUrls(video) {
+  const videoObj = video.toObject();
+  videoObj.videoUrl = null;
+  videoObj.thumbnailUrl = null;
+  try {
+    const { data: videoData, error: videoError } = await supabase
+      .storage.from(BUCKET).createSignedUrl(video.videoPath, 3600);
+    if (!videoError && videoData) videoObj.videoUrl = videoData.signedUrl;
+
+    if (video.thumbnailPath) {
+      const { data: thumbData, error: thumbError } = await supabase
+        .storage.from(BUCKET).createSignedUrl(video.thumbnailPath, 3600);
+      if (!thumbError && thumbData) videoObj.thumbnailUrl = thumbData.signedUrl;
+    }
+  } catch (err) {
+    console.error('Signed URL error:', err.message);
+  }
+  return videoObj;
+}
+
+// True when the video file is still in storage. Videos deleted before
+// files were kept on delete have no file and cannot be restored.
+async function videoFileExists(video) {
+  try {
+    const { data, error } = await supabase
+      .storage.from(BUCKET).createSignedUrl(video.videoPath, 60);
+    return !error && !!data;
+  } catch (err) {
+    return false;
+  }
+}
+
+async function removeVideoFiles(video) {
+  const files = [video.videoPath];
+  if (video.thumbnailPath) files.push(video.thumbnailPath);
+  const { error } = await supabase.storage.from(BUCKET).remove(files);
+  if (error) console.warn('Supabase storage cleanup warning:', error);
+}
+
+function markRestored(video, user, role) {
+  video.isDeleted = false;
+  video.deletedBy = undefined;
+  video.deletedByRole = undefined;
+  video.deletedAt = undefined;
+  video.deletionReason = undefined;
+  video.restoredAt = new Date();
+  video.restoredBy = user._id;
+  video.restoredByRole = role;
+}
+
+// GET /api/videos/trainer/deleted - Trainer: "Recently deleted" (own deletions
+// and admin removals that were not deleted permanently).
+router.get('/trainer/deleted', verifyToken, checkRole(['trainer']), async (req, res) => {
+  try {
+    const videos = await ExerciseVideo.find({
+      trainer: req.user._id,
+      isDeleted: true,
+      purgedAt: { $exists: false }
+    }).sort({ deletedAt: -1 });
+
+    const result = await Promise.all(videos.map(withSignedUrls));
+    return res.json({ videos: result });
+  } catch (err) {
+    console.error('Trainer deleted videos error:', err);
+    return res.status(500).json({ error: 'Failed to load deleted videos', message: err.message });
+  }
+});
+
+// POST /api/videos/:id/restore - Trainer: restore a video they deleted.
+// Videos removed by an admin can only be restored by an admin.
+router.post('/:id/restore', verifyToken, checkRole(['trainer']), async (req, res) => {
+  try {
+    const video = await ExerciseVideo.findById(req.params.id);
+    if (!video || video.trainer.toString() !== req.user._id.toString()) {
+      return res.status(404).json({ error: 'We could not find this video.' });
+    }
+    if (!video.isDeleted) {
+      return res.status(400).json({ error: 'This video is not deleted.' });
+    }
+    if (video.purgedAt) {
+      return res.status(410).json({ error: 'This video was deleted permanently.' });
+    }
+    if (video.deletedByRole !== 'trainer') {
+      return res.status(403).json({
+        error: 'This video was removed by an administrator. Only an admin can restore it.'
+      });
+    }
+    if (!(await videoFileExists(video))) {
+      return res.status(409).json({
+        error: 'The video file no longer exists, so this video cannot be restored.'
+      });
+    }
+
+    markRestored(video, req.user, 'trainer');
+    await video.save();
+    console.log(`[TRAINER] Video ${video._id} restored by trainer ${req.user._id}`);
+    return res.json({ message: 'Video restored', video: await withSignedUrls(video) });
+  } catch (err) {
+    console.error('Trainer restore video error:', err);
+    return res.status(500).json({ error: 'Failed to restore video', message: err.message });
+  }
+});
+
+// DELETE /api/videos/:id/permanent - Trainer: delete a video in
+// "Recently deleted" forever. The files are erased; the record is kept as a
+// tombstone (purgedAt) so admin moderation keeps the history.
+router.delete('/:id/permanent', verifyToken, checkRole(['trainer']), async (req, res) => {
+  try {
+    const video = await ExerciseVideo.findById(req.params.id);
+    if (!video || video.trainer.toString() !== req.user._id.toString() || video.purgedAt) {
+      return res.status(404).json({ error: 'We could not find this video.' });
+    }
+    if (!video.isDeleted) {
+      return res.status(400).json({ error: 'Delete the video first, then delete it permanently.' });
+    }
+
+    await removeVideoFiles(video);
+    video.purgedAt = new Date();
+    await video.save();
+    console.log(`[TRAINER] Video ${video._id} permanently deleted by trainer ${req.user._id}`);
+    return res.json({ message: 'Video permanently deleted' });
+  } catch (err) {
+    console.error('Trainer permanent delete video error:', err);
+    return res.status(500).json({ error: 'Failed to delete video permanently', message: err.message });
   }
 });
 
@@ -390,17 +512,22 @@ const escapeHtml = (value) => String(value == null ? '' : value)
 const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // GET /api/videos/admin/all - Admin: list ALL trainer uploads (public and private) for moderation
-// Query: ?status=active|deleted|all (default active), ?search=<title/trainer>, ?trainerId=<id>
+// Query: ?status=active|deleted|trainer|all (default active), ?search=<title/trainer>, ?trainerId=<id>
+// 'deleted' = every removed video, 'trainer' = only videos the trainer deleted themselves.
 router.get('/admin/all', verifyToken, checkRole(['admin']), async (req, res) => {
   try {
     const status = (req.query.status || 'active').toString().toLowerCase();
-    if (!['active', 'deleted', 'all'].includes(status)) {
-      return res.status(400).json({ error: 'Invalid status filter. Use active, deleted or all.' });
+    if (!['active', 'deleted', 'trainer', 'all'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status filter. Use active, deleted, trainer or all.' });
     }
 
     const query = {};
     if (status === 'active') query.isDeleted = { $ne: true };
     if (status === 'deleted') query.isDeleted = true;
+    if (status === 'trainer') {
+      query.isDeleted = true;
+      query.deletedByRole = 'trainer';
+    }
     if (req.query.trainerId) query.trainer = req.query.trainerId;
 
     const search = (req.query.search || '').toString().trim();
@@ -417,39 +544,32 @@ router.get('/admin/all', verifyToken, checkRole(['admin']), async (req, res) => 
     const videos = await ExerciseVideo.find(query)
       .populate('trainer', 'username email')
       .populate('deletedBy', 'username')
+      .populate('restoredBy', 'username')
       .sort({ createdAt: -1 })
       .limit(200);
 
-    // Signed URLs only for videos whose files still exist (removed videos are purged from storage)
+    // Signed URLs for every video whose files still exist. Removed videos keep
+    // their files (so they can be reviewed / restored) unless the trainer
+    // deleted them permanently, or they were removed before files were kept
+    // (then videoUrl stays null).
     const result = await Promise.all(videos.map(async (video) => {
-      const videoObj = video.toObject();
-      if (video.isDeleted) {
+      if (video.purgedAt) {
+        const videoObj = video.toObject();
         videoObj.videoUrl = null;
         videoObj.thumbnailUrl = null;
         return videoObj;
       }
-      try {
-        const { data: videoData, error: videoError } = await supabase
-          .storage.from(BUCKET).createSignedUrl(video.videoPath, 3600);
-        if (!videoError && videoData) videoObj.videoUrl = videoData.signedUrl;
-
-        if (video.thumbnailPath) {
-          const { data: thumbData, error: thumbError } = await supabase
-            .storage.from(BUCKET).createSignedUrl(video.thumbnailPath, 3600);
-          if (!thumbError && thumbData) videoObj.thumbnailUrl = thumbData.signedUrl;
-        }
-      } catch (err) {
-        console.error('Admin list: signed URL error:', err.message);
-      }
-      return videoObj;
+      return withSignedUrls(video);
     }));
 
-    const [activeCount, deletedCount] = await Promise.all([
+    const [activeCount, deletedCount, trainerDeletedCount] = await Promise.all([
+      // Counts ignore the trainerId/search filters (whole-platform totals).
       ExerciseVideo.countDocuments({ isDeleted: { $ne: true } }),
-      ExerciseVideo.countDocuments({ isDeleted: true })
+      ExerciseVideo.countDocuments({ isDeleted: true }),
+      ExerciseVideo.countDocuments({ isDeleted: true, deletedByRole: 'trainer' })
     ]);
 
-    return res.json({ videos: result, activeCount, deletedCount });
+    return res.json({ videos: result, activeCount, deletedCount, trainerDeletedCount });
   } catch (err) {
     console.error('Admin videos list error:', err);
     return res.status(500).json({ error: 'Failed to load videos for moderation', message: err.message });
@@ -483,23 +603,12 @@ router.delete('/admin/:id', verifyToken, checkRole(['admin']), async (req, res) 
     video.isDeleted = true;
     video.deletionReason = trimmedReason;
     video.deletedBy = req.user._id;
+    video.deletedByRole = 'admin';
     video.deletedAt = new Date();
     await video.save();
 
-    // Clean up storage (Supabase) for inappropriate content (similar to trainer delete)
-    const filesToDelete = [video.videoPath];
-    if (video.thumbnailPath) {
-      filesToDelete.push(video.thumbnailPath);
-    }
-    const { error: deleteError } = await supabase
-      .storage
-      .from(BUCKET)
-      .remove(filesToDelete);
-
-    if (deleteError) {
-      console.warn('Supabase storage cleanup warning for admin delete:', deleteError);
-      // Continue anyway - DB is the source of truth
-    }
+    // Files are kept so an admin can review the video and restore it
+    // (POST /admin/:id/restore). It is hidden from the trainer and members.
 
     // Send notification to trainer (using existing service)
     try {
@@ -532,6 +641,57 @@ router.delete('/admin/:id', verifyToken, checkRole(['admin']), async (req, res) 
   } catch (error) {
     console.error('Admin video delete error:', error);
     res.status(500).json({ error: error.message || 'Failed to delete video' });
+  }
+});
+
+// POST /api/videos/admin/:id/restore - Admin: undo a moderation removal.
+// Videos the trainer deleted themselves can only be restored by that trainer.
+router.post('/admin/:id/restore', verifyToken, checkRole(['admin']), async (req, res) => {
+  try {
+    const video = await ExerciseVideo.findById(req.params.id);
+    if (!video) {
+      return res.status(404).json({ error: 'We could not find this video.' });
+    }
+    if (!video.isDeleted) {
+      return res.status(400).json({ error: 'This video is not removed.' });
+    }
+    if (video.purgedAt) {
+      return res.status(410).json({ error: 'The trainer deleted this video permanently.' });
+    }
+    if (video.deletedByRole === 'trainer') {
+      return res.status(403).json({
+        error: 'The trainer deleted this video. Only the trainer can restore it.'
+      });
+    }
+    if (!(await videoFileExists(video))) {
+      return res.status(409).json({
+        error: 'The video file was erased when it was removed, so it cannot be restored.'
+      });
+    }
+
+    markRestored(video, req.user, 'admin');
+    await video.save();
+
+    try {
+      const trainerUser = await User.findById(video.trainer).select('email username');
+      if (trainerUser && trainerUser.email) {
+        await emailService.sendEmail(trainerUser.email, 'Your video has been restored', `
+            <h2>Video Restored</h2>
+            <p>Dear ${escapeHtml(trainerUser.username || 'Trainer')},</p>
+            <p>Your video titled "<strong>${escapeHtml(video.title)}</strong>" has been reviewed and restored by an administrator. It is visible again.</p>
+            <p>Video ID: ${video._id}</p>
+            <p>Best regards,<br>LiftLog Admin Team</p>
+          `);
+      }
+    } catch (emailErr) {
+      console.warn('Email notification for video restore failed (non-blocking):', emailErr.message);
+    }
+
+    console.log(`[ADMIN] Video ${video._id} restored by ${req.user._id}`);
+    res.json({ message: 'Video restored. The trainer was notified.', videoId: video._id });
+  } catch (error) {
+    console.error('Admin video restore error:', error);
+    res.status(500).json({ error: error.message || 'Failed to restore video' });
   }
 });
 

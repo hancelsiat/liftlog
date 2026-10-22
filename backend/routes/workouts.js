@@ -29,14 +29,21 @@ router.post('/', verifyToken, checkRole(['member', 'trainer']), async (req, res)
 
 // Create a new workout template (Trainer Route)
 router.post('/template', verifyToken, checkRole(['trainer']), async (req, res) => {
-  try {    const workout = new Workout({
+  try {
+    const workout = new Workout({
       title: req.body.title,
       description: req.body.description,
       exercises: req.body.exercises,
+      // Picked in the app's create screen; the schema validates the values.
+      category: req.body.category || undefined,
+      intensity: req.body.intensity || undefined,
+      duration: req.body.duration ?? undefined,
+      caloriesBurned: req.body.caloriesBurned ?? undefined,
       trainer: req.user._id,
       isTemplate: true
     });
     await workout.save();
+    await workout.populate('trainer', 'username _id');
 
     res.status(201).json({
       message: 'Workout template created successfully',
@@ -98,7 +105,7 @@ router.get('/trainers/available', verifyToken, checkRole(['all']), async (req, r
     const trainers = await User.find({
       role: 'trainer',
       isApproved: true // Ensure the trainer is actually approved by admin!
-    }).select('username email bio profile.firstName profile.lastName isApproved');
+    }).select('username fullName email bio profile.firstName profile.lastName isApproved');
 
     res.json({ trainers });
   } catch (error) {
@@ -113,6 +120,24 @@ router.get('/my-plan', verifyToken, checkRole(['member']), async (req, res) => {
       .populate('trainer', 'username')
       .sort({ date: -1 });
     res.json(workouts);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Trainer: "Recently deleted" templates (own deletions and admin removals that
+// were not deleted permanently). Declared before /trainer/:trainerId.
+router.get('/trainer/deleted', verifyToken, checkRole(['trainer']), async (req, res) => {
+  try {
+    const workouts = await Workout.find({
+      trainer: req.user._id,
+      isTemplate: true,
+      isDeleted: true,
+      purgedAt: { $exists: false }
+    })
+      .populate('trainer', 'username _id')
+      .sort({ deletedAt: -1 });
+    res.json({ workouts });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -184,11 +209,36 @@ router.patch('/:id', verifyToken, checkRole(['member', 'trainer']), async (req, 
       return res.status(403).json({ error: 'You do not have permission to update this workout.' });
     }
 
+    // Removed workouts can't be edited. Otherwise a trainer could clear
+    // isDeleted and bring back a template an admin removed.
+    if (workout.isDeleted) {
+      return res.status(404).json({ error: 'We could not find this workout to update.' });
+    }
+
+    // Only content fields can be edited. Moderation, ownership and restore
+    // fields (isDeleted, deletedBy, trainer, user, purgedAt, ...) cannot.
+    const EDITABLE = ['title', 'description', 'exercises', 'category', 'intensity',
+      'duration', 'caloriesBurned', 'notes', 'date', 'completedAt', 'isPublic'];
+    const updates = {};
+    for (const key of EDITABLE) {
+      if (req.body[key] !== undefined) updates[key] = req.body[key];
+    }
+    // Older app versions send the title as `name`.
+    if (updates.title === undefined && typeof req.body.name === 'string') {
+      updates.title = req.body.name;
+    }
+    if (typeof updates.title === 'string') {
+      updates.title = updates.title.trim();
+      if (!updates.title) {
+        return res.status(400).json({ error: 'Please provide a title for the workout.' });
+      }
+    }
+
     const updatedWorkout = await Workout.findByIdAndUpdate(
       req.params.id,
-      { $set: req.body },
+      { $set: updates },
       { new: true }
-    );
+    ).populate('trainer', 'username _id');
 
     res.json({
       message: 'Workout updated successfully',
@@ -205,7 +255,7 @@ router.delete('/:id', verifyToken, checkRole(['member', 'trainer']), async (req,
     // First, find the workout to ensure it exists and for authorization
     const workout = await Workout.findById(req.params.id);
 
-    if (!workout) {
+    if (!workout || workout.isDeleted) {
       return res.status(404).json({ error: 'We could not find this workout to delete.' });
     }
 
@@ -217,8 +267,19 @@ router.delete('/:id', verifyToken, checkRole(['member', 'trainer']), async (req,
       return res.status(403).json({ error: 'You do not have permission to delete this workout.' });
     }
 
-    // Now, remove the workout
-    await workout.remove();
+    if (workout.isTemplate) {
+      // Trainer templates are soft deleted so admins can see in Content
+      // moderation that the trainer deleted them.
+      workout.isDeleted = true;
+      workout.deletedBy = req.user._id;
+      workout.deletedByRole = 'trainer';
+      workout.deletedAt = new Date();
+      workout.deletionReason = 'Deleted by the trainer.';
+      await workout.save({ validateBeforeSave: false });
+    } else {
+      // Personal workout logs are not moderated content: remove them.
+      await workout.remove();
+    }
 
     res.json({ message: 'Workout deleted successfully' });
   } catch (error) {
@@ -234,17 +295,108 @@ router.delete('/', verifyToken, checkRole(['trainer']), async (req, res) => {
       return res.status(400).json({ error: 'Workout IDs must be a non-empty array' });
     }
 
-    const result = await Workout.deleteMany({
-      _id: { $in: workoutIds },
-      trainer: req.user._id  // Ensure trainer can only delete their own workouts
-    });
+    const validIds = workoutIds.filter((id) => mongoose.Types.ObjectId.isValid(id));
+    // Ensure trainer can only delete their own workouts
+    const ownFilter = {
+      _id: { $in: validIds },
+      trainer: req.user._id,
+      isDeleted: { $ne: true }
+    };
 
-    if (result.deletedCount === 0) {
+    // Templates are soft deleted so admins can see in Content moderation
+    // that the trainer deleted them.
+    const softResult = await Workout.updateMany(
+      { ...ownFilter, isTemplate: true },
+      {
+        $set: {
+          isDeleted: true,
+          deletedBy: req.user._id,
+          deletedByRole: 'trainer',
+          deletedAt: new Date(),
+          deletionReason: 'Deleted by the trainer.'
+        }
+      }
+    );
+    // Anything else (non-template copies) is removed as before.
+    const hardResult = await Workout.deleteMany({ ...ownFilter, isTemplate: { $ne: true } });
+
+    const deletedCount =
+      (softResult.modifiedCount || softResult.nModified || 0) + (hardResult.deletedCount || 0);
+
+    if (deletedCount === 0) {
       return res.status(404).json({ error: 'No matching workouts found to delete' });
     }
 
-    res.json({ message: `${result.deletedCount} workouts deleted successfully` });
+    console.log(`[TRAINER] ${deletedCount} workout(s) deleted by trainer ${req.user._id}`);
+    res.json({ message: `${deletedCount} workouts deleted successfully`, deletedCount });
 
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+function markRestored(workout, user, role) {
+  workout.isDeleted = false;
+  workout.deletedBy = undefined;
+  workout.deletedByRole = undefined;
+  workout.deletedAt = undefined;
+  workout.deletionReason = undefined;
+  workout.restoredAt = new Date();
+  workout.restoredBy = user._id;
+  workout.restoredByRole = role;
+}
+
+// Finds an own template in "Recently deleted" (not deleted permanently).
+async function findOwnDeletedTemplate(req, res) {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    res.status(404).json({ error: 'We could not find this workout.' });
+    return null;
+  }
+  const workout = await Workout.findById(req.params.id);
+  if (!workout || !workout.isTemplate || !workout.trainer?.equals(req.user._id) || workout.purgedAt) {
+    res.status(404).json({ error: 'We could not find this workout.' });
+    return null;
+  }
+  if (!workout.isDeleted) {
+    res.status(400).json({ error: 'This workout is not deleted.' });
+    return null;
+  }
+  return workout;
+}
+
+// Trainer: restore a template they deleted. Members can see it again.
+// Templates removed by an admin can only be restored by an admin.
+router.post('/:id/restore', verifyToken, checkRole(['trainer']), async (req, res) => {
+  try {
+    const workout = await findOwnDeletedTemplate(req, res);
+    if (!workout) return;
+    if (workout.deletedByRole !== 'trainer') {
+      return res.status(403).json({
+        error: 'This workout was removed by an administrator. Only an admin can restore it.'
+      });
+    }
+
+    markRestored(workout, req.user, 'trainer');
+    await workout.save({ validateBeforeSave: false });
+    console.log(`[TRAINER] Workout ${workout._id} restored by trainer ${req.user._id}`);
+    res.json({ message: 'Workout restored', workout });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Trainer: delete a template in "Recently deleted" forever. It disappears from
+// the trainer's app; the record stays as a tombstone (purgedAt) so admin
+// moderation keeps the history.
+router.delete('/:id/permanent', verifyToken, checkRole(['trainer']), async (req, res) => {
+  try {
+    const workout = await findOwnDeletedTemplate(req, res);
+    if (!workout) return;
+
+    workout.purgedAt = new Date();
+    await workout.save({ validateBeforeSave: false });
+    console.log(`[TRAINER] Workout ${workout._id} permanently deleted by trainer ${req.user._id}`);
+    res.json({ message: 'Workout permanently deleted' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -326,18 +478,23 @@ const escapeHtml = (value) => String(value == null ? '' : value)
 const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // Admin: list trainer-created workouts for moderation
-// Query: ?status=active|deleted|all (default active), ?search=<title/trainer>, ?trainerId=<id>
+// Query: ?status=active|deleted|trainer|all (default active), ?search=<title/trainer>, ?trainerId=<id>
+// 'deleted' = every removed template, 'trainer' = only templates the trainer deleted themselves.
 // Only trainer templates are listed (personal member logs are not public content).
 router.get('/admin/all', verifyToken, checkRole(['admin']), async (req, res) => {
   try {
     const status = (req.query.status || 'active').toString().toLowerCase();
-    if (!['active', 'deleted', 'all'].includes(status)) {
-      return res.status(400).json({ error: 'Invalid status filter. Use active, deleted or all.' });
+    if (!['active', 'deleted', 'trainer', 'all'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status filter. Use active, deleted, trainer or all.' });
     }
 
     const query = { isTemplate: true };
     if (status === 'active') query.isDeleted = { $ne: true };
     if (status === 'deleted') query.isDeleted = true;
+    if (status === 'trainer') {
+      query.isDeleted = true;
+      query.deletedByRole = 'trainer';
+    }
     if (req.query.trainerId) {
       if (!mongoose.Types.ObjectId.isValid(req.query.trainerId)) {
         return res.status(400).json({ error: 'Invalid trainer ID.' });
@@ -360,6 +517,7 @@ router.get('/admin/all', verifyToken, checkRole(['admin']), async (req, res) => 
     const workouts = await Workout.find(query)
       .populate('trainer', 'username email')
       .populate('deletedBy', 'username')
+      .populate('restoredBy', 'username')
       .sort({ createdAt: -1 })
       .limit(200)
       .lean();
@@ -373,12 +531,13 @@ router.get('/admin/all', verifyToken, checkRole(['admin']), async (req, res) => 
     const countMap = new Map(assignedCounts.map((c) => [c._id.toString(), c.count]));
     workouts.forEach((w) => { w.assignedCount = countMap.get(w._id.toString()) || 0; });
 
-    const [activeCount, deletedCount] = await Promise.all([
+    const [activeCount, deletedCount, trainerDeletedCount] = await Promise.all([
       Workout.countDocuments({ isTemplate: true, isDeleted: { $ne: true } }),
-      Workout.countDocuments({ isTemplate: true, isDeleted: true })
+      Workout.countDocuments({ isTemplate: true, isDeleted: true }),
+      Workout.countDocuments({ isTemplate: true, isDeleted: true, deletedByRole: 'trainer' })
     ]);
 
-    res.json({ workouts, activeCount, deletedCount });
+    res.json({ workouts, activeCount, deletedCount, trainerDeletedCount });
   } catch (error) {
     console.error('Admin workouts list error:', error);
     res.status(500).json({ error: error.message || 'Failed to load workouts for moderation' });
@@ -413,6 +572,7 @@ router.delete('/admin/:id', verifyToken, checkRole(['admin']), async (req, res) 
     workout.isDeleted = true;
     workout.deletionReason = trimmedReason;
     workout.deletedBy = req.user._id;
+    workout.deletedByRole = 'admin';
     workout.deletedAt = deletedAt;
     await workout.save({ validateBeforeSave: false });
 
@@ -434,6 +594,7 @@ router.delete('/admin/:id', verifyToken, checkRole(['admin']), async (req, res) 
           isDeleted: true,
           deletionReason: trimmedReason,
           deletedBy: req.user._id,
+          deletedByRole: 'admin',
           deletedAt
         }
       });
@@ -475,6 +636,84 @@ router.delete('/admin/:id', verifyToken, checkRole(['admin']), async (req, res) 
   } catch (error) {
     console.error('Admin workout delete error:', error);
     res.status(500).json({ error: error.message || 'Failed to delete workout' });
+  }
+});
+
+// Admin: undo a moderation removal. Member copies hidden by that same removal
+// (same deletedAt) are restored too. Templates the trainer deleted themselves
+// can only be restored by that trainer.
+router.post('/admin/:id/restore', verifyToken, checkRole(['admin']), async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(404).json({ error: 'We could not find this workout.' });
+    }
+    const workout = await Workout.findById(req.params.id);
+    if (!workout) {
+      return res.status(404).json({ error: 'We could not find this workout.' });
+    }
+    if (!workout.isDeleted) {
+      return res.status(400).json({ error: 'This workout is not removed.' });
+    }
+    if (workout.purgedAt) {
+      return res.status(410).json({ error: 'The trainer deleted this workout permanently.' });
+    }
+    if (workout.deletedByRole === 'trainer') {
+      return res.status(403).json({
+        error: 'The trainer deleted this workout. Only the trainer can restore it.'
+      });
+    }
+
+    const removedAt = workout.deletedAt;
+    markRestored(workout, req.user, 'admin');
+    await workout.save({ validateBeforeSave: false });
+
+    let restoredCopies = 0;
+    if (workout.isTemplate && removedAt) {
+      const copyResult = await Workout.updateMany(
+        {
+          isTemplate: { $ne: true },
+          isDeleted: true,
+          deletedAt: removedAt,
+          $or: [
+            { sourceTemplate: workout._id },
+            { sourceTemplate: { $exists: false }, trainer: workout.trainer, title: workout.title, assignedTo: { $exists: true } }
+          ]
+        },
+        {
+          $set: { isDeleted: false, restoredAt: new Date(), restoredBy: req.user._id, restoredByRole: 'admin' },
+          $unset: { deletedBy: '', deletedByRole: '', deletedAt: '', deletionReason: '' }
+        }
+      );
+      restoredCopies = copyResult.modifiedCount || copyResult.nModified || 0;
+    }
+
+    try {
+      const ownerId = workout.user || workout.assignedTo || workout.trainer;
+      const owner = await User.findById(ownerId).select('email username');
+      if (owner && owner.email) {
+        await emailService.sendEmail(owner.email, 'Your workout has been restored', `
+            <h2>Workout Restored</h2>
+            <p>Dear ${escapeHtml(owner.username || 'User')},</p>
+            <p>Your workout titled "<strong>${escapeHtml(workout.title)}</strong>" has been reviewed and restored by an administrator. It is visible again.</p>
+            <p>Workout ID: ${workout._id}</p>
+            <p>Best regards,<br>LiftLog Admin Team</p>
+          `);
+      }
+    } catch (emailErr) {
+      console.warn('Email notification for workout restore failed (non-blocking):', emailErr.message);
+    }
+
+    console.log(`[ADMIN] Workout ${workout._id} restored by ${req.user._id} (${restoredCopies} member copies)`);
+    res.json({
+      message: restoredCopies > 0
+        ? `Workout restored and back in ${restoredCopies} member plan(s). Owner notified.`
+        : 'Workout restored. Owner notified.',
+      workoutId: workout._id,
+      restoredCopies
+    });
+  } catch (error) {
+    console.error('Admin workout restore error:', error);
+    res.status(500).json({ error: error.message || 'Failed to restore workout' });
   }
 });
 

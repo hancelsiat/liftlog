@@ -200,7 +200,9 @@ io.use(async (socket, next) => {
     const jwt = require('jsonwebtoken');
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.userId).select('+lastSeen');
-    if (!user || !user.canAccess && user.role !== 'member') return next(new Error('Access denied'));
+    // canAccess is a method: without the call it was always truthy, so the
+    // check never denied anyone (e.g. unapproved trainers).
+    if (!user || !user.canAccess()) return next(new Error('Access denied'));
     socket.user = user;
     socket.userId = user._id.toString();
     next();

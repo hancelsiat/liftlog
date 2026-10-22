@@ -172,7 +172,7 @@ class CooldownResetRequestCardState extends State<CooldownResetRequestCard> {
                       status == 'approved'
                           ? 'Your last reset request was approved.'
                           : 'Your last reset request was declined'
-                              '${_request?['adminNote'] != null ? ': ${_request?['adminNote']}' : '.'}',
+                                '${_request?['adminNote'] != null ? ': ${_request?['adminNote']}' : '.'}',
                       style: const TextStyle(fontSize: 13),
                     ),
                   ),
@@ -246,9 +246,8 @@ class _RequestResetDialogState extends State<_RequestResetDialog> {
     super.dispose();
   }
 
-  String get _reason => _reasonChoice == _custom
-      ? _customController.text.trim()
-      : _reasonChoice;
+  String get _reason =>
+      _reasonChoice == _custom ? _customController.text.trim() : _reasonChoice;
 
   @override
   Widget build(BuildContext context) {

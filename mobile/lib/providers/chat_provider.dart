@@ -1,6 +1,5 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/message.dart';
 import '../models/user.dart';
@@ -16,8 +15,7 @@ class ChatProvider with ChangeNotifier {
   bool _isTyping = false;
   bool _partnerOnline = false;
   DateTime? _partnerLastSeen;
-  IO.Socket? _socket;
-  StreamSubscription? _socketSubscription;
+  io.Socket? _socket;
 
   List<Message> get messages => _messages;
   User? get partner => _partner;
@@ -27,33 +25,41 @@ class ChatProvider with ChangeNotifier {
   bool get partnerOnline => _partnerOnline;
   DateTime? get partnerLastSeen => _partnerLastSeen;
 
-  Future<void> connect(String partnerId, User currentUser, User partner, BuildContext context) async {
+  Future<void> connect(
+    String partnerId,
+    User currentUser,
+    User partner,
+    BuildContext context,
+  ) async {
     _isLoading = true;
     notifyListeners();
 
     try {
-      _partner = partner;  // Use the passed partner instead of getProfile()
+      _partner = partner; // Use the passed partner instead of getProfile()
       _messages = await _apiService.getChatHistory(partnerId);
 
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token');
 
       if (_socket == null && token != null) {
-        _socket = IO.io(ApiService.baseUrl.replaceAll('/api', ''), <String, dynamic>{
-          'transports': ['websocket'],
-          'auth': {'token': token},
-          // Always create a fresh connection; otherwise the cached socket is
-          // reused and old listeners stay attached (duplicate messages).
-          'forceNew': true,
-          'autoConnect': false,
-        });
+        _socket = io.io(
+          ApiService.baseUrl.replaceAll('/api', ''),
+          <String, dynamic>{
+            'transports': ['websocket'],
+            'auth': {'token': token},
+            // Always create a fresh connection; otherwise the cached socket is
+            // reused and old listeners stay attached (duplicate messages).
+            'forceNew': true,
+            'autoConnect': false,
+          },
+        );
 
         _socket!.connect();
 
         _socket!.onConnect((_) {
           _socket!.emit('joinChat', partnerId);
-          print('Socket connected for chat with ${partner.username}');
-          markAsRead(partnerId);  // Mark as read on connect
+          debugPrint('Socket connected for chat with ${partner.username}');
+          markAsRead(partnerId); // Mark as read on connect
         });
 
         _socket!.on('newMessage', (data) {
@@ -74,7 +80,9 @@ class ChatProvider with ChangeNotifier {
         _socket!.on('userOnline', (data) {
           if (data['userId'] == partnerId) {
             _partnerOnline = true;
-            _partnerLastSeen = data['lastSeen'] != null ? DateTime.tryParse(data['lastSeen'].toString()) : null;
+            _partnerLastSeen = data['lastSeen'] != null
+                ? DateTime.tryParse(data['lastSeen'].toString())
+                : null;
             notifyListeners();
           }
         });
@@ -85,7 +93,7 @@ class ChatProvider with ChangeNotifier {
 
         _socket!.on('error', (data) {
           _error = data['message'].toString();
-          showErrorSnackBar(context, _error!);
+          if (context.mounted) showErrorSnackBar(context, _error!);
           notifyListeners();
         });
       }
@@ -139,7 +147,7 @@ class ChatProvider with ChangeNotifier {
       }
       notifyListeners();
     } catch (e) {
-      print('Mark read error: $e');
+      debugPrint('Mark read error: $e');
     }
   }
 

@@ -1,9 +1,13 @@
-
 import 'package:flutter/material.dart';
 import 'dart:convert';
 
+import 'auth_tokens.dart';
+
 void showErrorSnackBar(BuildContext context, String errorMessage) {
-  String finalMessage = errorMessage.replaceAll('Exception: ', ''); // Start with the clean error message
+  String finalMessage = errorMessage.replaceAll(
+    'Exception: ',
+    '',
+  ); // Start with the clean error message
 
   try {
     // Attempt to find and parse the JSON part of the error if it's a raw API response
@@ -29,10 +33,12 @@ void showErrorSnackBar(BuildContext context, String errorMessage) {
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
       content: Text(finalMessage),
-      backgroundColor: Colors.red,
+      backgroundColor: AuthColors.danger,
       duration: const Duration(seconds: 4),
       behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AuthRadius.field),
+      ),
     ),
   );
 }

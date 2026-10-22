@@ -1,18 +1,14 @@
 import 'package:flutter/material.dart';
-import '../utils/app_theme.dart';
+import '../utils/auth_tokens.dart';
 
 class ExpandableText extends StatefulWidget {
   final String text;
   final int trimLines;
 
-  const ExpandableText({
-    super.key,
-    required this.text,
-    this.trimLines = 3,
-  });
+  const ExpandableText({super.key, required this.text, this.trimLines = 3});
 
   @override
-  _ExpandableTextState createState() => _ExpandableTextState();
+  State<ExpandableText> createState() => _ExpandableTextState();
 }
 
 class _ExpandableTextState extends State<ExpandableText> {
@@ -28,7 +24,14 @@ class _ExpandableTextState extends State<ExpandableText> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
-        final textSpan = TextSpan(text: widget.text, style: const TextStyle(color: Colors.white, fontSize: 14));
+        final textSpan = TextSpan(
+          text: widget.text,
+          style: const TextStyle(
+            color: AuthColors.textPrimary,
+            fontSize: 14,
+            height: 1.4,
+          ),
+        );
         final textPainter = TextPainter(
           text: textSpan,
           maxLines: widget.trimLines,
@@ -44,8 +47,14 @@ class _ExpandableTextState extends State<ExpandableText> {
               Text(
                 widget.text,
                 maxLines: _isExpanded ? null : widget.trimLines,
-                overflow: _isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white, fontSize: 14),
+                overflow: _isExpanded
+                    ? TextOverflow.visible
+                    : TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AuthColors.textPrimary,
+                  fontSize: 14,
+                  height: 1.4,
+                ),
               ),
               if (!_isExpanded) ...[
                 const SizedBox(height: 4),
@@ -54,7 +63,7 @@ class _ExpandableTextState extends State<ExpandableText> {
                   child: const Text(
                     'See More...',
                     style: TextStyle(
-                      color: AppTheme.primaryColor,
+                      color: AuthColors.accent,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -66,7 +75,7 @@ class _ExpandableTextState extends State<ExpandableText> {
                   child: const Text(
                     'See Less',
                     style: TextStyle(
-                      color: AppTheme.primaryColor,
+                      color: AuthColors.accent,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -75,7 +84,14 @@ class _ExpandableTextState extends State<ExpandableText> {
             ],
           );
         } else {
-          return Text(widget.text, style: const TextStyle(color: Colors.white, fontSize: 14));
+          return Text(
+            widget.text,
+            style: const TextStyle(
+              color: AuthColors.textPrimary,
+              fontSize: 14,
+              height: 1.4,
+            ),
+          );
         }
       },
     );

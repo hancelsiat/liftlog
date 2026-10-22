@@ -11,6 +11,16 @@ class ExerciseVideo {
   final String difficulty;
   final int? duration;
 
+  /// Set for videos in "Recently deleted".
+  final DateTime? deletedAt;
+
+  /// 'trainer' or 'admin' (older removals without it were made by an admin).
+  final String? deletedByRole;
+  final String? deletionReason;
+
+  /// True when the trainer can restore it (they deleted it themselves).
+  bool get deletedByTrainer => deletedByRole == 'trainer';
+
   ExerciseVideo({
     required this.id,
     required this.title,
@@ -23,13 +33,16 @@ class ExerciseVideo {
     this.exerciseType = 'strength',
     this.difficulty = 'beginner',
     this.duration,
+    this.deletedAt,
+    this.deletedByRole,
+    this.deletionReason,
   });
 
   factory ExerciseVideo.fromJson(Map<String, dynamic> json) {
     // Handle trainer name and ID from populated trainer object or direct field
     String trainerName = '';
     String? trainerId;
-    
+
     if (json['trainer'] is Map) {
       trainerName = json['trainer']['username'] ?? '';
       trainerId = json['trainer']['_id'] ?? json['trainer']['id'];
@@ -48,12 +61,13 @@ class ExerciseVideo {
       thumbnailUrl: json['thumbnailUrl'],
       trainerName: trainerName,
       trainerId: trainerId,
-      tags: json['tags'] != null
-        ? List<String>.from(json['tags'])
-        : [],
+      tags: json['tags'] != null ? List<String>.from(json['tags']) : [],
       exerciseType: json['exerciseType'] ?? 'strength',
       difficulty: json['difficulty'] ?? 'beginner',
       duration: json['duration'],
+      deletedAt: DateTime.tryParse(json['deletedAt']?.toString() ?? ''),
+      deletedByRole: json['deletedByRole']?.toString(),
+      deletionReason: json['deletionReason']?.toString(),
     );
   }
 
@@ -75,12 +89,12 @@ class ExerciseVideo {
 
   // Backwards-compatible getter so existing code that uses `videoFileId` keeps working.
   String get videoFileId => videoUrl;
-  
+
   // Helper to format duration
   String get formattedDuration {
     if (duration == null || duration == 0) return '';
     final minutes = duration! ~/ 60;
     final seconds = duration! % 60;
-    return '${minutes}:${seconds.toString().padLeft(2, '0')}';
+    return '$minutes:${seconds.toString().padLeft(2, '0')}';
   }
 }

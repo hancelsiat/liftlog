@@ -83,8 +83,32 @@ const exerciseVideoSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   },
+  // Who removed it: the uploading trainer or an admin (moderation).
+  // Older removals without this field were made by an admin.
+  deletedByRole: {
+    type: String,
+    enum: ['trainer', 'admin']
+  },
   deletedAt: {
     type: Date
+  },
+  // Set when the trainer deletes it permanently from "Recently deleted".
+  // The files are erased; the record stays so admins keep the audit trail.
+  purgedAt: {
+    type: Date
+  },
+  // Last restore: the trainer restores their own deletions, an admin
+  // restores moderation removals.
+  restoredAt: {
+    type: Date
+  },
+  restoredBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  restoredByRole: {
+    type: String,
+    enum: ['trainer', 'admin']
   }
 });
 

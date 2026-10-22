@@ -1,7 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import '../utils/app_theme.dart';
+import '../utils/auth_tokens.dart';
+import '../widgets/auth/auth_dialog.dart';
+import '../widgets/auth/auth_page_route.dart';
+import '../widgets/auth/auth_scaffold.dart';
+import '../widgets/auth/auth_text_field.dart';
+import '../widgets/auth/barbell_indicator.dart';
+import '../widgets/auth/error_banner.dart';
+import '../widgets/auth/pressable_button.dart';
+import '../widgets/auth/shake_on_error.dart';
+import '../widgets/auth/staggered_entrance.dart';
 import 'register_screen.dart';
 import 'dashboard_screen.dart';
 
@@ -17,151 +26,134 @@ class _LoginScreenState extends State<LoginScreen>
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _obscurePassword = true;
   late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
+
+  int _failCount = 0;
+  bool _lockout = false;
+  int _lastPlates = 0;
 
   @override
   void initState() {
     super.initState();
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: AuthMotion.entranceTotalMs),
     );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
-    _animationController.forward();
+    _emailController.addListener(_onFieldChanged);
+    _passwordController.addListener(_onFieldChanged);
   }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_animationController.isDismissed) {
+      if (AuthMotion.reduced(context)) {
+        _animationController.value = 1;
+      } else {
+        _animationController.forward();
+      }
+    }
+  }
+
+  // Rebuild only when the plate count actually changes.
+  void _onFieldChanged() {
+    if (_plates != _lastPlates) setState(() => _lastPlates = _plates);
+  }
+
+  // Same rules as the validators below; drives the barbell plates only.
+  int get _plates {
+    final email = _emailController.text;
+    final password = _passwordController.text;
+    return (email.isNotEmpty && email.contains('@') ? 1 : 0) +
+        (password.length >= 6 ? 1 : 0);
+  }
+
+  void _fail() => setState(() => _failCount++);
 
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
-    final size = MediaQuery.of(context).size;
 
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(gradient: AppTheme.backgroundGradient),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Logo and Title
-                      _buildHeader(),
-                      const SizedBox(height: 50),
-
-                      // Login Card
-                      Container(
-                        decoration: AppTheme.glassMorphism,
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // Email Field
-                            _buildEmailField(),
-                            const SizedBox(height: 20),
-
-                            // Password Field
-                            _buildPasswordField(),
-                            const SizedBox(height: 30),
-
-                            // Login Button
-                            _buildLoginButton(authProvider),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // Register Link
-                      _buildRegisterLink(),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
+    return AuthScaffold(
+      entrance: _animationController,
+      step: '01 / Sign in',
+      header: _buildHeader(authProvider),
+      form: _buildForm(authProvider),
+      footer: _buildRegisterLink(),
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(AuthProvider authProvider) {
+    final compact = MediaQuery.sizeOf(context).height < 700;
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        // App Icon/Logo
-        Container(
-          width: 100,
-          height: 100,
-          decoration: BoxDecoration(
-            gradient: AppTheme.primaryGradient,
-            shape: BoxShape.circle,
-            boxShadow: AppTheme.glowShadow,
-          ),
-          child: const Icon(
-            Icons.fitness_center,
-            size: 50,
-            color: Colors.white,
-          ),
+        BarbellIndicator(
+          plates: _plates,
+          maxPlates: 2,
+          failTrigger: _failCount,
+          phase: _lockout
+              ? BarbellPhase.lockout
+              : authProvider.isLoading
+              ? BarbellPhase.working
+              : BarbellPhase.idle,
         ),
-        const SizedBox(height: 24),
-
-        // App Title
-        ShaderMask(
-          shaderCallback: (bounds) =>
-              AppTheme.primaryGradient.createShader(bounds),
-          child: const Text(
-            'LiftLog',
-            style: TextStyle(
-              fontSize: 48,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-              letterSpacing: 2,
-            ),
-          ),
+        SizedBox(height: compact ? AuthSpace.s : AuthSpace.m),
+        HeadlineReveal(
+          lines: const ['BACK UNDER', 'THE BAR.'],
+          fontSize: compact ? 48 : 60,
+          semanticsLabel: 'Back under the bar.',
         ),
-        const SizedBox(height: 8),
-
-        Text(
-          'Your Premium Fitness Companion',
-          style: TextStyle(
-            fontSize: 16,
-            color: AppTheme.textSecondary.withOpacity(0.8),
-            letterSpacing: 0.5,
+        const SizedBox(height: 12),
+        EntranceRise(
+          index: 0,
+          child: Text(
+            'Sign in to pick up where you left off.',
+            style: AuthType.body(),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildEmailField() {
-    return TextFormField(
-      controller: _emailController,
-      keyboardType: TextInputType.emailAddress,
-      style: const TextStyle(color: AppTheme.textPrimary),
-      decoration: InputDecoration(
-        labelText: 'Email',
-        prefixIcon: Container(
-          margin: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            gradient: AppTheme.primaryGradient,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Icon(
-            Icons.email_outlined,
-            color: Colors.white,
-            size: 20,
+  Widget _buildForm(AuthProvider authProvider) {
+    return ShakeOnError(
+      trigger: _failCount,
+      child: Form(
+        key: _formKey,
+        child: AutofillGroup(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              EntranceRise(index: 1, child: _buildEmailField()),
+              const SizedBox(height: AuthSpace.s),
+              EntranceRise(index: 2, child: _buildPasswordField()),
+              const SizedBox(height: AuthSpace.m),
+              EntranceRise(index: 3, child: _buildLoginButton(authProvider)),
+              // Special cases (unverified / pending) are handled by dialogs.
+              ErrorBanner(
+                message:
+                    authProvider.emailNotVerified ||
+                        authProvider.pendingApproval
+                    ? null
+                    : authProvider.error,
+              ),
+            ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildEmailField() {
+    return AuthTextField(
+      label: 'Email',
+      controller: _emailController,
+      keyboardType: TextInputType.emailAddress,
+      textInputAction: TextInputAction.next,
+      autofillHints: const [AutofillHints.email],
       validator: (value) {
         if (value == null || value.isEmpty) {
           return 'Please enter your email address.';
@@ -175,34 +167,16 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Widget _buildPasswordField() {
-    return TextFormField(
+    return AuthTextField(
+      label: 'Password',
       controller: _passwordController,
-      obscureText: _obscurePassword,
-      style: const TextStyle(color: AppTheme.textPrimary),
-      decoration: InputDecoration(
-        labelText: 'Password',
-        prefixIcon: Container(
-          margin: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            gradient: AppTheme.secondaryGradient,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Icon(Icons.lock_outline, color: Colors.white, size: 20),
-        ),
-        suffixIcon: IconButton(
-          icon: Icon(
-            _obscurePassword
-                ? Icons.visibility_outlined
-                : Icons.visibility_off_outlined,
-            color: AppTheme.textSecondary,
-          ),
-          onPressed: () {
-            setState(() {
-              _obscurePassword = !_obscurePassword;
-            });
-          },
-        ),
-      ),
+      obscurable: true,
+      textInputAction: TextInputAction.done,
+      autofillHints: const [AutofillHints.password],
+      onSubmitted: (_) {
+        final auth = Provider.of<AuthProvider>(context, listen: false);
+        if (!auth.isLoading && !_lockout) _login();
+      },
       validator: (value) {
         if (value == null || value.isEmpty) {
           return 'Please enter your password.';
@@ -216,122 +190,28 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Widget _buildLoginButton(AuthProvider authProvider) {
-    return Container(
-      height: 56,
-      decoration: BoxDecoration(
-        gradient: AppTheme.primaryGradient,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.primaryColor.withOpacity(0.4),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: ElevatedButton(
-        onPressed: authProvider.isLoading ? null : _login,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-        child: authProvider.isLoading
-            ? const SizedBox(
-                height: 24,
-                width: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              )
-            : const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Sign In',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1,
-                    ),
-                  ),
-                  SizedBox(width: 8),
-                  Icon(Icons.arrow_forward, size: 20),
-                ],
-              ),
-      ),
-    );
-  }
-
-  Widget _buildErrorMessage(String error) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppTheme.errorColor.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppTheme.errorColor.withOpacity(0.3),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.error_outline, color: AppTheme.errorColor, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              error,
-              style: const TextStyle(color: AppTheme.errorColor, fontSize: 14),
-            ),
-          ),
-        ],
-      ),
+    return PressableButton(
+      label: 'Sign In',
+      loading: authProvider.isLoading || _lockout,
+      onPressed: authProvider.isLoading || _lockout ? null : _login,
     );
   }
 
   Widget _buildRegisterLink() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          'Don\'t have an account? ',
-          style: TextStyle(
-            color: AppTheme.textSecondary.withOpacity(0.8),
-            fontSize: 14,
-          ),
-        ),
-        TextButton(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const RegisterScreen()),
-            );
-          },
-          style: TextButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-          ),
-          child: ShaderMask(
-            shaderCallback: (bounds) =>
-                AppTheme.primaryGradient.createShader(bounds),
-            child: const Text(
-              'Sign Up',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-        ),
-      ],
+    return AuthFooterLink(
+      prompt: 'Don\'t have an account?',
+      action: 'Sign Up',
+      onTap: () {
+        Navigator.push(
+          context,
+          AuthPageRoute(builder: (context) => const RegisterScreen()),
+        );
+      },
     );
   }
 
   void _login() async {
+    FocusScope.of(context).unfocus();
     if (_formKey.currentState!.validate()) {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final success = await authProvider.login(
@@ -341,6 +221,12 @@ class _LoginScreenState extends State<LoginScreen>
       );
 
       if (success && mounted) {
+        // Lockout: the bar lifts and holds for a beat, then we leave.
+        setState(() => _lockout = true);
+        if (!AuthMotion.reduced(context)) {
+          await Future<void>.delayed(AuthMotion.base + AuthMotion.lockoutHold);
+        }
+        if (!mounted) return;
         // Navigate to dashboard with fade transition
         Navigator.pushReplacement(
           context,
@@ -354,80 +240,58 @@ class _LoginScreenState extends State<LoginScreen>
             transitionDuration: const Duration(milliseconds: 500),
           ),
         );
+      } else if (!mounted) {
+        return;
       } else if (authProvider.pendingApproval) {
-        showDialog(
+        showAuthDialog<void>(
           context: context,
           barrierDismissible:
               false, // User must tap button to dismiss, so they read the message
-          builder: (context) => AlertDialog(
-            backgroundColor: Theme.of(context).colorScheme.surface,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            icon: Icon(
-              Icons.hourglass_top_rounded,
-              color: Colors.amber[600],
-              size: 50,
-            ),
-            title: const Text(
-              'Waiting for Admin Approval',
-              style: TextStyle(fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            content: const Text(
+          eyebrow: 'Pending review',
+          title: 'Waiting for Admin Approval',
+          message:
               'Your trainer registration was successful, and your email is verified! However, an administrator needs to review and approve your account before you can log in.\n\nPlease be patient, as this usually takes less than 24 hours.',
-              textAlign: TextAlign.center,
+          actions: (dialogContext) => [
+            AuthDialogAction(
+              label: 'I Understand',
+              primary: true,
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
             ),
-            actions: [
-              Center(
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.amber[600],
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                    child: const Text('I Understand'),
-                  ),
-                ),
-              ),
-            ],
-          ),
+          ],
         );
       } else if (authProvider.emailNotVerified) {
-        showDialog(
+        showAuthDialog<void>(
           context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Email Not Verified'),
-            content: const Text(
+          eyebrow: 'One more step',
+          title: 'Email Not Verified',
+          message:
               'Please verify your email address before logging in. Would you like to resend the verification email?',
+          actions: (dialogContext) => [
+            AuthDialogAction(
+              label: 'Cancel',
+              onPressed: () => Navigator.of(dialogContext).pop(),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () {
-                  authProvider.resendVerificationEmail(
-                    context,
-                    _emailController.text.trim(),
-                  );
-                  Navigator.of(context).pop();
-                },
-                child: const Text('Resend'),
-              ),
-            ],
-          ),
+            AuthDialogAction(
+              label: 'Resend',
+              primary: true,
+              onPressed: () {
+                authProvider.resendVerificationEmail(
+                  context,
+                  _emailController.text.trim(),
+                );
+                Navigator.of(dialogContext).pop();
+              },
+            ),
+          ],
         );
+      } else {
+        // Generic failure (the provider already showed the snackbar).
+        _fail();
       }
+    } else {
+      _fail();
     }
   }
 
