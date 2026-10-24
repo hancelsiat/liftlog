@@ -205,9 +205,10 @@ router.patch('/:id', verifyToken, checkRole(['member', 'trainer']), async (req, 
       return res.status(404).json({ error: 'We could not find this workout to update.' });
     }
 
-    // Authorization check (copied from admin logic)
+    // Owner (member log / trainer template or assigned copy), or the trainer
+    // of the member who owns this personal log.
     const isOwner = workout.user?.equals(req.user._id) || workout.trainer?.equals(req.user._id);
-    const canTrainerEdit = req.user.role === 'trainer' && !!workout.user;
+    const canTrainerEdit = !isOwner && await isTrainerOfLogOwner(req.user, workout);
 
     if (!isOwner && !canTrainerEdit) {
       return res.status(403).json({ error: 'You do not have permission to update this workout.' });
@@ -263,22 +264,25 @@ router.delete('/:id', verifyToken, checkRole(['member', 'trainer']), async (req,
       return res.status(404).json({ error: 'We could not find this workout to delete.' });
     }
 
-    // Authorization check (copied from update logic)
+    // Same rules as update.
     const isOwner = workout.user?.equals(req.user._id) || workout.trainer?.equals(req.user._id);
-    const canTrainerDelete = req.user.role === 'trainer' && !!workout.user;
+    const canTrainerDelete = !isOwner && await isTrainerOfLogOwner(req.user, workout);
 
     if (!isOwner && !canTrainerDelete) {
       return res.status(403).json({ error: 'You do not have permission to delete this workout.' });
     }
 
-    if (workout.isTemplate) {
-      // Trainer templates are soft deleted so admins can see in Content
-      // moderation that the trainer deleted them.
+    if (isModeratedByTrainer(workout, req.user)) {
+      // Trainer templates and workouts the trainer assigned to a member are
+      // soft deleted so admins can see in Content moderation that the trainer
+      // deleted them. Hidden from the member's plan and the trainer's views.
       workout.isDeleted = true;
       workout.deletedBy = req.user._id;
       workout.deletedByRole = 'trainer';
       workout.deletedAt = new Date();
-      workout.deletionReason = 'Deleted by the trainer.';
+      workout.deletionReason = workout.isTemplate
+        ? 'Deleted by the trainer.'
+        : 'Removed from the member\'s plan by the trainer.';
       await workout.save({ validateBeforeSave: false });
     } else {
       // Personal workout logs are not moderated content: remove them.
@@ -307,25 +311,32 @@ router.delete('/', verifyToken, checkRole(['trainer']), async (req, res) => {
       isDeleted: { $ne: true }
     };
 
-    // Templates are soft deleted so admins can see in Content moderation
-    // that the trainer deleted them.
+    // Templates and copies assigned to members are soft deleted so admins can
+    // see in Content moderation that the trainer deleted them.
+    const deletedAt = new Date();
+    const softFields = {
+      isDeleted: true,
+      deletedBy: req.user._id,
+      deletedByRole: 'trainer',
+      deletedAt
+    };
     const softResult = await Workout.updateMany(
       { ...ownFilter, isTemplate: true },
-      {
-        $set: {
-          isDeleted: true,
-          deletedBy: req.user._id,
-          deletedByRole: 'trainer',
-          deletedAt: new Date(),
-          deletionReason: 'Deleted by the trainer.'
-        }
-      }
+      { $set: { ...softFields, deletionReason: 'Deleted by the trainer.' } }
     );
-    // Anything else (non-template copies) is removed as before.
-    const hardResult = await Workout.deleteMany({ ...ownFilter, isTemplate: { $ne: true } });
+    const softCopyResult = await Workout.updateMany(
+      { ...ownFilter, isTemplate: { $ne: true }, assignedTo: { $exists: true, $ne: null } },
+      { $set: { ...softFields, deletionReason: 'Removed from the member\'s plan by the trainer.' } }
+    );
+    // Anything else (the trainer's own personal logs) is removed as before.
+    const hardResult = await Workout.deleteMany({
+      ...ownFilter,
+      isTemplate: { $ne: true },
+      $or: [{ assignedTo: { $exists: false } }, { assignedTo: null }]
+    });
 
-    const deletedCount =
-      (softResult.modifiedCount || softResult.nModified || 0) + (hardResult.deletedCount || 0);
+    const modified = (r) => r.modifiedCount || r.nModified || 0;
+    const deletedCount = modified(softResult) + modified(softCopyResult) + (hardResult.deletedCount || 0);
 
     if (deletedCount === 0) {
       return res.status(404).json({ error: 'No matching workouts found to delete' });
@@ -338,6 +349,21 @@ router.delete('/', verifyToken, checkRole(['trainer']), async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// True when a trainer may edit/delete a member's personal log: the log has
+// an owner (`user`) and that member's current trainer is this trainer.
+async function isTrainerOfLogOwner(user, workout) {
+  if (user.role !== 'trainer' || !workout.user) return false;
+  const owner = await User.findById(workout.user).select('trainer');
+  return !!owner && String(owner.trainer) === String(user._id);
+}
+
+// Trainer content admins moderate: the trainer's templates and the copies
+// they assigned to members (both carry `trainer`).
+function isModeratedByTrainer(workout, user) {
+  if (user.role !== 'trainer' || !workout.trainer?.equals(user._id)) return false;
+  return !!workout.isTemplate || !!workout.assignedTo;
+}
 
 function markRestored(workout, user, role) {
   workout.isDeleted = false;
@@ -483,6 +509,15 @@ const escapeHtml = (value) => String(value == null ? '' : value)
   .replace(/"/g, '&quot;')
   .replace(/'/g, '&#39;');
 
+// Workouts shown in admin moderation: trainer templates and the copies a
+// trainer assigned to a member. Members' own personal logs are not listed.
+const MODERATED_WORKOUTS = {
+  $or: [
+    { isTemplate: true },
+    { isTemplate: { $ne: true }, assignedTo: { $exists: true, $ne: null } }
+  ]
+};
+
 const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // Admin: list trainer-created workouts for moderation
@@ -496,7 +531,8 @@ router.get('/admin/all', verifyToken, checkRole(['admin']), async (req, res) => 
       return res.status(400).json({ error: 'Invalid status filter. Use active, deleted, trainer or all.' });
     }
 
-    const query = { isTemplate: true };
+    // Trainer templates plus the copies trainers assigned to members.
+    const query = { $and: [MODERATED_WORKOUTS] };
     if (status === 'active') query.isDeleted = { $ne: true };
     if (status === 'deleted') query.isDeleted = true;
     if (status === 'trainer') {
@@ -513,17 +549,22 @@ router.get('/admin/all', verifyToken, checkRole(['admin']), async (req, res) => 
     const search = (req.query.search || '').toString().trim();
     if (search) {
       const rx = new RegExp(escapeRegex(search), 'i');
-      const matchingTrainers = await User.find({ username: rx, role: 'trainer' }).select('_id');
-      query.$or = [
-        { title: rx },
-        { description: rx },
-        { 'exercises.name': rx },
-        { trainer: { $in: matchingTrainers.map((t) => t._id) } }
-      ];
+      const matchingUsers = await User.find({ username: rx, role: { $in: ['trainer', 'member'] } }).select('_id');
+      const userIds = matchingUsers.map((u) => u._id);
+      query.$and.push({
+        $or: [
+          { title: rx },
+          { description: rx },
+          { 'exercises.name': rx },
+          { trainer: { $in: userIds } },
+          { assignedTo: { $in: userIds } }
+        ]
+      });
     }
 
     const workouts = await Workout.find(query)
       .populate('trainer', 'username email')
+      .populate('assignedTo', 'username')
       .populate('deletedBy', 'username')
       .populate('restoredBy', 'username')
       .sort({ createdAt: -1 })
@@ -540,9 +581,9 @@ router.get('/admin/all', verifyToken, checkRole(['admin']), async (req, res) => 
     workouts.forEach((w) => { w.assignedCount = countMap.get(w._id.toString()) || 0; });
 
     const [activeCount, deletedCount, trainerDeletedCount] = await Promise.all([
-      Workout.countDocuments({ isTemplate: true, isDeleted: { $ne: true } }),
-      Workout.countDocuments({ isTemplate: true, isDeleted: true }),
-      Workout.countDocuments({ isTemplate: true, isDeleted: true, deletedByRole: 'trainer' })
+      Workout.countDocuments({ ...MODERATED_WORKOUTS, isDeleted: { $ne: true } }),
+      Workout.countDocuments({ ...MODERATED_WORKOUTS, isDeleted: true }),
+      Workout.countDocuments({ ...MODERATED_WORKOUTS, isDeleted: true, deletedByRole: 'trainer' })
     ]);
 
     res.json({ workouts, activeCount, deletedCount, trainerDeletedCount });
@@ -611,7 +652,8 @@ router.delete('/admin/:id', verifyToken, checkRole(['admin']), async (req, res) 
 
     // Notify the relevant user (owner or assigned trainer)
     try {
-      const ownerId = workout.user || workout.assignedTo || workout.trainer;
+      // The trainer owns templates and assigned copies; personal logs belong to `user`.
+      const ownerId = workout.trainer || workout.user || workout.assignedTo;
       const owner = await User.findById(ownerId).select('email username');
       const ownerEmail = owner ? owner.email : null;
       if (ownerEmail) {
@@ -696,7 +738,8 @@ router.post('/admin/:id/restore', verifyToken, checkRole(['admin']), async (req,
     }
 
     try {
-      const ownerId = workout.user || workout.assignedTo || workout.trainer;
+      // The trainer owns templates and assigned copies; personal logs belong to `user`.
+      const ownerId = workout.trainer || workout.user || workout.assignedTo;
       const owner = await User.findById(ownerId).select('email username');
       if (owner && owner.email) {
         await emailService.sendEmail(owner.email, 'Your workout has been restored', `

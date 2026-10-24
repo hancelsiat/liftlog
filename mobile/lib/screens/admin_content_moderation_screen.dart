@@ -74,6 +74,11 @@ String _formatDate(dynamic value) {
 bool _deletedByTrainer(Map<String, dynamic> item) =>
     item['isDeleted'] == true && item['deletedByRole'] == 'trainer';
 
+/// True for a workout a trainer assigned to a member (a copy of a template),
+/// as opposed to the trainer's own template.
+bool _isAssignedCopy(Map<String, dynamic> item) =>
+    item['isTemplate'] != true && item['assignedTo'] != null;
+
 /// True when the trainer deleted it permanently (only the record is left).
 bool _purged(Map<String, dynamic> item) => item['purgedAt'] != null;
 
@@ -513,9 +518,16 @@ class _ModerationListState extends State<_ModerationList>
           title:
               'Deleted by trainer $trainer · ${_formatDate(item['deletedAt'])}',
           lines: [
-            'Remark: the trainer deleted this from their own library. '
-                'It is hidden from members and kept here for monitoring.',
-            if (_purged(item))
+            if (_isAssignedCopy(item))
+              'Remark: the trainer removed this from '
+                  '${_nameOf(item['assignedTo'], fallback: 'the member')}\'s plan. '
+                  'It is hidden from the member and kept here for monitoring.'
+            else
+              'Remark: the trainer deleted this from their own library. '
+                  'It is hidden from members and kept here for monitoring.',
+            if (_isAssignedCopy(item))
+              'The trainer can assign the workout again if needed.'
+            else if (_purged(item))
               'The trainer deleted it permanently '
                   '(${_formatDate(item['purgedAt'])}). It cannot be restored.'
             else
@@ -740,6 +752,17 @@ class _ModerationListState extends State<_ModerationList>
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList();
     final assigned = (w['assignedCount'] as num?)?.toInt() ?? 0;
+    final copy = _isAssignedCopy(w);
+    final assignedLine = copy
+        ? ' · assigned to ${_nameOf(w['assignedTo'], fallback: 'a member')}'
+        : (assigned > 0 ? ' · assigned to $assigned' : '');
+    final deletedLine = !_deletedByTrainer(w)
+        ? ''
+        : copy
+        ? '\nREMOVED FROM PLAN BY TRAINER'
+        : (_purged(w)
+              ? '\nPERMANENTLY DELETED BY TRAINER'
+              : '\nDELETED BY TRAINER');
 
     final showBox = _selecting && !deleted;
     return PressableSurface(
@@ -768,9 +791,9 @@ class _ModerationListState extends State<_ModerationList>
             padding: const EdgeInsets.only(top: 6),
             child: Text(
               'By ${_nameOf(w['trainer'])} · ${exercises.length} exercise(s)'
-              '${assigned > 0 ? ' · assigned to $assigned' : ''}\n'
-              '${_formatDate(w['createdAt'])}'
-              '${_deletedByTrainer(w) ? (_purged(w) ? '\nPERMANENTLY DELETED BY TRAINER' : '\nDELETED BY TRAINER') : ''}'
+              '$assignedLine\n'
+              '${copy ? 'ASSIGNED COPY · ' : ''}${_formatDate(w['createdAt'])}'
+              '$deletedLine'
               '${w['isDeleted'] != true && w['restoredAt'] != null ? '\nRESTORED BY ${w['restoredByRole'] == 'admin' ? 'ADMIN' : 'TRAINER'}' : ''}',
               style: AuthType.body(size: 12),
             ),
