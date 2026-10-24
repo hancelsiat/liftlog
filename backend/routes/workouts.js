@@ -62,7 +62,7 @@ router.get('/', verifyToken, async (req, res) => {
       endDate
     } = req.query;
 
-    const query = { user: req.user._id, isTemplate: { $ne: true } };
+    const query = { user: req.user._id, isTemplate: { $ne: true }, isDeleted: { $ne: true } };
 
     if (startDate && endDate) {
       query.date = {
@@ -176,11 +176,15 @@ router.get('/trainer/:trainerId', verifyToken, checkRole(['all']), async (req, r
 // Get a specific workout by ID
 router.get('/:id', verifyToken, async (req, res) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(404).json({ error: 'We could not find this workout.' });
+    }
     const workout = await Workout.findById(req.params.id)
       .populate('trainer', 'username')
       .populate('user', 'username');
 
-    if (!workout) {
+    // Removed workouts are only visible to admins (moderation screen).
+    if (!workout || (workout.isDeleted && req.user.role !== 'admin')) {
       return res.status(404).json({ error: 'We could not find this workout.' });
     }
 
@@ -450,12 +454,16 @@ router.get('/user/:userId',
 // Mark a workout as complete
 router.post('/:workoutId/complete', verifyToken, checkRole(['member']), async (req, res) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.workoutId)) {
+      return res.status(404).json({ error: 'We could not find this workout.' });
+    }
     const workout = await Workout.findById(req.params.workoutId);
-    if (!workout) {
+    // Removed workouts are hidden from the member's plan; they can't be completed.
+    if (!workout || workout.isDeleted) {
       return res.status(404).json({ error: 'We could not find this workout.' });
     }
 
-    if (workout.assignedTo.toString() !== req.user._id.toString()) {
+    if (!workout.assignedTo || workout.assignedTo.toString() !== req.user._id.toString()) {
       return res.status(403).json({ error: 'You do not have permission to mark this workout as complete.' });
     }
 

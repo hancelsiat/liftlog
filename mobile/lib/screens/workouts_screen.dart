@@ -26,6 +26,21 @@ class _WorkoutsScreenState extends State<WorkoutsScreen>
   List<Workout> _assignedWorkouts = [];
   List<Map<String, dynamic>> _trainers = [];
   User? _user;
+
+  /// Search text for the "Choose a Trainer" list (filtered on the device).
+  String _trainerQuery = '';
+
+  /// Trainers matching the search by username, full name, email or bio.
+  List<Map<String, dynamic>> get _visibleTrainers => _trainers
+      .where(
+        (t) => matchesSearch(_trainerQuery, [
+          t['username']?.toString(),
+          t['fullName']?.toString(),
+          t['email']?.toString(),
+          t['bio']?.toString(),
+        ]),
+      )
+      .toList();
   TabController? _tabController;
 
   @override
@@ -98,6 +113,7 @@ class _WorkoutsScreenState extends State<WorkoutsScreen>
       if (mounted) {
         setState(() {
           _user = authProvider.user;
+          _trainerQuery = '';
           _loadFuture = _fetchAssignedWorkouts();
         });
       }
@@ -238,6 +254,7 @@ class _WorkoutsScreenState extends State<WorkoutsScreen>
         setState(() {
           _user = authProvider.user;
           _assignedWorkouts.clear(); // Clear old workouts
+          _trainerQuery = ''; // The search box is rebuilt empty
           _loadFuture = _loadTrainers();
         });
       }
@@ -284,7 +301,18 @@ class _WorkoutsScreenState extends State<WorkoutsScreen>
               controller: _tabController!,
               tabs: const ['Assigned', 'Completed'],
             )
-          : null,
+          : Padding(
+              padding: const EdgeInsets.fromLTRB(
+                GymScaffold.side,
+                0,
+                GymScaffold.side,
+                AuthSpace.xs,
+              ),
+              child: GymSearchField(
+                hint: 'Search trainer name, email or bio',
+                onChanged: (q) => setState(() => _trainerQuery = q.trim()),
+              ),
+            ),
       body: FutureBuilder<void>(
         future: _loadFuture,
         builder: (context, snapshot) {
@@ -378,13 +406,27 @@ class _WorkoutsScreenState extends State<WorkoutsScreen>
       );
     }
 
+    final visible = _visibleTrainers;
+    if (visible.isEmpty) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(height: MediaQuery.sizeOf(context).height * 0.12),
+          GymEmptyState(
+            icon: Icons.search_off,
+            message: 'No trainers match "$_trainerQuery".',
+          ),
+        ],
+      );
+    }
+
     return ListView.separated(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: _listPadding,
-      itemCount: _trainers.length,
+      itemCount: visible.length,
       separatorBuilder: (context, index) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
-        final trainer = _trainers[index];
+        final trainer = visible[index];
         return StaggeredReveal(
           index: index,
           child: _TrainerCard(

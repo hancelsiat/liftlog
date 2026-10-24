@@ -1,5 +1,6 @@
 
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const User = require('../models/User');
 const Workout = require('../models/Workout');
@@ -18,7 +19,36 @@ router.get('/', verifyToken, checkRole(['trainer']), async (req, res) => {
 // Get a client's progress
 router.get('/:memberId/progress', verifyToken, checkRole(['trainer']), async (req, res) => {
   try {
-    const progress = await Workout.find({ assignedTo: req.params.memberId }).populate('trainer', 'username');
+    const { memberId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(memberId)) {
+      return res.status(404).json({ error: 'We could not find this client in our records.' });
+    }
+
+    // Only the member's current trainer, or a trainer who still has them in
+    // their client list (e.g. the member left), can see their plan.
+    const [trainer, member] = await Promise.all([
+      User.findById(req.user._id).select('clients'),
+      User.findById(memberId).select('trainer')
+    ]);
+    if (!member) {
+      return res.status(404).json({ error: 'We could not find this client in our records.' });
+    }
+    const trainerId = String(req.user._id);
+    const isCurrentTrainer = String(member.trainer) === trainerId;
+    const isInClientList = !!trainer && (trainer.clients || []).some((c) => String(c) === memberId);
+    if (!isCurrentTrainer && !isInClientList) {
+      return res.status(403).json({ error: 'This member is not one of your clients.' });
+    }
+
+    // Hide copies removed by admin moderation (or by the trainer deleting a
+    // template with its copies), same as the member's own plan (/workouts/my-plan).
+    const progress = await Workout.find({
+      assignedTo: memberId,
+      isTemplate: { $ne: true },
+      isDeleted: { $ne: true }
+    })
+      .populate('trainer', 'username')
+      .sort({ date: -1 });
     res.json(progress);
   } catch (error) {
     res.status(500).json({ error: error.message });
